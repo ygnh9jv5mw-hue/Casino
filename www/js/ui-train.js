@@ -27,7 +27,8 @@
       ${it('index', '✦', 'Index trainer', 'Illustrious 18 + Fab 4 at live counts', Math.round(A.idxPct() * 100) + '%')}
       ${it('recall', '#', 'Index recall', 'Name the exact number', b.recall ? 'best ' + b.recall : '')}
       <h3 class="sec">Simulation & tools</h3>
-      ${it('shoe', '🂡', 'Shoe simulator', 'Count, bet and play a real shoe — with heat', S.shoe.hands ? S.shoe.hands + ' hands' : '')}
+      ${it('shoe', '🂡', B.isDD() ? 'Double-deck simulator' : 'Shoe simulator', B.isDD() ? 'Your game: burn card, random cut, pitch dealing, count checks' : 'Count, bet and play a real shoe — with heat', S.shoe.hands ? S.shoe.hands + ' hands' : '')}
+      ${it('casino', '♣', 'Casino table', '6-deck shoe, real procedures: the cut, cut card, burn, shuffle', S.casino ? A.fmt$(S.casino.bank) : '')}
       ${it('chart', '☷', 'Strategy charts', 'For your table rules')}
       ${it('bankroll', '$', 'Bankroll & risk of ruin', 'Hourly win, swings, survival odds')}`,
       mount: A.bindGo

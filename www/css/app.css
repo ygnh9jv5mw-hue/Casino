@@ -328,3 +328,23 @@ body.sub main { padding-bottom: calc(var(--sb) + 18px); }
 .others { gap: 4px; } .oseat { min-width: 52px; padding: 3px; } .cards.mini .pc + .pc { margin-left: -22px; }
 .chart { table-layout: fixed; } .chart tr > :first-child { width: 14%; }
 .tray.dd .tray-in { height: 80px; }
+
+/* ---------- casino table ---------- */
+.shoebox { position: relative; }
+.cutmark { position: absolute; left: -4px; right: -4px; height: 3px; background: var(--gold); border-radius: 2px; box-shadow: 0 0 6px #f4c55aaa; }
+.cutmark.h { top: -6px; bottom: -6px; left: 50%; right: auto; width: 4px; height: auto; transform: translateX(-2px); }
+.cutpill { margin: -4px auto 8px; width: max-content; max-width: 92%; background: #f4c55a; color: #241800; font: 800 11px var(--font); letter-spacing: .4px; padding: 5px 10px; border-radius: 99px; animation: pop .4s; box-shadow: 0 4px 12px #0007; }
+.ceremony { padding: 20px 16px; }
+.cutstack { position: relative; height: 70px; margin: 16px 0 14px; border-radius: 8px; cursor: pointer;
+  background: repeating-linear-gradient(90deg, #f6f1e2 0 2px, #cfc5a6 2px 3px); box-shadow: 0 6px 16px #0008, inset 0 -6px 10px #0002; }
+.cutstack .cs-hint { position: absolute; inset: 0; display: grid; place-items: center; color: #3a2f12; font: 800 12px var(--font); letter-spacing: 1.5px; text-transform: uppercase; opacity: .65; }
+.cutstack.placed { cursor: default; }
+.riffle { position: relative; height: 70px; width: 140px; margin: 6px auto 14px; }
+.riffle i { position: absolute; top: 14px; width: 54px; height: 40px; border-radius: 5px; background: repeating-linear-gradient(0deg, #f6f1e2 0 2px, #cfc5a6 2px 3px); box-shadow: 0 4px 10px #0007; }
+.riffle i:nth-child(1) { left: 6px; animation: rifL .8s ease-in-out infinite alternate; } .riffle i:nth-child(2) { right: 6px; animation: rifR .8s ease-in-out infinite alternate; }
+.riffle i:nth-child(3) { left: 43px; top: 30px; opacity: .9; animation: rifM .8s ease-in-out infinite alternate; }
+@keyframes rifL { to { transform: translateX(22px) rotate(-6deg); } } @keyframes rifR { to { transform: translateX(-22px) rotate(6deg); } } @keyframes rifM { to { transform: translateY(-12px); } }
+.shoesum { padding: 12px 14px; } .shoesum .stats { margin: 8px 0 4px; } .shoesum .stats b { font-size: 16px; } .shoesum details summary { color: var(--gold); padding: 6px 0; }
+.betbtns { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; margin-top: 4px; } .betbtns .btn { margin: 0; padding: 13px 6px; font-size: 15px; } .betbtns .btn:disabled { opacity: .4; }
+.place .pend { font: 900 20px var(--round); color: #fff; }
+.chip:disabled { opacity: .3; }

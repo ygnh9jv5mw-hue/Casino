@@ -59,9 +59,9 @@
         ${tile('strategy', '♠', 'Strategy', Math.round(A.masteryPct('all') * 100) + '% mastered')}
         ${tile('blitz', '⚡', 'Blitz', 'best ' + S.best.blitz)}
         ${tile('reflex', '±', 'Reflex', 'best ' + S.best.reflex)}
-        ${tile('deck', '🂠', 'Deck count', S.best.deck !== null ? S.best.deck.toFixed(1) + 's' : '—')}
+        ${tile('casino', '♣', 'Casino', S.casino ? A.fmt$(S.casino.bank) : '6 decks')}
         ${tile('tc', '÷', 'True count', S.best.tc !== null ? S.best.tc.toFixed(1) + 's' : '—')}
-        ${tile('shoe', '🂡', 'Shoe sim', S.shoe.hands + ' hands')}
+        ${tile('shoe', '🂡', A.B.isDD() ? 'Double deck' : 'Shoe sim', S.shoe.hands + ' hands')}
       </div>
 
       <h3 class="sec">Casino-ready</h3>

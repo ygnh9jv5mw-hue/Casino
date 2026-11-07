@@ -11,6 +11,8 @@ A card-counting training app built to make people learn fast:
 - **Counting gym** — Reflex, Pair cancellation, Deck countdown, Speed ladder, Table flash.
 - **True count & betting** — conversion, tray reading, bet ramp.
 - **Index plays** — Illustrious 18 + Fab 4 trainer and exact-number recall.
+- **Casino table** — a normal 6-deck game with a chip bankroll and real shoe procedures: shuffle, the player cut,
+  cut card placed at a random depth, burn card, last hand when the cut card comes out, then a fresh shuffle.
 - **Shoe simulator** — 6/8 decks, up to 5 other players, animated dealing, count checks, bet grading,
   index-play grading, decision clock, table chatter and a heat meter that can get you backed off.
 - **Course** — 8 modules, 25 lessons with key takeaways, a quiz per module.
