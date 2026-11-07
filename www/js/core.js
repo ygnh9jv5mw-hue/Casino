@@ -14,7 +14,7 @@
   const KEY = 'bjmc.v2';
   const DEF = () => ({
     v: 2,
-    prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, sound: true, haptics: true, remind: '', unlockTo: 1 },
+    prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, remind: '', unlockTo: 1 },
     xp: 0, xpDay: { d: '', xp: 0 }, goalDays: [], days: [],
     done: {}, quiz: {}, campDone: {},
     best: { strat: 0, blitz: 0, reflex: 0, pairs: 0, deck: null, ladder: 0, flash: 0, tc: null, decks: 0, ramp: 0, recall: 0, index: 0, shoeClean: 0 },
@@ -39,7 +39,7 @@
   }
   load();
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
-  const applyRules = () => B.setRules({ h17: !!S.prof.h17, ls: !!S.prof.ls });
+  const applyRules = () => B.setRules({ h17: !!S.prof.h17, ls: !!S.prof.ls, decks: S.prof.decks === 2 ? 2 : 6 });
   applyRules();
 
   // ---------------- XP, ranks, daily goal ----------------

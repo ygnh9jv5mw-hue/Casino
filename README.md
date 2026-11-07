@@ -4,6 +4,8 @@ A card-counting training app built to make people learn fast:
 
 - **Bootcamp** — 14 stages from zero to casino-ready that unlock on results, not days.
 - **Daily workout** — a mixed, back-to-back drill session built from your current stage.
+- **Double deck or shoe** — pick your game: double-deck charts and index numbers (computed with the EV engine in
+  `tools/strategy-calc`), double-deck bet ramp, burn card, random cut and pitch (face-down) dealing in the simulator.
 - **Adaptive basic strategy** — spaced repetition over all 280 chart cells, with an explanation for every miss
   and a mastery map. Supports H17/S17 and surrender on/off (verified against the published charts).
 - **Counting gym** — Reflex, Pair cancellation, Deck countdown, Speed ladder, Table flash.

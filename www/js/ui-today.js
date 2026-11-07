@@ -125,7 +125,10 @@
         ${choice('goal', 100, 'Casual · 100 XP', 'About 10 minutes a day')}
         ${choice('goal', 250, 'Serious · 250 XP', 'About 20 minutes a day')}
         ${choice('goal', 500, 'Intense · 500 XP', '40+ minutes — the fastest path')}`,
-      () => `<h2>What rules will you play?</h2><p class="muted">Every chart and drill adapts. Most US shoe games are H17. Check the felt: "Dealer hits soft 17".</p>
+      () => `<h2>What game do you play?</h2><p class="muted">Basic strategy, index numbers, the bet ramp and the simulator all change with the number of decks.</p>
+        ${choice('decks', 2, 'Double deck', 'Two decks — usually hand-held, burn card, cut card at a random depth')}
+        ${choice('decks', 6, 'Shoe game', '6 or 8 decks dealt from a shoe')}`,
+      () => `<h2>What rules will you play?</h2><p class="muted">Every chart and drill adapts. Most US games are H17. Check the felt: "Dealer hits soft 17".</p>
         ${choice('h17', 1, 'Dealer hits soft 17 (H17)', 'Most common in the US')}
         ${choice('h17', 0, 'Dealer stands on all 17s (S17)', 'Better game, found at higher limits')}`,
       () => `<div class="ob-hero"><div class="logo">✓</div><h2>You're set.</h2><p class="muted">Your first stage is ready, and so is today's workout.</p></div>
@@ -139,6 +142,7 @@
         if (k === 'level') { S.prof.level = v; S.prof.unlockTo = v === 'counter' ? 9 : v === 'basic' ? 5 : 1; }
         if (k === 'goal') S.prof.goal = +v;
         if (k === 'h17') { S.prof.h17 = v === '1'; A.applyRules(); }
+        if (k === 'decks') { S.prof.decks = +v; S.prof.gameAsked = true; A.applyRules(); }
         A.save(); A.fx.tap(); step++; draw(root);
       }));
       const dn = $('[data-done]', root); if (dn) dn.onclick = () => { S.prof.onboarded = true; A.save(); close(); A.render(); };
@@ -146,6 +150,19 @@
     const close = A.sheet('<div class="ob" data-lock></div>', (r) => draw(r));
   }
   A.onboard = onboard;
+
+  // one-time question for players who set up before double-deck support existed
+  A.askGame = () => {
+    const S = A.S;
+    A.sheet(`<div class="kicker">New in this version</div><h2 class="m0">What game do you play?</h2>
+      <p class="muted">Double-deck basic strategy, index numbers and betting are different. Pick your game and everything adapts — you can change it any time in Settings.</p>
+      <div class="opts"><button class="opt" data-g="2"><b>Double deck</b><small>Two decks, burn card, cut card at a random depth</small></button>
+      <button class="opt" data-g="6"><b>Shoe game</b><small>6 or 8 decks dealt from a shoe</small></button></div>`, (r, close) => {
+      r.querySelector('.sheet').setAttribute('data-lock', '1');
+      $$('[data-g]', r).forEach((b) => (b.onclick = () => { S.prof.decks = +b.dataset.g; S.prof.gameAsked = true; S.prof.shoe = null; A.applyRules(); A.save(); close(); A.render(); A.toast(`Set up for ${B2().rulesLabel()}`, 'good'); }));
+    });
+  };
+  const B2 = () => A.B;
 
   // ---------------- settings ----------------
   SCREENS.settings = () => {
@@ -155,9 +172,10 @@
       title: 'Settings',
       html: `
         <h3 class="sec">Table rules</h3>
-        <div class="card"><label>Dealer on soft 17</label>${seg('h17', [[true, 'Hits (H17)'], [false, 'Stands (S17)']])}
+        <div class="card"><label>Game</label>${seg('decks', [[2, 'Double deck'], [6, 'Shoe (6–8 decks)']])}
+          <label>Dealer on soft 17</label>${seg('h17', [[true, 'Hits (H17)'], [false, 'Stands (S17)']])}
           <label>Late surrender</label>${seg('ls', [[true, 'Offered'], [false, 'Not offered']])}
-          <p class="tiny muted">4–8 decks, double after split allowed. Charts, drills, index plays and the shoe simulator all follow these rules.</p></div>
+          <p class="tiny muted">${esc(A.B.rulesLabel())}. Charts, drills, index numbers, the bet ramp and the shoe simulator all follow these rules.</p></div>
         <h3 class="sec">Training</h3>
         <div class="card"><label>Daily goal</label>${seg('goal', [[100, 'Casual 100'], [250, 'Serious 250'], [500, 'Intense 500']])}
           <label>Starting point</label>${seg('unlockTo', [[1, 'Stage 1'], [5, 'Stage 5'], [9, 'Stage 9']])}
@@ -172,7 +190,8 @@
       mount(root) {
         $$('[data-set]', root).forEach((g) => $$('button', g).forEach((b) => (b.onclick = () => {
           const k = g.dataset.set, raw = b.dataset.v; p[k] = raw === 'true' ? true : raw === 'false' ? false : +raw;
-          if (k === 'h17' || k === 'ls') A.applyRules();
+          if (k === 'decks') { p.gameAsked = true; p.shoe = null; }
+          if (k === 'h17' || k === 'ls' || k === 'decks') A.applyRules();
           A.save(); A.replace('settings', {});
         })));
         $$('[data-sw]', root).forEach((b) => (b.onclick = () => { p[b.dataset.sw] = !p[b.dataset.sw]; A.save(); b.classList.toggle('on', p[b.dataset.sw]); A.fx.tap(); }));

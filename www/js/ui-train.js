@@ -72,7 +72,7 @@
         <div id="tb" class="tbar ${pressure ? '' : 'hide'}"><i></i></div>
         ${felt(`<div class="lbl">Dealer</div><div class="cards" id="dl"></div><div class="lbl">You</div><div class="cards" id="pl"></div><div class="tot" id="pt"></div>`, 'flashable')}
         ${actBtns()}
-        <div id="fb" class="fb info">${B.rules().h17 ? 'H17' : 'S17'} · DAS · ${B.rules().ls ? 'late surrender' : 'no surrender'}</div>
+        <div id="fb" class="fb info">${esc(B.rulesLabel())}</div>
         <div class="row-sb small"><button class="linkbtn" id="prs">Pressure: off</button><button class="linkbtn" data-go2="chart">Chart</button></div>`,
       mount(root) {
         const upd = () => {
@@ -354,16 +354,23 @@
   };
 
   // ---------- discard tray graphic ----------
-  function tray(played, total = 6) {
+  function tray(played, total = gameDecks()) {
     const h = Math.round((played / total) * 100);
-    return `<div class="tray"><div class="tray-in"><div class="stack" style="height:${h}%"></div></div><div class="tray-lbl">${total}-deck discard tray</div></div>`;
+    return `<div class="tray ${total <= 2 ? 'dd' : ''}"><div class="tray-in"><div class="stack" style="height:${h}%"></div></div><div class="tray-lbl">${total}-deck discard tray</div></div>`;
   }
   A.tray = tray;
+  const gameDecks = () => (B.isDD() ? 2 : 6);
+  // decks left for drills: half decks in a 6-deck shoe; half decks (TC) or quarter decks (tray) in double deck
+  const randLeft = (quarter) => (B.isDD() ? (quarter ? (1 + rnd(7)) / 4 : (1 + rnd(3)) / 2) : (1 + rnd(11)) / 2);
 
   // ---------- True count ----------
   SCREENS.tc = (args) => {
     const S = A.S, N = 10; let q = 0, ok = 0, times = [], cur, t0, hard = false;
-    const make = () => { const left = (1 + rnd(11)) / 2; const rc = Math.round((Math.random() * 2 - 1) * 4 * left + (Math.random() < 0.5 ? rnd(6) : 0)); cur = { left, rc, ans: B.trueCount(rc, left) }; };
+    const make = () => {
+      const left = randLeft(false), dd = B.isDD();
+      const rc = dd ? (rnd(2) ? 1 : -1) * (1 + rnd(9)) : Math.round((Math.random() * 2 - 1) * 4 * left + (Math.random() < 0.5 ? rnd(6) : 0));
+      cur = { left, rc, ans: B.trueCount(rc, left) };
+    };
     return {
       title: 'True Count',
       html: `<div class="seg" id="md"><button class="on" data-v="0">Decks left shown</button><button data-v="1">Read the tray</button></div><div id="tw"></div>`,
@@ -380,7 +387,7 @@
             setTimeout(ask, good ? 600 : 1700);
           }, { label: 'Enter true count', small: true });
           tw.innerHTML = `<div class="qprog">${Array.from({ length: N }, (_, j) => `<i class="${j < q ? 'on' : j === q ? 'cur' : ''}"></i>`).join('')}</div>
-            <div class="felt tcfelt"><div class="lbl">Running count</div><div class="rc">${sgn(cur.rc)}</div>${tray(6 - cur.left)}
+            <div class="felt tcfelt"><div class="lbl">Running count</div><div class="rc">${sgn(cur.rc)}</div>${tray(gameDecks() - cur.left)}
             <div class="lbl">${hard ? 'Decks left: <b>?</b>' : `Decks left: <b>${cur.left}</b>`}</div></div><div id="res"></div>${p.html}`;
           p.bind(tw);
         };
@@ -405,11 +412,12 @@
         const tw = $('#tw', root);
         const ask = () => {
           if (q >= N) return done();
-          const played = (1 + rnd(11)) / 2, left = 6 - played;
-          const opts = new Set([left]); while (opts.size < 4) { const o = left + pick([-1.5, -1, -0.5, 0.5, 1, 1.5]); if (o >= 0.5 && o <= 5.5) opts.add(o); }
+          const dd = B.isDD(), total = gameDecks(), left = randLeft(true), played = total - left;
+          const steps = dd ? [-0.75, -0.5, -0.25, 0.25, 0.5, 0.75] : [-1.5, -1, -0.5, 0.5, 1, 1.5], lo = dd ? 0.25 : 0.5, hi = dd ? 1.75 : 5.5;
+          const opts = new Set([left]); while (opts.size < 4) { const o = left + pick(steps); if (o >= lo && o <= hi) opts.add(o); }
           const list = [...opts].sort((a, b) => a - b);
           tw.innerHTML = `<div class="qprog">${Array.from({ length: N }, (_, j) => `<i class="${j < q ? 'on' : j === q ? 'cur' : ''}"></i>`).join('')}</div>
-            <div class="felt tcfelt">${tray(played)}<div class="lbl">How many decks are <b>left</b> in the shoe?</div></div>
+            <div class="felt tcfelt">${tray(played)}<div class="lbl">How many decks are <b>left</b> ${dd ? 'to deal' : 'in the shoe'}?</div></div>
             <div class="opts grid2">${list.map((o) => `<button class="opt" data-v="${o}"><b>${o}</b></button>`).join('')}</div><div id="res"></div>`;
           $$('[data-v]', tw).forEach((b) => (b.onclick = () => {
             const good = +b.dataset.v === left; if (good) ok++; q++; A.hist(1, good ? 1 : 0); good ? A.fx.ok() : A.fx.bad();
@@ -418,15 +426,15 @@
             setTimeout(ask, good ? 700 : 1500);
           }));
         };
-        const done = () => { const rec = A.record('decks', ok); A.addXP(ok * 2); result(tw, { kicker: 'Tray reading', big: `${ok}/${N}`, rec, args, good: ok >= 8, note: 'Tip: picture the tray in halves and quarters — 1.5, 3, 4.5 decks.', again: () => { q = 0; ok = 0; ask(); } }); };
+        const done = () => { const rec = A.record('decks', ok); A.addXP(ok * 2); result(tw, { kicker: 'Tray reading', big: `${ok}/${N}`, rec, args, good: ok >= 8, note: B.isDD() ? 'Tip: in double deck, think in quarter decks — 13 cards each. Half a deck is 26 cards.' : 'Tip: picture the tray in halves and quarters — 1.5, 3, 4.5 decks.', again: () => { q = 0; ok = 0; ask(); } }); };
         ask();
       }
     };
   };
 
   // ---------- Bet ramp ----------
-  const CHIPS = [[1, 'c1'], [2, 'c2'], [4, 'c4'], [8, 'c8'], [12, 'c12']];
-  A.chips = (attr = 'data-bet') => `<div class="chips">${CHIPS.map(([u, c]) => `<button class="chip ${c}" ${attr}="${u}"><span>${u}</span></button>`).join('')}</div>`;
+  const CHIPC = ['c1', 'c2', 'c4', 'c8', 'c12'];
+  A.chips = (attr = 'data-bet') => `<div class="chips">${B.rampSteps().map((u, i) => `<button class="chip ${CHIPC[i]}" ${attr}="${u}"><span>${u}</span></button>`).join('')}</div>`;
   SCREENS.ramp = (args) => {
     const N = 10; let q = 0, ok = 0;
     return {
@@ -436,10 +444,10 @@
         const rw = $('#rw', root);
         const ask = () => {
           if (q >= N) return done();
-          const left = (1 + rnd(11)) / 2, rc = Math.round((Math.random() * 1.6 - 0.4) * 5 * left), tc = B.trueCount(rc, left), want = B.ramp(tc);
+          const left = randLeft(false), rc = Math.round((Math.random() * 1.6 - 0.4) * (B.isDD() ? 4 : 5) * left), tc = B.trueCount(rc, left), want = B.ramp(tc);
           rw.innerHTML = `<div class="qprog">${Array.from({ length: N }, (_, j) => `<i class="${j < q ? 'on' : j === q ? 'cur' : ''}"></i>`).join('')}</div>
             <div class="felt tcfelt"><div class="lbl">Running count</div><div class="rc">${sgn(rc)}</div><div class="lbl">Decks left: <b>${left}</b></div></div>
-            <p class="center muted small">Ramp: ≤+1 → 1 · +2 → 2 · +3 → 4 · +4 → 8 · +5 → 12 units</p>${A.chips()}<div id="res"></div>`;
+            <p class="center muted small">${B.isDD() ? 'Double-deck ramp' : 'Ramp'}: ${B.rampText()}</p>${A.chips()}<div id="res"></div>`;
           $$('[data-bet]', rw).forEach((b) => (b.onclick = () => {
             const good = +b.dataset.bet === want; if (good) ok++; q++; A.hist(1, good ? 1 : 0); good ? A.fx.ok() : A.fx.bad();
             $$('[data-bet]', rw).forEach((x) => (x.disabled = true));
@@ -464,8 +472,8 @@
         const upd = () => { $('#sk', root).textContent = streak; $('#ac', root).textContent = n ? Math.round((100 * ok) / n) + '%' : '–'; $('#ms', root).textContent = Math.round(A.idxPct() * 100) + '%'; $('#rp', root).textContent = reps ? `${n}/${reps}` : S.best.index; };
         const next = () => {
           const d = A.pickDev(), idx = B.devIdx(d), tc = idx + pick([-2, -1, -1, 0, 0, 1, 1, 2]);
-          const hand = d.hand(), o = Object.assign({ canSurrender: d.set === 'Fab4' }, d.o || {});
-          cur = { d, tc, hand, o, ans: d.insurance ? (tc >= 3 ? 'Y' : 'N') : B.play(hand, d.up, tc, o) }; lock = false;
+          const hand = d.hand(), o = Object.assign({ canSurrender: d.kind === 'sur' }, d.o || {});
+          cur = { d, tc, hand, o, rule: B.devRule(d), ans: d.insurance ? (tc >= idx ? 'Y' : 'N') : B.play(hand, d.up, tc, o) }; lock = false;
           const btns = d.insurance ? `<div class="acts two"><button class="act a-Y" data-a="Y">Take insurance</button><button class="act a-N" data-a="N">No insurance</button></div>`
             : actBtns({ dis: { P: !B.isPair(hand), R: !o.canSurrender || !B.rules().ls } });
           iw.innerHTML = felt(`<div class="tcbadge">TC <b>${sgn(tc)}</b></div><div class="lbl">Dealer</div><div class="cards">${A.cardHTML(B.card(B.rankFor(d.up)))}${A.cardHTML(null)}</div>
@@ -479,13 +487,13 @@
           const fl = $('.felt', iw); fl.classList.add(good ? 'good' : 'badf');
           if (good) {
             ok++; streak++; A.fx.ok(); pool.add(2); if (streak > S.best.index) S.best.index = streak; A.save(); upd();
-            $('#fb', iw).innerHTML = `<div class="fb ok">✓ ${nm(a)} — ${esc(cur.d.rule)}</div>`;
+            $('#fb', iw).innerHTML = `<div class="fb ok">✓ ${nm(a)} — ${esc(cur.rule)}</div>`;
             if (reps && n >= reps) return setTimeout(finish, 500);
             setTimeout(next, 650);
           } else {
             streak = 0; A.fx.bad(); A.save(); upd();
-            misses.push({ t: `${cur.d.name} at TC ${sgn(cur.tc)}`, a: nm(cur.ans), w: cur.d.rule });
-            $('#fb', iw).innerHTML = `<div class="fb bad"><b>${cur.d.name} at ${sgn(cur.tc)}: ${nm(cur.ans)}.</b><br><span class="small">${esc(cur.d.rule)}.</span><button class="btn sm" id="gi">Got it ›</button></div>`;
+            misses.push({ t: `${cur.d.name} at TC ${sgn(cur.tc)}`, a: nm(cur.ans), w: cur.rule });
+            $('#fb', iw).innerHTML = `<div class="fb bad"><b>${cur.d.name} at ${sgn(cur.tc)}: ${nm(cur.ans)}.</b><br><span class="small">${esc(cur.rule)}.</span><button class="btn sm" id="gi">Got it ›</button></div>`;
             $('#gi', iw).onclick = () => (reps && n >= reps ? finish() : next());
           }
         };
@@ -507,13 +515,15 @@
         const upd = () => { $('#sk', root).textContent = streak; $('#ac', root).textContent = n ? Math.round((100 * ok) / n) + '%' : '–'; $('#rp', root).textContent = reps ? `${n}/${reps}` : S.best.recall; };
         const next = () => {
           const d = A.pickDev(); cur = d;
-          const q = d.below ? `<b>${esc(d.name)}</b>: you <b>hit</b> below what true count?` : `<b>${esc(d.name)}</b>: <b>${esc(d.act.toLowerCase())}</b> at what true count or higher?`;
+          const hiN = d.insurance ? 'take insurance' : B.NAMES[d.hi].toLowerCase(), loN = d.insurance ? 'decline it' : d.kind === 'pair' ? 'stand' : B.NAMES[d.lo].toLowerCase();
+          const q = `<b>${esc(d.name)}</b>: from what true count do you <b>${esc(hiN)}</b>${d.insurance ? '' : ` instead of ${esc(loN)}`}?`;
+          const rule = B.devRule(d);
           const p = A.pad((g) => {
             n++; const want = B.devIdx(d), good = g === want; A.gradeDev(d.id, good); A.hist(1, good ? 1 : 0);
             if (good) { ok++; streak++; A.fx.ok(); pool.add(2); if (streak > S.best.recall) S.best.recall = streak; }
-            else { streak = 0; A.fx.bad(); misses.push({ t: d.name, a: sgn(want), w: d.rule }); }
+            else { streak = 0; A.fx.bad(); misses.push({ t: d.name, a: sgn(want), w: rule }); }
             A.save(); upd();
-            $('#res', rw).innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}">${good ? '✓' : '✗'} ${esc(d.rule)}</div>`;
+            $('#res', rw).innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}">${good ? '✓' : '✗'} ${esc(rule)}</div>`;
             if (reps && n >= reps) return setTimeout(finish, 700);
             setTimeout(next, good ? 650 : 1800);
           }, { label: 'Answer', small: true });
@@ -530,10 +540,10 @@
   SCREENS.chart = () => {
     const ups = B.UPS, r = B.rules();
     const head = `<tr><th></th>${ups.map((u) => `<th>${B.upName(u)}</th>`).join('')}</tr>`;
-    const body = (rows) => rows.map((row) => `<tr><th>${B.rowLabel(row)}</th>${ups.map((u) => { const p = B.play(B.cellCards(row), u, null); const ds = row === 's18' && p === 'D' || row === 's19' && p === 'D'; return `<td class="k-${p}">${ds ? 'Ds' : p}</td>`; }).join('')}</tr>`).join('');
+    const body = (rows) => rows.map((row) => `<tr><th>${B.rowLabel(row)}</th>${ups.map((u) => { const p = B.chartCode(row, u); return `<td class="k-${p === 'Ds' ? 'D' : p}">${p}</td>`; }).join('')}</tr>`).join('');
     return {
-      title: 'Strategy Chart',
-      html: `<div class="card tiny">${r.h17 ? 'Dealer hits soft 17' : 'Dealer stands on soft 17'} · 4–8 decks · double after split · ${r.ls ? 'late surrender' : 'no surrender'} <a class="linkbtn" id="chg">change</a></div>
+      title: B.isDD() ? 'Double-Deck Chart' : 'Strategy Chart',
+      html: `<div class="card tiny">${esc(B.rulesLabel())} <a class="linkbtn" id="chg">change</a></div>
         <div class="legend"><span class="k-H">H</span> Hit <span class="k-S">S</span> Stand <span class="k-D">D</span> Double <span class="k-D">Ds</span> Double/else stand <span class="k-P">P</span> Split ${r.ls ? '<span class="k-R">R</span> Surrender' : ''}</div>
         <h3 class="sec">Hard totals</h3><table class="chart">${head}${body(B.ROWS.hard)}</table>
         <h3 class="sec">Soft totals</h3><table class="chart">${head}${body(B.ROWS.soft)}</table>

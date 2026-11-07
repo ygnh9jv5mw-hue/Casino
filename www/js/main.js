@@ -5,5 +5,8 @@
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   A.render();
   if (!A.S.prof.onboarded) setTimeout(A.onboard, 60);
-  else if (A.S.prof.remind) A.scheduleReminder();
+  else {
+    if (!A.S.prof.gameAsked) setTimeout(A.askGame, 300);
+    if (A.S.prof.remind) A.scheduleReminder();
+  }
 })();

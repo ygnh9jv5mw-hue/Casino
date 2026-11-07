@@ -36,6 +36,7 @@ window.COURSE = [
           <li><b>Surrender</b> 16 vs 9, 10, A and 15 vs 10 (H17: also 15 and 17 vs A, and 8,8 vs A).</li>
           <li><b>Always hit 8 or less. Always stand on hard 17+.</b></li>
         </ol>
+        {{GAME_NOTES}}
         <p>Target: 100 hands in a row with zero errors, under 2 seconds each. The adaptive trainer feeds you the hands you miss until you stop missing them.</p>`,
         takeaways: ['Split A & 8, never 5 & 10', 'Stiffs stand vs 2–6', '12 stands only vs 4–6', 'Hard 17+ always stands'] },
       { id: 'm1l4', title: 'The mistakes that cost the most', mins: 3, drill: 'blitz', body: `
@@ -89,7 +90,21 @@ window.COURSE = [
           <li>Shoe simulator: right count at every check, with other players at the table</li>
         </ul>
         <p>Don't play for real money until you hit all of them. The Progress tab tracks every record.</p>`,
-        takeaways: ['Deck in under 25s', 'TC in under 2s', 'Perfect counts under distraction'] }
+        takeaways: ['Deck in under 25s', 'TC in under 2s', 'Perfect counts under distraction'] },
+      { id: 'm2l5', title: 'Double deck: burn card, cut card, pitch games', mins: 5, drill: 'shoe', body: `
+        <p>With only 104 cards, <b>every card moves the true count more</b>. A running count of +3 is a true count of +2 with a deck and a half left, +3 with one deck, and +6 with half a deck. Estimate decks left to the nearest half deck — 1½, 1, ½ — and divide.</p>
+        <p><b>The burn card.</b> After the shuffle the dealer burns the top card face down. You never see it, so you never count it. It just stays part of the "unseen" cards — your running count still starts at 0.</p>
+        <p><b>The cut card.</b> Where the shuffle comes is set by the cut, so penetration changes every deck. The deeper the cut, the more often the count gets big. When you can see where the cut card sits, you know how much of the deck you'll get — a shallow cut is a reason to keep your bets small or move on.</p>
+        <p><b>Pitch (hand-held) games.</b> Cards are dealt face down, so you can't count everything right away:</p>
+        <ul>
+          <li>Count <b>your own cards</b> and the <b>dealer's up card</b> immediately.</li>
+          <li>Count other players' cards when they <b>bust</b>, turn up a <b>blackjack</b>, or <b>double</b> (they turn their two cards over).</li>
+          <li>The <b>double-down card</b> is dealt face down — count it when it's turned over at the end.</li>
+          <li>When the dealer flips the hole card and settles each hand, <b>count everything that's turned over</b>. Be ready: it happens fast.</li>
+        </ul>
+        <p><b>Betting.</b> Your edge rises quickly in double deck, so the ramp starts earlier and is shorter: 1 unit at 0 or below, then 2, 4, 6, 8 units at +1, +2, +3, +4. Big jumps get noticed fast in a double-deck pit — ramp and parlay.</p>
+        <div class="callout">Set your game to Double deck in Settings and every chart, index number, ramp and the simulator (burn card, random cut, pitch dealing) switch over.</div>`,
+        takeaways: ['Each card matters more — estimate decks to the half', 'Never count the burn card', 'Pitch: count cards as they are turned over', 'Ramp earlier, ramp quieter'] }
     ],
     quiz: [
       { q: 'What is the Hi-Lo value of a 7?', a: ['+1', '0', '−1', '+½'], c: 1, why: '7, 8 and 9 are neutral.' },
@@ -114,24 +129,13 @@ window.COURSE = [
         <div class="callout">Take insurance at true count +3 or higher. Never below.</div>`,
         takeaways: ['Insurance at +3 or higher', 'Never "even money" below +3'] },
       { id: 'm3l3', title: 'The Illustrious 18', mins: 6, drill: 'recall', body: `
-        <p>The 18 deviations that capture most of the gain. "Stand at +2" means stand when TC ≥ +2, otherwise play basic strategy.</p>
-        <table class="tbl"><tr><th>Hand</th><th>Play</th><th>Index</th></tr>
-        <tr><td>Insurance</td><td>Take</td><td>+3</td></tr><tr><td>16 vs 10</td><td>Stand</td><td>0</td></tr>
-        <tr><td>15 vs 10</td><td>Stand</td><td>+4</td></tr><tr><td>10,10 vs 5</td><td>Split</td><td>+5</td></tr>
-        <tr><td>10,10 vs 6</td><td>Split</td><td>+4</td></tr><tr><td>10 vs 10</td><td>Double</td><td>+4</td></tr>
-        <tr><td>12 vs 3</td><td>Stand</td><td>+2</td></tr><tr><td>12 vs 2</td><td>Stand</td><td>+3</td></tr>
-        <tr><td>11 vs A (S17)</td><td>Double</td><td>+1</td></tr><tr><td>9 vs 2</td><td>Double</td><td>+1</td></tr>
-        <tr><td>10 vs A</td><td>Double</td><td>+4 (H17: +3)</td></tr><tr><td>9 vs 7</td><td>Double</td><td>+3</td></tr>
-        <tr><td>16 vs 9</td><td>Stand</td><td>+5</td></tr><tr><td>13 vs 2</td><td>Hit</td><td>below −1</td></tr>
-        <tr><td>12 vs 4</td><td>Hit</td><td>below 0</td></tr><tr><td>12 vs 5</td><td>Hit</td><td>below −2</td></tr>
-        <tr><td>12 vs 6</td><td>Hit</td><td>below −1</td></tr><tr><td>13 vs 3</td><td>Hit</td><td>below −2</td></tr></table>
-        <p class="small muted">In H17 games, 11 vs A is always a double, so that index drops out.</p>`,
+        <p>The 18 deviations that capture most of the gain. Each row reads: <b>at this true count or higher, make this play</b> — below it, play the other way (usually hit or stand).</p>
+        {{I18}}
+        <p class="small muted">These numbers are set for your game ({{RULES}}). Change your game in Settings and the table updates.</p>`,
         takeaways: ['Memorise in groups: stands, doubles, splits, hits', 'Most indices are between −2 and +5'] },
       { id: 'm3l4', title: 'The Fab 4 surrenders', mins: 2, drill: 'index', body: `
-        <table class="tbl"><tr><th>Hand</th><th>Surrender at</th></tr>
-        <tr><td>14 vs 10</td><td>+3</td></tr><tr><td>15 vs 10</td><td>0</td></tr>
-        <tr><td>15 vs 9</td><td>+2</td></tr><tr><td>15 vs A (S17)</td><td>+1</td></tr></table>
-        <p>Where late surrender is offered, these are worth nearly as much as the Illustrious 18. In H17 games, 15 vs A is a basic-strategy surrender.</p>`,
+        {{FAB4}}
+        <p>Where late surrender is offered, these are worth nearly as much as the Illustrious 18. Below the index, don't surrender — play the hand out.</p>`,
         takeaways: ['14 vs 10 at +3', '15 vs 10 at 0', '15 vs 9 at +2'] }
     ],
     quiz: [
@@ -140,7 +144,7 @@ window.COURSE = [
       { q: '12 vs 3 at true count +2?', a: ['Hit', 'Stand', 'Double', 'Surrender'], c: 1, why: 'Stand at +2 or higher.' },
       { q: 'Dealer shows an Ace, true count +2. Insurance?', a: ['Take it', 'Decline', 'Only with blackjack', 'Only for half'], c: 1, why: 'Insurance only at +3 or higher.' },
       { q: '15 vs 10 with surrender, true count 0?', a: ['Hit', 'Stand', 'Surrender', 'Double'], c: 2, why: 'Surrender at 0 or higher.' },
-      { q: 'At what true count do you split 10s against a 6?', a: ['+2', '+3', '+4', '+6'], c: 2, why: '10,10 vs 6 splits at +4 (vs 5 at +5).' }
+      { q: 'At what true count do you split 10s against a 5?', a: ['+3', '+4', '+5', '+6'], c: 2, why: '10,10 vs 5 splits at +5 in every game.' }
     ]
   },
   {

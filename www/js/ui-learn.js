@@ -29,6 +29,27 @@
     };
   };
 
+  // Lesson bodies can contain placeholders that are filled from the player's own game and rules.
+  const B = window.BJ, sg = A.sgn;
+  function devTable(set) {
+    const rows = B.activeDevs().filter((d) => d.set === set).map((d) => {
+      const i = B.devIdx(d), play = d.insurance ? 'Take insurance' : B.NAMES[d.hi];
+      const other = d.insurance ? '' : d.kind === 'pair' ? 'stand' : d.kind === 'sur' ? 'play it out' : B.NAMES[d.lo].toLowerCase();
+      return `<tr><td>${esc(d.name.replace(' (surrender)', ''))}</td><td>${esc(play)}</td><td><b>${sg(i)}</b> or higher${other ? `<br><span class="tiny muted">else ${esc(other)}</span>` : ''}</td></tr>`;
+    }).join('');
+    return `<table class="tbl"><tr><th>Hand</th><th>Play</th><th>True count</th></tr>${rows}</table>`;
+  }
+  function gameNotes() {
+    if (!B.isDD()) return '';
+    const h17 = B.rules().h17;
+    return `<div class="callout">Your game is <b>double deck</b>. A few cells change:
+      <ul style="margin:8px 0 0"><li>Double <b>9 vs 2</b> (as well as 3–6).</li><li>Split <b>6s vs 2–7</b> and <b>7s vs 2–8</b>.</li>
+      <li>Hit <b>16 vs 9</b> — no surrender.</li>
+      ${h17 ? '<li>Double <b>A3 vs 4</b>, <b>soft 18 vs 2</b> and <b>soft 19 vs 6</b>.</li><li>Split <b>8s vs A</b> instead of surrendering.</li>' : '<li>Hit <b>11 vs A</b> off the top (double from +1).</li>'}</ul></div>`;
+  }
+  const fill = (html) => html.replace('{{I18}}', () => devTable('I18')).replace('{{FAB4}}', () => (B.rules().ls ? devTable('Fab4') : '<p class="muted">Your game has no surrender, so the Fab 4 don\'t apply. Turn surrender on in Settings if your casino offers it.</p>'))
+    .replace('{{RULES}}', () => esc(B.rulesLabel())).replace('{{GAME_NOTES}}', gameNotes);
+
   SCREENS.lesson = ({ id }) => {
     const S = A.S; let m, l, idx;
     COURSE.forEach((mm) => mm.lessons.forEach((ll, i) => { if (ll.id === id) { m = mm; l = ll; idx = i; } }));
@@ -36,7 +57,7 @@
     return {
       title: l.title,
       html: `<div class="pill gold">${esc(m.title)} · ${l.mins || 3} min</div>
-        <div class="lesson">${l.body}</div>
+        <div class="lesson">${fill(l.body)}</div>
         ${l.takeaways ? `<div class="card takeaways"><div class="kicker">Key takeaways</div><ul>${l.takeaways.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
         ${l.drill ? `<button class="btn dark" id="drill">Practice this now ›</button>` : ''}
         <button class="btn" id="done" style="margin-top:10px">${S.done[l.id] ? (nextL ? 'Next lesson ›' : m.quiz ? 'Take the quiz ›' : 'Back to module') : 'Mark complete' + (nextL ? ' & continue' : '') + ' · +20 XP'}</button>`,

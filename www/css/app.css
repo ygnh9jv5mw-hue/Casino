@@ -326,3 +326,5 @@ body.sub main { padding-bottom: calc(var(--sb) + 18px); }
 .pad button { padding: 12px 0; }
 @media (max-height: 700px) { .display { min-height: 56px; font-size: 34px; padding: 10px; } .pad button { padding: 10px 0; font-size: 20px; } .felt { padding: 10px 8px 12px; } }
 .others { gap: 4px; } .oseat { min-width: 52px; padding: 3px; } .cards.mini .pc + .pc { margin-left: -22px; }
+.chart { table-layout: fixed; } .chart tr > :first-child { width: 14%; }
+.tray.dd .tray-in { height: 80px; }

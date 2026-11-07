@@ -32,7 +32,7 @@ window.CAMP = [
     { k: 'fastest', key: 'tc', max: 3, t: 'True count: 10/10, under 3s each', go: 'tc' },
     { k: 'best', key: 'decks', min: 8, t: 'Tray reading: 8/10', go: 'decks' } ] },
   { id: 8, title: 'Casino Speed', sub: 'Whole rounds at a glance', tasks: [
-    { k: 'lesson', id: 'm2l4' },
+    { k: 'lesson', id: 'm2l4' }, { k: 'lesson', id: 'm2l5' },
     { k: 'fastest', key: 'deck', max: 30, t: 'Deck countdown: perfect in 30s', go: 'deck' },
     { k: 'best', key: 'flash', min: 6, t: 'Table Flash: level 6', go: 'flash' },
     { k: 'quiz', id: 'm2', pct: 80 } ] },
