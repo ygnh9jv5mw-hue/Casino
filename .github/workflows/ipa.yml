@@ -1,0 +1,63 @@
+name: Build unsigned IPA
+
+# Compiles the iOS app on a GitHub macOS runner and commits the unsigned .ipa to dist/.
+# Sign it afterwards with your own signer.
+on:
+  push:
+    paths-ignore: ['dist/**', '*.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx cap sync ios
+      - run: xcodebuild -version
+
+      - name: Archive without code signing
+        run: |
+          mkdir -p build
+          set -o pipefail
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            > build/xcodebuild.log 2>&1 || { tail -120 build/xcodebuild.log; exit 1; }
+          tail -5 build/xcodebuild.log
+
+      - name: Package IPA
+        run: |
+          rm -rf build/ipa && mkdir -p build/ipa/Payload dist
+          cp -R build/App.xcarchive/Products/Applications/App.app build/ipa/Payload/
+          (cd build/ipa && zip -qry ../../dist/BlackjackMasterClass-unsigned.ipa Payload)
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BlackjackMasterClass-unsigned-ipa
+          path: dist/BlackjackMasterClass-unsigned.ipa
+
+      - name: Commit IPA to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/BlackjackMasterClass-unsigned.ipa
+          git commit -m "Build unsigned IPA (run ${{ github.run_number }}) [skip ci]" || exit 0
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

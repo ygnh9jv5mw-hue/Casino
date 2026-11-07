@@ -1,0 +1,9 @@
+{
+  "appId": "com.blackjackmasterclass.app",
+  "appName": "BJ MasterClass",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#07130d"
+  }
+}
