@@ -83,7 +83,7 @@
         if (!G.cutOut && G.shoe.length < G.cut) G.cutOut = true; // the cut card comes out — this round is the last
         return c;
       };
-      const reveal = (c) => { if (c && c.down) { c.down = false; c.anim = 1; G.rc += B.hilo(c.r); } };
+      const reveal = (c) => { if (c && c.down) { c.down = false; c.flip = 1; G.rc += B.hilo(c.r); } };
       const unseen = () => G.shoe.length + G.burned;
       const decksLeft = () => Math.max(0.5, Math.round(unseen() / 26) / 2);
       const tc = () => B.trueCount(G.rc, decksLeft());
@@ -135,7 +135,7 @@
             } else {
               const extra = casino ? '' : ` · ${dd ? 'double deck' : cfg.decks + ' decks'} · ${cutLabel()}${cfg.burn ? ' · burn card' : ''}${pitch() ? ' · pitched' : ''}`;
               table = `<div class="table empty">${head}${arc}<div class="rule-line">${ruleLine}${extra}</div>${cutPill}
-                <div class="you"><div class="place">${casino && G.pend ? `<span class="pend">${fmt$(G.pend)}</span>` : 'Place your bet'}</div></div></div>`;
+                <div class="you"><div class="place${casino && G.pend !== shownPend ? ' drop' : ''}">${casino && G.pend ? `<span class="pend">${fmt$(G.pend)}</span>` : 'Place your bet'}</div></div></div>`;
             }
             let ctl = '';
             const msg = G.msg ? `<div class="fb ${G.msgOk ? 'ok' : 'bad'} slim">${G.msg}</div>` : '';
@@ -152,11 +152,11 @@
             // when the controls change (new phase), ignore taps for a moment so the second tap of a double-tap
             // can't land on whatever button just appeared under the finger (e.g. a chip under "Next hand")
             if (G.phase !== lastPhase) { lastPhase = G.phase; tapGuardUntil = performance.now() + 380; }
-            sw.innerHTML = hud + heat + table + `<div class="ctl">${ctl}</div>`;
-            if (R) [R.dealer, ...R.seats.map((s) => s.cards || []), ...R.hands.map((h) => h.cards)].forEach((a) => a.forEach((c) => (c.anim = 0)));
+            sw.innerHTML = hud + heat + table + `<div class="ctl">${ctl}</div>`; shownPend = R ? 0 : G.pend;
+            if (R) [R.dealer, ...R.seats.map((s) => s.cards || []), ...R.hands.map((h) => h.cards)].forEach((a) => a.forEach((c) => { c.anim = 0; c.flip = 0; }));
             bind();
           }
-          let lastPhase = '', tapGuardUntil = 0;
+          let lastPhase = '', tapGuardUntil = 0, shownPend = 0; // shownPend: the bet last drawn in the circle, so only a change animates
           const guard = (fn) => (...a) => { if (performance.now() < tapGuardUntil) return; fn(...a); };
           function bind() {
             const pk = $('#peek', sw); if (pk) pk.onclick = () => { if (!cfg.showRC) { G.st.peeks++; pk.textContent = `RC ${sgn(G.rc)} · TC ${sgn(tc())}`; } };

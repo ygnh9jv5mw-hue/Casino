@@ -14,13 +14,13 @@
   const KEY = 'bjmc.v2';
   const DEF = () => ({
     v: 2,
-    prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, remind: '', unlockTo: 1 },
+    prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, playOut: true, remind: '', unlockTo: 1 },
     xp: 0, xpDay: { d: '', xp: 0 }, goalDays: [], days: [],
     done: {}, quiz: {}, campDone: {},
     best: { strat: 0, blitz: 0, reflex: 0, pairs: 0, deck: null, ladder: 0, flash: 0, tc: null, decks: 0, ramp: 0, recall: 0, index: 0, shoeClean: 0 },
     cells: {}, idx: {}, hist: {},
     shoe: { hands: 0, dec: 0, decOk: 0, checks: 0, checksOk: 0, bets: 0, betsOk: 0, shoes: 0, backoffs: 0 },
-    flags: {}, log: [], wk: { d: '', i: 0 }
+    flags: {}, log: [], wk: { d: '', i: 0, plan: [] }
   });
   let S;
   // Saved data is checked field by field: anything missing, damaged or out of range falls back to its default,
@@ -39,7 +39,7 @@
     d.prof = {
       onboarded: bool(p.onboarded, false), level: ['new', 'basic', 'counter'].includes(p.level) ? p.level : 'new',
       goal: [100, 250, 500].includes(p.goal) ? p.goal : 250, h17: bool(p.h17, true), ls: bool(p.ls, true), decks: p.decks === 2 ? 2 : 6,
-      gameAsked: bool(p.gameAsked, false), sound: bool(p.sound, true), haptics: bool(p.haptics, true),
+      gameAsked: bool(p.gameAsked, false), sound: bool(p.sound, true), haptics: bool(p.haptics, true), playOut: bool(p.playOut, true),
       remind: typeof p.remind === 'string' && /^\d{2}:\d{2}$/.test(p.remind) ? p.remind : '', unlockTo: [1, 5, 9].includes(p.unlockTo) ? p.unlockTo : 1,
       shoe: isObj(p.shoe) ? p.shoe : null, casino: isObj(p.casino) ? p.casino : null // table settings are re-checked by the table itself
     };
@@ -60,7 +60,14 @@
     for (const k of Object.keys(d.shoe)) d.shoe[k] = Math.round(num(sh[k], 0, 0, 1e9));
     d.shoe.decOk = Math.min(d.shoe.decOk, d.shoe.dec); d.shoe.checksOk = Math.min(d.shoe.checksOk, d.shoe.checks); d.shoe.betsOk = Math.min(d.shoe.betsOk, d.shoe.bets);
     d.log = Array.isArray(s.log) ? s.log.filter(isObj).map((e, i) => ({ id: num(e.id, Date.now() + i), date: str(e.date, '', 20), where: str(e.where, '', 120), hours: num(e.hours, 0, 0, 1000), result: num(e.result, 0, -1e9, 1e9), notes: str(e.notes, '', 1000) })) : [];
-    d.wk = isObj(s.wk) && isDay(s.wk.d) ? { d: s.wk.d, i: Math.round(num(s.wk.i, 0, 0, 20)) } : { d: '', i: 0 };
+    const WK_IDS = ['reflex', 'strategy', 'tc', 'pairs', 'index', 'blitz', 'flash', 'deck', 'shoe', 'ladder', 'recall'];
+    const plan = isObj(s.wk) && Array.isArray(s.wk.plan) ? s.wk.plan.filter((x) => isObj(x) && WK_IDS.includes(x.id)).slice(0, 10).map((x) => {
+      const a = isObj(x.args) ? x.args : {}, args = {};
+      if (typeof a.reps === 'number' && a.reps >= 1 && a.reps <= 100) args.reps = Math.round(a.reps);
+      if (typeof a.hands === 'number' && a.hands >= 1 && a.hands <= 200) args.hands = Math.round(a.hands);
+      return { id: x.id, t: str(x.t, '', 60), s: str(x.s, '', 80), args };
+    }) : [];
+    d.wk = isObj(s.wk) && isDay(s.wk.d) ? { d: s.wk.d, i: Math.round(num(s.wk.i, 0, 0, 20)), plan } : { d: '', i: 0, plan: [] };
     if (isObj(s.casino)) { const c = s.casino; d.casino = { bank: num(c.bank, 1000, 0, 1e9), hands: num(c.hands, 0, 0), net: num(c.net, 0, -1e12, 1e12), peak: num(c.peak, 1000, 0, 1e9), shoes: num(c.shoes, 0, 0), reloads: num(c.reloads, 0, 0) }; }
     return d;
   }
@@ -245,7 +252,13 @@
   }
 
   // ---------------- daily workout ----------------
+  // today's plan is fixed when the workout starts, so it can't change underneath you mid-session
   function workout() {
+    if (S.wk.d === dayKey() && Array.isArray(S.wk.plan) && S.wk.plan.length) return S.wk.plan;
+    return buildWorkout();
+  }
+  function startWorkout() { S.wk = { d: dayKey(), i: 0, plan: buildWorkout() }; save(); return S.wk.plan; }
+  function buildWorkout() {
     const st = currentStage() + 1, g = S.prof.goal, big = g >= 500, mid = g >= 250;
     const steps = [
       { id: 'reflex', t: 'Warm-up: Reflex', s: '60 seconds of card values', args: {} },
@@ -260,11 +273,17 @@
   }
   const wkIndex = () => (S.wk.d === dayKey() ? S.wk.i : 0);
   function wkNext() { // called by a drill when its workout step is finished
-    const d = dayKey(); if (S.wk.d !== d) S.wk = { d, i: 0 };
-    S.wk.i++; const n = workout().length;
-    if (S.wk.i >= n) { addXP(100); S.flags['wk_' + d] = true; }
+    const d = dayKey(); if (S.wk.d !== d) S.wk = { d, i: 0, plan: buildWorkout() };
+    const plan = workout(); S.wk.i++;
+    if (S.wk.i >= plan.length) { addXP(100); S.flags['wk_' + d] = true; save(); return popTo('workout'); }
     save();
-    replace('workout', {});
+    const s = plan[S.wk.i]; replace(s.id, Object.assign({ wk: true }, s.args)); // straight into the next drill — no stacked screens
+  }
+  // go back to a screen already in the stack (or open it as the only screen)
+  function popTo(screen) {
+    while (stack.length && stack[stack.length - 1].screen !== screen) stack.pop();
+    if (!stack.length) stack.push({ screen, args: {} });
+    dir = -1; render();
   }
 
   // ---------------- router ----------------
@@ -298,12 +317,13 @@
   const FACE = { J: 'J', Q: 'Q', K: 'K' };
   const CARD_NAME = { A: 'Ace', J: 'Jack', Q: 'Queen', K: 'King' };
   const SUIT_NAME = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' };
-  function cardHTML(c, cls = '') {
-    if (!c) return `<div class="pc back ${cls}" role="img" aria-label="face-down card"><i></i></div>`;
-    const anim = c.anim ? ' deal' : '';
+  function cardHTML(c, cls = '', delay = 0) { // delay: when a face-down card is dealt in sequence
+    if (!c) return `<div class="pc back ${cls}"${delay ? ` style="animation-delay:${delay}ms"` : ''} role="img" aria-label="face-down card"><i></i></div>`;
+    const anim = c.flip ? ' flip' : c.anim ? ' deal' : '';
+    const st = c.anim && c.delay ? ` style="animation-delay:${c.delay}ms"` : '';
     const mid = FACE[c.r] ? `<span class="face">${c.r}<em>${c.s}</em></span>` : c.r === 'A' ? `<span class="ace">${c.s}</span>` : `<span class="pip">${c.s}</span>`;
     const label = `${CARD_NAME[c.r] || c.r} of ${SUIT_NAME[c.s]}`;
-    return `<div class="pc ${RED(c.s) ? 'red' : ''} ${cls}${anim}" role="img" aria-label="${label}"><span class="cr" aria-hidden="true">${c.r}<b>${c.s}</b></span><span aria-hidden="true">${mid}</span><span class="cr br" aria-hidden="true">${c.r}<b>${c.s}</b></span></div>`;
+    return `<div class="pc ${RED(c.s) ? 'red' : ''} ${cls}${anim}"${st} role="img" aria-label="${label}"><span class="cr" aria-hidden="true">${c.r}<b>${c.s}</b></span><span aria-hidden="true">${mid}</span><span class="cr br" aria-hidden="true">${c.r}<b>${c.s}</b></span></div>`;
   }
   function pad(onSubmit, opts = {}) {
     let val = '', neg = false, sent = false;
@@ -357,11 +377,19 @@
     document.body.appendChild(box); setTimeout(() => box.remove(), 3200);
   }
   function ring(pct, size = 64, stroke = 7, label = '', color = 'var(--accent)') {
-    const r = (size - stroke) / 2, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct));
+    const r = (size - stroke) / 2, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct || 0));
     return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="rgba(255,255,255,.08)" stroke-width="${stroke}" fill="none"/>
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="${color}" stroke-width="${stroke}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
+      <circle class="ring-arc" style="--c:${c.toFixed(1)}px" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="${color}" stroke-width="${stroke}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
       ${label ? `<text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" class="ring-t">${label}</text>` : ''}</svg>`;
   }
+  // animate a number up to its value (e.g. a result score); keeps any suffix like % or s
+  function countUp(el, text) {
+    const m = /^(-?)(\d+(?:\.\d+)?)(.*)$/.exec(String(text)); if (!el || !m || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const to = parseFloat(m[2]), dec = (m[2].split('.')[1] || '').length, sign = m[1], suf = m[3], t0 = performance.now(), dur = 650;
+    const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = sign + (to * e).toFixed(dec) + suf; if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+
   // countdown bar: returns controller {stop(), add(ms), left()}
   function timer(el, ms, onEnd, onTick) {
     let end = performance.now() + ms, raf = 0, stopped = false;
@@ -449,9 +477,9 @@
     RANKS, rank, todayXP, addXP, hist, streak, fx, scheduleReminder,
     pickCell, gradeCell, mastered, masteryPct, groupCells, pickDev, gradeDev, idxPct, record,
     lessons, lessonById, doneCount, taskDone, taskLabel, taskGo, stageDone, stageOpen, currentStage,
-    workout, wkIndex, wkNext,
+    workout, startWorkout, wkIndex, wkNext, popTo,
     SCREENS, go, back, replace, setTab, render, get stackDepth() { return stack.length; }, get current() { return stack.length ? stack[stack.length - 1].screen : tab; },
-    cardHTML, pad, toast, sheet, celebrate, confetti, ring, timer, openUrl, icon, CFG, COURSE, CAMP, B, nextAfter, TITLES,
+    cardHTML, pad, toast, sheet, celebrate, confetti, ring, countUp, timer, openUrl, icon, CFG, COURSE, CAMP, B, nextAfter, TITLES,
     reset: () => { localStorage.removeItem(KEY); localStorage.removeItem('bjmc.v1'); load(); applyRules(); stack = []; tab = 'today'; render(); }
   };
 })();

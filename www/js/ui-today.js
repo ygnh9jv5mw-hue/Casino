@@ -31,7 +31,8 @@
          <h2>${wi ? `Step ${wi + 1} of ${wk.length}` : `${wk.length} drills · ${wk.length * 3} min`}</h2>
          <p>${wi ? `Next up: ${esc(wk[wi].t)}` : 'A mixed session built from where you are. +100 XP when you finish.'}</p>
          <div class="steps-mini">${wk.map((s, i) => `<i class="${i < wi ? 'on' : ''}"></i>`).join('')}</div>
-         <button class="btn" data-go="workout">${wi ? 'Continue workout' : 'Start workout'}</button>`
+         <button class="btn" id="wkgo">${wi ? 'Continue workout' : 'Start workout'}</button>
+         <button class="linkbtn" data-go="workout" style="display:block;margin:6px auto -8px">See today's drills</button>`
       : `<div class="eyebrow">${A.icon('check')} Workout done</div>
          <h2>${nextTask ? esc(A.taskLabel(nextTask)) : 'Bootcamp complete'}</h2>
          <p>${nextTask ? `Stage ${stage.id} · ${esc(stage.title)}` : 'Keep your edge with the casino table and the simulator.'}</p>
@@ -65,10 +66,19 @@
       mount(root) {
         bindGo(root);
         const c = $('#cont', root); if (c) c.onclick = () => { if (!nextTask) return go('casino'); const [s, a] = A.taskGo(nextTask); go(s, a); };
+        const w = $('#wkgo', root); if (w) w.onclick = () => startStep();
         $('#alld', root).onclick = () => A.setTab('train');
       }
     };
   };
+  // start (or continue) today's workout and jump straight into the current drill
+  function startStep(fromOverview) {
+    if (A.wkIndex() === 0 && !(A.S.wk.d === A.dayKey() && A.S.wk.plan && A.S.wk.plan.length)) A.startWorkout();
+    const plan = A.workout(), s = plan[A.wkIndex()];
+    if (!s) return go('workout');
+    const args = Object.assign({ wk: true }, s.args);
+    if (fromOverview) A.replace(s.id, args); else go(s.id, args);
+  }
   const tile = (g, ic, t, s) => `<button class="tile" data-go="${g}"><span class="ti">${A.icon(ic)}</span><b>${esc(t)}</b><small>${esc(s)}</small></button>`;
   A.tile = tile;
 
@@ -81,8 +91,8 @@
         ${done ? `<div class="fb ok">${A.icon('check')} Workout complete · +100 XP</div><button class="btn ghost" id="again">Run it again</button>`
           : `<button class="btn big" id="go">${wi ? 'Continue' : 'Start'} · ${esc(wk[wi].t)}</button>`}`,
       mount(root) {
-        const g = $('#go', root); if (g) g.onclick = () => { const s = wk[wi]; go(s.id, Object.assign({ wk: true }, s.args)); };
-        const a = $('#again', root); if (a) a.onclick = () => { A.S.wk = { d: A.dayKey(), i: 0 }; A.S.flags['wk_' + A.dayKey()] = true; A.save(); A.replace('workout', {}); };
+        const g = $('#go', root); if (g) g.onclick = () => startStep(true);
+        const a = $('#again', root); if (a) a.onclick = () => { A.startWorkout(); A.S.flags['wk_' + A.dayKey()] = true; A.save(); A.replace('workout', {}); };
       }
     };
   };

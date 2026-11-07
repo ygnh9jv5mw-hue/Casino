@@ -11,7 +11,7 @@
       html: `
       <h3 class="sec">Basic strategy</h3>
       <div class="group">
-        ${it('strategy', 'spade', 'Adaptive trainer', 'Misses come back until you own them', Math.round(A.masteryPct('all') * 100) + '%')}
+        ${it('strategy', 'spade', 'Adaptive trainer', 'Real hands, played out · misses come back', Math.round(A.masteryPct('all') * 100) + '%')}
         ${it('blitz', 'bolt', 'Strategy Blitz', '60 seconds, wrong answers cost time', b.blitz ? 'Best ' + b.blitz : '')}
         ${it('mastery', 'grid', 'Mastery map', 'Every cell of the chart')}
       </div>
@@ -31,7 +31,7 @@
       </div>
       <h3 class="sec">Index plays</h3>
       <div class="group">
-        ${it('index', 'sparkle', 'Index trainer', 'Illustrious 18 and Fab 4 at live counts', Math.round(A.idxPct() * 100) + '%')}
+        ${it('index', 'sparkle', 'Index trainer', 'Illustrious 18 and Fab 4, hands played out', Math.round(A.idxPct() * 100) + '%')}
         ${it('recall', 'hash', 'Index recall', 'Name the exact number', b.recall ? 'Best ' + b.recall : '')}
       </div>
       <h3 class="sec">Play</h3>
@@ -80,6 +80,7 @@
         ? `<button class="btn big" id="wkn">Continue workout ${A.icon('chevron')}</button><button class="btn ghost" id="ag">Go again</button>`
         : `<button class="btn next" id="nxt"><span class="nextlbl">Next</span>${esc(nx.label)}</button><div class="btnrow"><button class="btn ghost" id="ag">Go again</button><button class="btn ghost" id="dn">Done</button></div>`}
     </div>`;
+    A.countUp($('.big-num', root), String(o.big));
     if (o.rec) { A.confetti(); A.fx.win(); }
     const w = $('#wkn', root); if (w) w.onclick = () => A.wkNext();
     const n = $('#nxt', root); if (n) n.onclick = () => A.replace(nx.s, nx.a);
@@ -88,11 +89,118 @@
     S && A.save();
   }
 
+  // ---------- a real hand: your action is played out, the dealer plays, the hand is settled ----------
+  // The cards still to come. With a true count, they match it: at +4 the low cards are gone and tens are
+  // more likely, at -4 the reverse, so the play-out shows what really tends to happen at that count.
+  function countedShoe(tc) {
+    const left = B.isDD() ? 1 : 3, s = B.shoe(left); // about half the cards are still to be dealt
+    let k = tc === null || tc === undefined ? 0 : Math.round(Math.abs(tc) * left);
+    const gone = tc > 0 ? 1 : -1; // positive count: low cards (+1) have been played; negative: high cards (-1)
+    for (let i = s.length - 1; i >= 0 && k > 0; i--) if (B.hilo(s[i].r) === gone) { s.splice(i, 1); k--; }
+    return s;
+  }
+  function makeHand({ cards, up, upCard, tc = null, firstOpts = {} }) {
+    const shoe = tc === null || tc === undefined ? B.shoe(B.isDD() ? 2 : 6) : countedShoe(tc);
+    for (const c of [upCard, ...cards]) { const i = shoe.findIndex((x) => x.r === c.r); if (i >= 0) shoe.splice(i, 1); }
+    // the dealer has already peeked, so the hole card can't complete a blackjack
+    const bad = up === 11 ? 10 : up === 10 ? 11 : -1;
+    let hi = shoe.length - 1; while (hi > 0 && B.rv(shoe[hi].r) === bad) hi--;
+    const hole = shoe.splice(hi, 1)[0]; hole.down = true;
+    const G = { up, tc, shoe, dealer: [upCard, hole], hands: [{ cards, bet: 1 }], act: 0, done: false };
+    G.draw = () => { const c = G.shoe.pop(); c.anim = 1; return c; };
+    G.cur = () => G.hands[G.act];
+    G.options = (h) => {
+      const two = h.cards.length === 2, first = G.hands.length === 1 && !h.fromSplit && two;
+      return { canDouble: two && !h.splitAces && (!first || firstOpts.canDouble !== false), canSplit: two && B.isPair(h.cards) && G.hands.length < 4 && !h.splitAces,
+        canSurrender: first && B.rules().ls && firstOpts.canSurrender !== false };
+    };
+    G.apply = (a) => { // returns true while the player still has decisions to make
+      const h = G.cur();
+      if (a === 'H') { h.cards.push(G.draw()); if (B.value(h.cards).total >= 21) h.done = true; }
+      else if (a === 'S') h.done = true;
+      else if (a === 'D') { h.bet *= 2; h.cards.push(G.draw()); h.done = true; }
+      else if (a === 'R') { h.surr = true; h.done = true; }
+      else if (a === 'P') {
+        const c2 = h.cards.pop(), aces = h.cards[0].r === 'A', nh = { cards: [c2], bet: h.bet, fromSplit: true }; h.fromSplit = true;
+        h.cards.push(G.draw()); nh.cards.push(G.draw()); G.hands.splice(G.act + 1, 0, nh);
+        if (aces) h.done = nh.done = h.splitAces = nh.splitAces = true;
+      }
+      for (;;) { // skip hands that are finished (or a split hand that made 21)
+        while (G.act < G.hands.length && G.hands[G.act].done) G.act++;
+        if (G.act < G.hands.length && B.value(G.cur().cards).total === 21) { G.cur().done = true; continue; }
+        break;
+      }
+      return G.act < G.hands.length;
+    };
+    G.live = () => G.hands.some((h) => !h.surr && B.value(h.cards).total <= 21);
+    G.dealerHits = () => { const v = B.value(G.dealer); return v.total < 17 || (B.rules().h17 && v.total === 17 && v.soft); };
+    G.settle = () => {
+      const d = B.value(G.dealer).total; let net = 0;
+      for (const h of G.hands) { const p = B.value(h.cards).total; h.res = h.surr ? -0.5 : p > 21 ? -1 : d > 21 || p > d ? 1 : p === d ? 0 : -1; net += h.res * h.bet; }
+      G.net = net; G.done = true; return net;
+    };
+    return G;
+  }
+  function renderHand(el, G, badge = '') {
+    const showD = !G.dealer.some((c) => c.down), dv = B.value(G.dealer);
+    const res = (h) => (h.res === undefined ? '' : h.res > 0 ? `<span class="res win">+${h.res * h.bet}</span>` : h.res < 0 ? `<span class="res lose">${h.res * h.bet}</span>` : '<span class="res push">Push</span>');
+    const hands = G.hands.map((h, i) => {
+      const v = B.value(h.cards), active = !G.done && i === G.act && G.hands.length > 1;
+      return `<div class="hand ${active ? 'act' : ''}"><div class="cards">${h.cards.map((c) => A.cardHTML(c)).join('')}</div>
+        <div class="tot">${(v.soft && v.total < 21 ? 'soft ' : '') + v.total}${v.total > 21 ? ' · bust' : ''}${h.surr ? ' · surrendered' : ''}${h.bet > 1 ? ' · doubled' : ''}</div>${res(h)}</div>`;
+    }).join('');
+    el.innerHTML = `${badge}<div class="lbl">Dealer</div><div class="cards">${G.dealer.map((c) => (c.down ? A.cardHTML(null, c.anim ? 'deal' : '', c.anim ? c.delay : 0) : A.cardHTML(c))).join('')}</div>${showD ? `<div class="tot">${dv.total}${dv.total > 21 ? ' · bust' : ''}</div>` : ''}
+      <div class="lbl" style="margin-top:12px">You</div><div class="you">${hands}</div>`;
+    [G.dealer, ...G.hands.map((h) => h.cards)].forEach((a) => a.forEach((c) => { c.anim = 0; c.flip = 0; c.delay = 0; }));
+  }
+  // Runs one hand on the felt: takes your decisions, plays them out, then the dealer, then settles.
+  function playHand(ui, o) {
+    const G = makeHand(o); const timers = []; let clock = null, locked = false, decisions = 0, allGood = true;
+    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    const paint = () => renderHand(ui.felt, G, o.badge || '');
+    const enable = () => { const op = G.options(G.cur()); setActs(ui.root, { D: !op.canDouble, P: !op.canSplit, R: !op.canSurrender }); };
+    const startClock = () => { if (clock) clock.stop(); if (o.pressure) clock = A.timer(ui.tbar, o.pressure, () => decide(null)); };
+    function decide(a) {
+      if (locked || G.done) return;
+      if (clock) clock.stop();
+      const h = G.cur(), op = G.options(h), book = B.play(h.cards, G.up, o.tc, op), good = a === book, first = decisions === 0;
+      decisions++; if (!good) allGood = false;
+      o.onDecision({ a, book, good, first, cards: h.cards.slice(), op });
+      if (!o.playOut) { locked = true; return o.onEnd({ net: null, quick: true, good }); }
+      const more = G.apply(a || 'S'); paint();
+      if (more) { enable(); startClock(); return; }
+      locked = true; setActs(ui.root, { H: 1, S: 1, D: 1, P: 1, R: 1 });
+      later(dealerTurn, 420);
+    }
+    function dealerTurn() {
+      const hole = G.dealer[1]; hole.down = false; hole.flip = 1; paint(); A.fx.tap();
+      const step = () => { if (G.live() && G.dealerHits()) { G.dealer.push(G.draw()); paint(); later(step, 480); } else later(end, 360); };
+      later(step, 620);
+    }
+    function end() { const net = G.settle(); paint(); net > 0 ? A.fx.ok() : net < 0 ? A.fx.tap() : null; o.onEnd({ net, quick: false, allGood, surr: G.hands.length === 1 && !!G.hands[0].surr }); }
+    // dealt like a casino: your card, the dealer's up card, your second card, the dealer's hole card
+    o.cards.forEach((c, i) => { c.anim = 1; c.delay = i ? 240 : 0; }); Object.assign(o.upCard, { anim: 1, delay: 120 }); Object.assign(G.dealer[1], { anim: 1, delay: 360 });
+    paint(); enable(); startClock();
+    return { decide, stop: () => { locked = true; if (clock) clock.stop(); timers.forEach(clearTimeout); } };
+  }
+  const unitsTxt = (x) => `${x} unit${x === 1 ? '' : 's'}`;
+  const handOutcome = (r) => (r.surr
+    ? { label: 'Surrendered: half your bet back', note: r.allGood ? 'Right play. Played out, this hand loses more than half a bet on average, so surrendering costs less.' : '' }
+    : { allGood: r.allGood });
+  // o: { allGood, label, note } — a right play can lose and a wrong one can win; say so, so the result never teaches the wrong lesson
+  function outcomeHTML(net, last, o = {}) {
+    const head = o.label || (net > 0 ? `You win ${unitsTxt(net)}` : net < 0 ? `You lose ${unitsTxt(-net)}` : 'Push');
+    const note = o.note !== undefined ? o.note : o.allGood === true && net < 0 ? 'Right play, unlucky cards. Over many hands it is still the best play.'
+      : o.allGood === false && net > 0 ? 'You won this one, but the right play does better over many hands.' : '';
+    return `<div class="outcome ${net > 0 ? 'win' : net < 0 ? 'lose' : 'push'}">${head}${note ? `<small>${note}</small>` : ''}</div>
+    <button class="btn" id="nh">${last ? 'See results' : 'Next hand'}</button>`;
+  }
+
   // ---------- Adaptive strategy trainer ----------
   const FOCUS = [['all', 'All hands'], ['hard', 'Hard totals'], ['soft', 'Soft hands'], ['pairs', 'Pairs'], ['weak', 'Weak spots']];
   SCREENS.strategy = (args) => {
     const S = A.S, reps = args.reps || 20;
-    let group = args.group || 'all', pressure = 0, streak = 0, n = 0, ok = 0, cur = null, tmr = null, locked = false;
+    let group = args.group || 'all', pressure = 0, playOut = S.prof.playOut !== false, streak = 0, hands = 0, n = 0, ok = 0, units = 0, game = null, key = null, tid = 0;
     const pool = xpPool(), misses = [];
     const focusName = () => FOCUS.find((f) => f[0] === group)[1];
     return {
@@ -101,59 +209,60 @@
       onRight: () => go('chart'),
       html: `${meta([['', 'rp', `0/${reps}`], ['Streak', 'sk', 0], ['', 'ac', '–', 'acc']])}
         <div id="tb" class="tbar hide"><i></i></div>
-        ${felt(`<div class="lbl">Dealer</div><div class="cards" id="dl"></div><div class="lbl">You</div><div class="cards" id="pl"></div><div class="tot" id="pt"></div>`, 'flashable')}
+        <div class="felt flashable" id="felt"></div>
         ${actBtns()}
-        <div id="fb" class="fb info">${esc(B.rulesLabel())}</div>
-        <div class="row-sb"><button class="pillbtn" id="focus">Focus <b>${focusName()}</b></button><button class="pillbtn" id="prs">Pressure <b>Off</b></button></div>`,
+        <div id="fb" class="fb info">${esc(B.rulesLabel())}</div><div id="out"></div>
+        <div class="row-sb"><button class="pillbtn" id="focus">Focus <b>${focusName()}</b></button><button class="pillbtn" id="opts">${A.icon('sliders')} Options</button></div>`,
       mount(root) {
-        const upd = () => { $('#sk', root).textContent = streak; $('#ac', root).textContent = n ? Math.round((100 * ok) / n) + '%' : '–'; $('#rp', root).textContent = `${n}/${reps}`; };
-        function deal() {
-          const key = A.pickCell(group), [row, upS] = key.split('-'), up = +upS;
-          const cards = B.cellCards(row);
-          cur = { key, cards, up, upc: B.card(B.rankFor(up)), ans: B.play(cards, up, null) };
-          $('#dl', root).innerHTML = A.cardHTML(Object.assign(cur.upc, { anim: 1 })) + A.cardHTML(null);
-          $('#pl', root).innerHTML = cards.map((c) => A.cardHTML(Object.assign(c, { anim: 1 }))).join('');
-          $('#pt', root).textContent = handTotal(cards);
-          setActs(root, { P: !B.isPair(cards), R: !B.rules().ls });
-          locked = false;
-          if (tmr) tmr.stop();
-          if (pressure) tmr = A.timer($('#tb i', root), pressure, () => answer(null));
+        const fb = $('#fb', root), out = $('#out', root), feltEl = $('#felt', root);
+        const upd = () => { $('#sk', root).textContent = streak; $('#ac', root).textContent = n ? Math.round((100 * ok) / n) + '%' : '–'; $('#rp', root).textContent = `${hands}/${reps}`; };
+        function newHand() {
+          if (game) game.stop(); clearTimeout(tid);
+          out.innerHTML = ''; fb.className = 'fb info'; fb.textContent = '';
+          key = A.pickCell(group); const [row, upS] = key.split('-'), up = +upS;
+          const cards = B.cellCards(row), upCard = B.card(B.rankFor(up));
+          game = playHand({ root, felt: feltEl, tbar: $('#tb i', root) }, { cards, up, upCard, tc: null, playOut, pressure, onDecision, onEnd });
         }
-        function answer(a) {
-          if (locked) return; locked = true; if (tmr) tmr.stop();
-          n++; const good = a === cur.ans; A.gradeCell(cur.key, good); A.hist(1, good ? 1 : 0);
-          const fb = $('#fb', root), fl = $('.felt', root);
-          fl.classList.remove('good', 'badf'); void fl.offsetWidth;
-          if (good) {
-            ok++; streak++; A.fx.ok(); pool.add(1);
-            if (streak > S.best.strat) S.best.strat = streak;
-            fb.className = 'fb ok'; fb.innerHTML = `${A.icon('check')} ${B.NAMES[a]}`;
-            fl.classList.add('good'); upd(); A.save();
-            if (n >= reps) return setTimeout(finish, 350);
-            setTimeout(deal, 330);
-          } else {
-            streak = 0; A.fx.bad(); fl.classList.add('badf');
-            const w = B.why(cur.cards, cur.up, cur.ans);
-            misses.push({ t: B.cellLabel(cur.key), a: B.NAMES[cur.ans], w });
-            upd(); A.save();
-            wrongPanel(fb, `${a ? `${B.NAMES[cur.ans]}, not ${B.NAMES[a]}` : `Too slow — ${B.NAMES[cur.ans]}`}`, w, () => { fb.className = 'fb info'; fb.textContent = ''; if (n >= reps) finish(); else deal(); });
+        function onDecision(d) {
+          n++; if (d.first) A.gradeCell(key, d.good); A.hist(1, d.good ? 1 : 0);
+          feltEl.classList.remove('good', 'badf'); void feltEl.offsetWidth; feltEl.classList.add(d.good ? 'good' : 'badf');
+          if (d.good) { ok++; streak++; A.fx.ok(); pool.add(1); if (streak > S.best.strat) S.best.strat = streak; fb.className = 'fb ok'; fb.innerHTML = `${A.icon('check')} ${B.NAMES[d.a]}`; }
+          else {
+            streak = 0; A.fx.bad();
+            const w = B.why(d.cards, +key.split('-')[1], d.book);
+            misses.push({ t: d.first ? B.cellLabel(key) : `${B.value(d.cards).soft ? 'Soft' : 'Hard'} ${B.value(d.cards).total} vs ${B.upName(+key.split('-')[1])}`, a: B.NAMES[d.book], w });
+            fb.className = 'fb bad'; fb.innerHTML = `<b>${d.a ? `${B.NAMES[d.book]} was the play, not ${B.NAMES[d.a]}` : `Too slow — ${B.NAMES[d.book]} was the play`}</b><span class="small">${esc(w)}</span>`;
           }
+          upd(); A.save();
+        }
+        function onEnd(r) {
+          if (r.quick) { // play-out off: straight to the next hand
+            hands++; upd();
+            if (r.good) { tid = setTimeout(() => (hands >= reps ? finish() : newHand()), 330); return; }
+            out.innerHTML = `<button class="btn" id="nh">${hands >= reps ? 'See results' : 'Next hand'}</button>`;
+          } else { hands++; units += r.net; upd(); out.innerHTML = outcomeHTML(r.net, hands >= reps, handOutcome(r)); }
+          $('#nh', out).onclick = () => (hands >= reps ? finish() : newHand());
         }
         function finish() {
-          pool.flush();
-          result(root, { kicker: `${focusName()} · ${n} hands`, big: Math.round((100 * ok) / n) + '%', sub: `${ok} of ${n} correct`, args, misses, good: ok === n,
+          if (game) game.stop(); clearTimeout(tid); pool.flush();
+          result(root, { kicker: `${focusName()} · ${hands} hands`, big: n ? Math.round((100 * ok) / n) + '%' : '0%', sub: `${ok} of ${n} decisions correct${playOut ? ` · ${units > 0 ? 'won ' + unitsTxt(units) : units < 0 ? 'lost ' + unitsTxt(-units) : 'broke even'}` : ''}`, args, misses, good: ok === n,
             note: ok === n ? 'A perfect set.' : 'The hands you missed will come back sooner until you get them right.',
             again: () => A.replace('strategy', Object.assign({}, args, { group })) });
         }
-        $$('[data-a]', root).forEach((b) => (b.onclick = () => answer(b.dataset.a)));
-        $('#focus', root).onclick = () => {
-          A.sheet(`<h3 class="m0">Focus</h3><p class="muted small">Which hands should come up?</p><div class="opts">${FOCUS.map(([v, t]) => `<button class="opt" data-f="${v}"><b>${t}</b>${v === group ? '<small>Current</small>' : ''}</button>`).join('')}</div>`, (r, close) => {
-            $$('[data-f]', r).forEach((b) => (b.onclick = () => { group = b.dataset.f; close(); $('#focus b', root).textContent = focusName(); deal(); }));
-          });
-        };
-        $('#prs', root).onclick = () => { pressure = pressure === 0 ? 3000 : pressure === 3000 ? 2000 : pressure === 2000 ? 1500 : 0; $('#prs b', root).textContent = pressure ? pressure / 1000 + 's' : 'Off'; $('#tb', root).classList.toggle('hide', !pressure); deal(); };
-        upd(); deal();
-        return () => { if (tmr) tmr.stop(); pool.flush(); };
+        $$('[data-a]', root).forEach((b) => (b.onclick = () => game && game.decide(b.dataset.a)));
+        $('#focus', root).onclick = () => A.sheet(`<h3 class="m0">Focus</h3><p class="muted small">Which hands should come up?</p><div class="opts">${FOCUS.map(([v, t]) => `<button class="opt" data-f="${v}"><b>${t}</b>${v === group ? '<small>Current</small>' : ''}</button>`).join('')}</div>`, (r, close) => {
+          $$('[data-f]', r).forEach((b) => (b.onclick = () => { group = b.dataset.f; close(); $('#focus b', root).textContent = focusName(); newHand(); }));
+        });
+        $('#opts', root).onclick = () => A.sheet(`<h3 class="m0">Options</h3>
+          <div class="tgl"><span>Play hands out<br><small class="muted">See the cards, the dealer and the result</small></span><button class="switch ${playOut ? 'on' : ''}" id="po"><i></i></button></div>
+          <label>Pressure (time per decision)</label><div class="seg" id="pz">${[[0, 'Off'], [3000, '3s'], [2000, '2s'], [1500, '1.5s']].map(([v, t]) => `<button data-v="${v}" class="${pressure === v ? 'on' : ''}">${t}</button>`).join('')}</div>
+          <button class="btn" id="oc" style="margin-top:14px">Done</button>`, (r, close) => {
+          $('#po', r).onclick = (e) => { playOut = !playOut; S.prof.playOut = playOut; A.save(); e.currentTarget.classList.toggle('on', playOut); };
+          $$('#pz button', r).forEach((b) => (b.onclick = () => { pressure = +b.dataset.v; $$('#pz button', r).forEach((x) => x.classList.toggle('on', x === b)); }));
+          $('#oc', r).onclick = () => { close(); $('#tb', root).classList.toggle('hide', !pressure); newHand(); };
+        });
+        upd(); newHand();
+        return () => { if (game) game.stop(); clearTimeout(tid); pool.flush(); };
       }
     };
   };
@@ -492,43 +601,79 @@
 
   // ---------- Index trainer ----------
   SCREENS.index = (args) => {
-    const S = A.S, reps = args.reps || 20; let n = 0, ok = 0, streak = 0, cur, lock = false; const pool = xpPool(), misses = [];
+    const S = A.S, reps = args.reps || 20;
+    let n = 0, ok = 0, streak = 0, spots = 0, units = 0, game = null, cur = null; const pool = xpPool(), misses = [];
+    const playOut = () => S.prof.playOut !== false;
     return {
       title: 'Index Plays',
-      html: `${meta([['', 'rp', `0/${reps}`], ['Streak', 'sk', 0], ['', 'ac', '–', 'acc']])}<div id="iw"></div>`,
+      html: `${meta([['', 'rp', `0/${reps}`], ['Streak', 'sk', 0], ['', 'ac', '–', 'acc']])}
+        <div class="felt flashable" id="felt"></div><div id="acts"></div><div id="fb"></div><div id="out"></div>`,
       mount(root) {
-        const iw = $('#iw', root);
-        const upd = () => { $('#sk', root).textContent = streak; $('#ac', root).textContent = n ? Math.round((100 * ok) / n) + '%' : '–'; $('#rp', root).textContent = `${n}/${reps}`; };
-        const next = () => {
-          const d = A.pickDev(), idx = B.devIdx(d), tc = idx + pick([-2, -1, -1, 0, 0, 1, 1, 2]);
-          const hand = d.hand(), o = Object.assign({ canSurrender: d.kind === 'sur' }, d.o || {});
-          cur = { d, tc, hand, o, rule: B.devRule(d), ans: d.insurance ? (tc >= idx ? 'Y' : 'N') : B.play(hand, d.up, tc, o) }; lock = false;
-          const btns = d.insurance ? `<div class="acts two"><button class="act a-Y" data-a="Y">Take insurance</button><button class="act a-N" data-a="N">No insurance</button></div>`
-            : actBtns({ dis: { P: !B.isPair(hand), R: !o.canSurrender || !B.rules().ls } });
-          iw.innerHTML = felt(`<div class="tcbadge">TC <b>${sgn(tc)}</b></div><div class="lbl">Dealer</div><div class="cards">${A.cardHTML(B.card(B.rankFor(d.up)))}${A.cardHTML(null)}</div>
-            <div class="lbl">You</div><div class="cards">${hand.map((c) => A.cardHTML(c)).join('')}</div><div class="tot">${d.insurance ? 'Dealer shows an Ace — insurance?' : handTotal(hand) + (o.canSurrender && B.rules().ls ? ' · surrender allowed' : ' · no surrender')}</div>`, 'flashable') + btns + '<div id="fb"></div>';
-          $$('[data-a]', iw).forEach((b) => (b.onclick = () => answer(b.dataset.a)));
-        };
-        const answer = (a) => {
-          if (lock) return; lock = true; n++;
-          const good = a === cur.ans; A.gradeDev(cur.d.id, good); A.hist(1, good ? 1 : 0);
-          const nm = (k) => (k === 'Y' ? 'Take insurance' : k === 'N' ? 'No insurance' : B.NAMES[k]);
-          const fl = $('.felt', iw); fl.classList.add(good ? 'good' : 'badf');
-          if (good) {
-            ok++; streak++; A.fx.ok(); pool.add(2); if (streak > S.best.index) S.best.index = streak; A.save(); upd();
-            $('#fb', iw).innerHTML = `<div class="fb ok">${A.icon('check')} ${nm(a)}</div>`;
-            if (n >= reps) return setTimeout(finish, 500);
-            setTimeout(next, 650);
-          } else {
-            streak = 0; A.fx.bad(); A.save(); upd();
-            misses.push({ t: `${cur.d.name} at TC ${sgn(cur.tc)}`, a: nm(cur.ans), w: cur.rule });
-            const box = document.createElement('div'); $('#fb', iw).appendChild(box);
-            wrongPanel(box, `${nm(cur.ans)} at ${sgn(cur.tc)}`, `${cur.d.name}: ${cur.rule}.`, () => (n >= reps ? finish() : next()));
+        const feltEl = $('#felt', root), actsEl = $('#acts', root), fb = $('#fb', root), out = $('#out', root);
+        const upd = () => { $('#sk', root).textContent = streak; $('#ac', root).textContent = n ? Math.round((100 * ok) / n) + '%' : '–'; $('#rp', root).textContent = `${spots}/${reps}`; };
+        const nm = (k) => (k === 'Y' ? 'Take insurance' : k === 'N' ? 'No insurance' : B.NAMES[k]);
+        const badge = (tc) => `<div class="tcbadge">TC <b>${sgn(tc)}</b></div>`;
+        const flash = (good) => { feltEl.classList.remove('good', 'badf'); void feltEl.offsetWidth; feltEl.classList.add(good ? 'good' : 'badf'); };
+        function grade(good, chosen, right, first, cards) {
+          n++; A.hist(1, good ? 1 : 0); if (first) A.gradeDev(cur.d.id, good); flash(good);
+          if (good) { ok++; streak++; A.fx.ok(); pool.add(2); if (streak > S.best.index) S.best.index = streak; fb.className = 'fb ok'; fb.innerHTML = `${A.icon('check')} ${nm(chosen)}`; }
+          else {
+            streak = 0; A.fx.bad();
+            // the first decision is the index play itself; later ones (after a hit or split) are judged on the hand you then hold
+            const v = cards && B.value(cards), spot = first || !v ? cur.d.name : `${v.soft ? 'Soft' : 'Hard'} ${v.total} vs ${B.upName(cur.d.up)}`;
+            const why = first || !v ? cur.rule : B.why(cards, cur.d.up, right);
+            misses.push({ t: `${spot} at TC ${sgn(cur.tc)}`, a: nm(right), w: why });
+            fb.className = 'fb bad'; fb.innerHTML = `<b>${chosen ? `${nm(right)} was the play, not ${nm(chosen)}` : `Too slow — ${nm(right)}`}</b><span class="small">${esc(spot)} at ${sgn(cur.tc)}: ${esc(why)}${/[.!?]$/.test(why) ? '' : '.'}</span>`;
           }
-        };
-        const finish = () => { pool.flush(); result(iw, { kicker: `Index plays · ${n} spots`, big: Math.round((100 * ok) / n) + '%', sub: `${ok} of ${n} correct`, args, misses, good: ok === n, again: () => A.replace('index', Object.assign({}, args)) }); };
-        next();
-        return () => pool.flush();
+          upd(); A.save();
+        }
+        function done(net, opts) {
+          spots++; if (typeof net === 'number') units += net; upd();
+          out.innerHTML = typeof net === 'number' ? outcomeHTML(net, spots >= reps, opts) : `<button class="btn" id="nh">${spots >= reps ? 'See results' : 'Next spot'}</button>`;
+          $('#nh', out).onclick = () => (spots >= reps ? finish() : next());
+        }
+        function next() {
+          if (game) game.stop();
+          fb.className = ''; fb.innerHTML = ''; out.innerHTML = '';
+          const d = A.pickDev(), idx = B.devIdx(d), tc = idx + pick([-2, -1, -1, 0, 0, 1, 1, 2]);
+          cur = { d, tc, rule: B.devRule(d) };
+          const upCard = B.card(B.rankFor(d.up)), hand = d.hand();
+          if (d.insurance) { // insurance: decide, then the hole card is turned over
+            const hole = countedShoe(tc)[0];
+            const paint = (reveal) => {
+              feltEl.innerHTML = `${badge(tc)}<div class="lbl">Dealer</div><div class="cards">${A.cardHTML(upCard)}${reveal ? A.cardHTML(Object.assign(hole, { flip: 1 })) : A.cardHTML(null, 'deal', 360)}</div>
+                <div class="lbl" style="margin-top:12px">You</div><div class="cards">${hand.map((c) => A.cardHTML(c)).join('')}</div><div class="tot">Dealer shows an Ace — insurance?</div>`;
+              hole.flip = 0;
+            };
+            hand.forEach((c, i) => Object.assign(c, { anim: 1, delay: i ? 240 : 0 })); Object.assign(upCard, { anim: 1, delay: 120 });
+            paint(false); [upCard, ...hand].forEach((c) => Object.assign(c, { anim: 0, delay: 0 }));
+            actsEl.innerHTML = `<div class="acts two"><button class="act a-Y" data-a="Y">Take insurance</button><button class="act a-N" data-a="N">No insurance</button></div>`;
+            $$('[data-a]', actsEl).forEach((b) => (b.onclick = () => {
+              $$('[data-a]', actsEl).forEach((x) => (x.disabled = true));
+              const a = b.dataset.a, right = tc >= idx ? 'Y' : 'N'; grade(a === right, a, right, true);
+              setTimeout(() => {
+                paint(true); const bj = B.rv(hole.r) === 10;
+                const tot = $('.tot', feltEl); if (tot) tot.textContent = bj ? 'Dealer has blackjack — insurance pays 2 to 1' : 'No blackjack — insurance loses';
+                // the insurance bet is half the main bet: it pays 2 to 1 when the hole card is a ten
+                done(a === 'Y' ? (bj ? 1 : -0.5) : null, { allGood: a === right, label: bj ? 'Insurance wins 1 unit' : 'Insurance loses half a unit' });
+              }, 450);
+            }));
+            return;
+          }
+          actsEl.innerHTML = actBtns();
+          const firstOpts = Object.assign({ canSurrender: d.kind === 'sur' }, d.o || {});
+          $$('[data-a]', actsEl).forEach((b) => (b.onclick = () => game && game.decide(b.dataset.a)));
+          game = playHand({ root: actsEl, felt: feltEl, tbar: null }, { cards: hand, up: d.up, upCard, tc, firstOpts, badge: badge(tc), playOut: playOut(), pressure: 0,
+            onDecision: (x) => grade(x.good, x.a, x.book, x.first, x.cards),
+            onEnd: (r) => done(r.quick ? null : r.net, handOutcome(r)) });
+        }
+        function finish() {
+          if (game) game.stop(); pool.flush();
+          result(root, { kicker: `Index plays · ${spots} spots`, big: n ? Math.round((100 * ok) / n) + '%' : '0%', sub: `${ok} of ${n} decisions correct`, args, misses, good: ok === n,
+            again: () => A.replace('index', Object.assign({}, args)) });
+        }
+        upd(); next();
+        return () => { if (game) game.stop(); pool.flush(); };
       }
     };
   };
