@@ -348,3 +348,18 @@ body.sub main { padding-bottom: calc(var(--sb) + 18px); }
 .betbtns { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; margin-top: 4px; } .betbtns .btn { margin: 0; padding: 13px 6px; font-size: 15px; } .betbtns .btn:disabled { opacity: .4; }
 .place .pend { font: 900 20px var(--round); color: #fff; }
 .chip:disabled { opacity: .3; }
+
+/* ---------- test-pass fixes ---------- */
+main { overflow-x: hidden; }                       /* no sideways wobble while pages slide in */
+html, body { touch-action: manipulation; -webkit-touch-callout: none; }
+.switch::after { content: ""; position: absolute; inset: -8px -6px; } /* bigger tap area for toggles */
+@media (max-height: 700px) {                       /* short phones (SE / mini with Display Zoom) */
+  .pc { width: 52px; height: 74px; } .cards, .dealer .cards { min-height: 74px; }
+  .pc .pip { font-size: 24px; } .pc .ace { font-size: 34px; } .pc .face { font-size: 26px; }
+  .table { min-height: 230px; padding-bottom: 14px; } .arc { width: 66%; margin-bottom: -26px; }
+  .place { margin-top: 12px; width: 76px; height: 76px; font-size: 11px; }
+  .chip { width: 52px; height: 52px; } .chip span { width: 34px; height: 34px; }
+  .hud b { font-size: 14px; } .hud span { font-size: 9px; } .heat { margin-bottom: 6px; }
+  .statrow b { font-size: 16px; } .statrow > div { padding: 5px 2px; }
+  .act { padding: 13px 4px; }
+}

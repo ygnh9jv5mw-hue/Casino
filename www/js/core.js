@@ -68,7 +68,7 @@
       setTimeout(() => { confetti(); toast(`🔥 Daily goal hit — ${streak()} day streak!`, 'good'); fx.win(); }, 250);
     }
     const after = rank().i;
-    if (after > before) setTimeout(() => celebrate(`Rank up!`, `You're now a <b>${RANKS[after][1]}</b>.`), 600);
+    if (after > before) queueCelebrate(`Rank up!`, `You're now a <b>${RANKS[after][1]}</b>.`);
     save(); xpBadge(n);
   }
   function streak() {
@@ -194,11 +194,17 @@
   }
   const stageDone = (st) => st.tasks.every(taskDone);
   const stageOpen = (i) => i === 0 || CAMP[i].id <= (S.prof.unlockTo || 1) || stageDone(CAMP[i - 1]);
-  function currentStage() { for (let i = 0; i < CAMP.length; i++) if (!stageDone(CAMP[i]) && stageOpen(i)) return i; return CAMP.length - 1; }
+  function currentStage() {
+    // players who chose a later starting point see that stage first; earlier stages stay open behind it
+    const from = S.prof.unlockTo || 1;
+    for (let i = 0; i < CAMP.length; i++) if (CAMP[i].id >= from && !stageDone(CAMP[i]) && stageOpen(i)) return i;
+    for (let i = 0; i < CAMP.length; i++) if (!stageDone(CAMP[i]) && stageOpen(i)) return i;
+    return CAMP.length - 1;
+  }
   function checkCamp() { // award newly completed stages
     let any = false;
     CAMP.forEach((st) => { if (!S.campDone[st.id] && stageDone(st)) { S.campDone[st.id] = true; any = st; } });
-    if (any) { save(); addXP(150); setTimeout(() => celebrate('Stage complete!', `<b>${esc(any.title)}</b> is done. The next stage is unlocked.`), 300); }
+    if (any) { save(); addXP(150); queueCelebrate('Stage complete!', `<b>${esc(any.title)}</b> is done. The next stage is unlocked.`); }
   }
 
   // ---------------- daily workout ----------------
@@ -247,19 +253,23 @@
     document.body.classList.toggle('sub', !!stack.length);
     if (scr.mount) cleanup = scr.mount(v.firstElementChild, cur.args || {}) || null;
     const rb = $('#rbtn'); if (rb && scr.onRight) rb.onclick = scr.onRight;
+    if (!stack.length && pending.length) setTimeout(flushCelebrations, 450);
   }
 
   // ---------------- UI helpers ----------------
   const RED = (s) => s === '♥' || s === '♦';
   const FACE = { J: 'J', Q: 'Q', K: 'K' };
+  const CARD_NAME = { A: 'Ace', J: 'Jack', Q: 'Queen', K: 'King' };
+  const SUIT_NAME = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' };
   function cardHTML(c, cls = '') {
-    if (!c) return `<div class="pc back ${cls}"><i></i></div>`;
+    if (!c) return `<div class="pc back ${cls}" role="img" aria-label="face-down card"><i></i></div>`;
     const anim = c.anim ? ' deal' : '';
     const mid = FACE[c.r] ? `<span class="face">${c.r}<em>${c.s}</em></span>` : c.r === 'A' ? `<span class="ace">${c.s}</span>` : `<span class="pip">${c.s}</span>`;
-    return `<div class="pc ${RED(c.s) ? 'red' : ''} ${cls}${anim}"><span class="cr">${c.r}<b>${c.s}</b></span>${mid}<span class="cr br">${c.r}<b>${c.s}</b></span></div>`;
+    const label = `${CARD_NAME[c.r] || c.r} of ${SUIT_NAME[c.s]}`;
+    return `<div class="pc ${RED(c.s) ? 'red' : ''} ${cls}${anim}" role="img" aria-label="${label}"><span class="cr" aria-hidden="true">${c.r}<b>${c.s}</b></span><span aria-hidden="true">${mid}</span><span class="cr br" aria-hidden="true">${c.r}<b>${c.s}</b></span></div>`;
   }
   function pad(onSubmit, opts = {}) {
-    let val = '', neg = false;
+    let val = '', neg = false, sent = false;
     const html = `<div class="display ${opts.small ? 'sm' : ''}" id="pd">${opts.placeholder || '0'}</div>
       <div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<button data-k="${n}">${n}</button>`).join('')}
       <button data-k="±" class="sign">±</button><button data-k="0">0</button><button data-k="⌫">⌫</button></div>
@@ -268,7 +278,7 @@
       const show = () => { const d = $('#pd', root); if (d) d.textContent = (neg ? '−' : val && val !== '0' && !opts.unsigned ? '+' : '') + (val || '0'); };
       $$('[data-k]', root).forEach((b) => (b.onclick = () => {
         const k = b.dataset.k; fx.tap();
-        if (k === 'go') { const n = (neg ? -1 : 1) * (+val || 0); val = ''; neg = false; show(); return onSubmit(n); }
+        if (k === 'go') { if (sent) return; sent = true; const n = (neg ? -1 : 1) * (+val || 0); val = ''; neg = false; show(); return onSubmit(n); } // one answer per keypad
         if (k === '±') neg = !neg; else if (k === '⌫') val = val.slice(0, -1); else if (val.length < 3) val = (val === '0' ? '' : val) + k;
         show();
       }));
@@ -292,8 +302,12 @@
   }
   function celebrate(title, body) {
     confetti(); fx.win();
-    sheet(`<div class="celebrate"><div class="burst">★</div><h2>${title}</h2><p class="muted">${body}</p><button class="btn" id="cok">Keep going</button></div>`, (r, close) => { $('#cok', r).onclick = close; });
+    sheet(`<div class="celebrate"><div class="burst">★</div><h2>${title}</h2><p class="muted">${body}</p><button class="btn" id="cok">Keep going</button></div>`, (r, close) => { $('#cok', r).onclick = () => { close(); setTimeout(flushCelebrations, 250); }; });
   }
+  // Rank-ups and finished stages wait until you're back on a main tab, so they never cover a drill or a hand.
+  const pending = [];
+  function queueCelebrate(title, body) { pending.push([title, body]); if (!stack.length) setTimeout(flushCelebrations, 400); }
+  function flushCelebrations() { if (stack.length || !pending.length || $('#modal .scrim')) return; const [t, b] = pending.shift(); celebrate(t, b); }
   function confetti() {
     const box = document.createElement('div'); box.className = 'confetti';
     const cols = ['#f2c14e', '#33d17a', '#59a8ff', '#ff5d5d', '#ffffff'];

@@ -61,5 +61,5 @@ window.CAMP = [
   { id: 14, title: 'Pro', sub: 'Advanced play and the team', tasks: [
     { k: 'lesson', id: 'm6l1' }, { k: 'lesson', id: 'm6l2' }, { k: 'lesson', id: 'm6l3' },
     { k: 'lesson', id: 'm7l1' }, { k: 'lesson', id: 'm7l2' }, { k: 'lesson', id: 'm8l1' }, { k: 'lesson', id: 'm8l2' },
-    { k: 'quiz', id: 'm6', pct: 80 }, { k: 'quiz', id: 'm8', pct: 80 } ] }
+    { k: 'quiz', id: 'm6', pct: 80 }, { k: 'quiz', id: 'm7', pct: 80 }, { k: 'quiz', id: 'm8', pct: 80 } ] }
 ];
