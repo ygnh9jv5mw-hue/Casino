@@ -63,8 +63,9 @@
     mount(root) {
       A.S.flags.bankroll = true; A.save();
       const calc = () => {
-        const v = (id) => parseFloat($(id, root).value) || 0;
-        const B0 = v('#b1'), avg = v('#b2'), edge = v('#b3') / 100, sd = v('#b4'), hph = v('#b5'), hrs = v('#b6');
+        // clamp every input to a sane range so typos, negatives or huge numbers can't produce NaN
+        const v = (id, lo, hi) => { const x = parseFloat($(id, root).value); return isFinite(x) ? Math.min(hi, Math.max(lo, x)) : 0; };
+        const B0 = v('#b1', 0, 1e9), avg = v('#b2', 0, 1e7), edge = v('#b3', -50, 50) / 100, sd = v('#b4', 0, 1e7), hph = v('#b5', 0, 1000), hrs = Math.round(v('#b6', 0, 1e5));
         const ev = avg * edge, evh = ev * hph, sdh = sd * Math.sqrt(hph), N = hph * hrs, evT = ev * N, sdT = sd * Math.sqrt(N);
         const ror = ev > 0 && sd > 0 ? Math.exp((-2 * ev * B0) / (sd * sd)) : 1;
         const n0 = ev > 0 ? (sd / ev) ** 2 : Infinity, behind = sdT > 0 ? 0.5 * erfc(evT / sdT / Math.SQRT2) : 0;

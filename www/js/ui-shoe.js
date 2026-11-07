@@ -36,6 +36,15 @@
         cfg = Object.assign({ speed: 'normal', clock: 0, dev: true, showRC: false, heat: true, chatter: true, coach: true, quiz: false }, defaults, S.prof.shoe || {});
         if (ddg) cfg.decks = 2; else if (cfg.decks !== 8) cfg.decks = 6;
       }
+      // re-check stored table settings so a bad value can never break the table
+      if (!SPEEDS.hasOwnProperty(cfg.speed)) cfg.speed = 'normal';
+      if (![0, 2000, 3000, 5000].includes(cfg.clock)) cfg.clock = 0;
+      if (!(cfg.seats === 'random' && casino) && !(Number.isInteger(cfg.seats) && cfg.seats >= 0 && cfg.seats <= 5)) cfg.seats = casino ? 'random' : 2;
+      if (!(cfg.cut === 'random' || (typeof cfg.cut === 'number' && cfg.cut >= 0.4 && cfg.cut <= 0.9))) cfg.cut = 'random';
+      if (!['up', 'pitch'].includes(cfg.deal)) cfg.deal = 'up';
+      if (![10, 25, 50, 100].includes(cfg.min)) cfg.min = 25;
+      for (const k of ['dev', 'showRC', 'heat', 'chatter', 'coach', 'quiz', 'burn', 'h17', 'ls']) cfg[k] = !!cfg[k];
+      if (casino) B.setRules({ decks: cfg.decks, h17: cfg.h17, ls: cfg.ls });
       const dd = B.isDD();
       const N = () => cfg.decks * 52;
       const maxBet = () => cfg.min * 40;
@@ -64,7 +73,12 @@
       newShoe();
       const total = { hands: 0 }; // hands this session (for workout targets)
       const drawC = (vis = true) => {
-        if (!G.shoe.length) { G.shoe = B.shoe(cfg.decks); G.msg = 'The dealer shuffled the discards to finish the round.'; } // safety net, practically never reached
+        if (!G.shoe.length) { // out of cards mid-round: like a real dealer, shuffle the discards (everything not on the table) and finish the hand
+          const fresh = B.shoe(cfg.decks), onTable = R ? [...R.dealer, ...R.seats.flatMap((s) => s.cards || []), ...R.hands.flatMap((h) => h.cards)] : [];
+          for (const t of onTable) { const i = fresh.findIndex((x) => x.r === t.r && x.s === t.s); if (i >= 0) fresh.splice(i, 1); }
+          G.shoe = fresh; G.rc = 0; G.burned = 0; G.cutOut = true;
+          G.msg = 'Out of cards — the dealer shuffled the discards to finish this hand. The count restarts at 0.'; G.msgOk = true;
+        }
         const c = G.shoe.pop(); c.anim = 1; c.down = !vis; if (vis) G.rc += B.hilo(c.r);
         if (!G.cutOut && G.shoe.length < G.cut) G.cutOut = true; // the cut card comes out — this round is the last
         return c;
@@ -131,7 +145,7 @@
                   <div class="betbtns"><button class="btn dark" id="clr">Clear</button><button class="btn dark" id="rebet" ${G.lastBet && G.lastBet <= S.casino.bank ? '' : 'disabled'}>Rebet${G.lastBet ? ' ' + fmt$(G.lastBet) : ''}</button><button class="btn" id="dealb" ${G.pend >= cfg.min ? '' : 'disabled'}>Deal</button></div>
                   <p class="center tiny muted">${G.pend && G.pend < cfg.min ? `Table minimum is $${cfg.min}.` : `Bet with the count: 1 unit = $${cfg.min} · ${B.rampText()}`}</p>`;
               } else ctl = `${msg}<p class="center tiny muted">Bet by the true count: ${B.rampText()}${cfg.heat ? ' · jump too fast and you\'ll get heat' : ''}</p>${A.chips()}`;
-            } else if (G.phase === 'ins') ctl = `${msg}<p class="center"><b>Insurance?</b></p><div class="acts two"><button class="act a-Y" data-ins="1">Take insurance</button><button class="act a-N" data-ins="0">No insurance</button></div>`;
+            } else if (G.phase === 'ins') { const can = canInsure(); ctl = `${msg}<p class="center"><b>Insurance?</b>${can ? '' : ' <span class="tiny muted">— not enough chips</span>'}</p><div class="acts two"><button class="act a-Y" data-ins="1" ${can ? '' : 'disabled'}>Take insurance</button><button class="act a-N" data-ins="0">No insurance</button></div>`; }
             else if (G.phase === 'play') { const o = options(R.hands[R.act]); ctl = `${msg}${cfg.clock ? '<div class="tbar"><i></i></div>' : ''}<div class="acts">${['H', 'S', 'D', 'P', 'R'].map((k) => `<button class="act a-${k}" data-a="${k}" ${(k === 'D' && !o.canDouble) || (k === 'P' && !o.canSplit) || (k === 'R' && !o.canSurrender) ? 'disabled' : ''}>${B.NAMES[k]}</button>`).join('')}</div>`; }
             else if (G.phase === 'over') ctl = `${msg}<div class="fb ${R.net > 0 ? 'ok' : R.net < 0 ? 'bad' : 'info'} slim">${R.net > 0 ? `You won ${money(R.net)}` : R.net < 0 ? `You lost ${money(-R.net)}` : 'Push'}</div><button class="btn big" id="nr">${G.cutOut ? 'Shuffle up ›' : 'Next hand ›'}</button>`;
             else ctl = `${msg}<div class="wait">Dealing…</div>`;
@@ -232,8 +246,11 @@
             if (R.up === 11) { G.phase = 'ins'; draw(); return; }
             peek();
           }
+          // in the casino, insurance costs half the bet in real chips — it can't be taken without them
+          function canInsure() { return !casino || S.casino.bank - exposure() >= R.hands[0].bet / 2; }
           function insurance(take) {
-            const want = tc() >= insIdx(); G.st.dec++; S.shoe.dec++;
+            const afford = canInsure(); if (!afford) take = false;
+            const want = tc() >= insIdx() && afford; G.st.dec++; S.shoe.dec++;
             if (take === want) { G.st.decOk++; S.shoe.decOk++; say(`✓ ${take ? 'Insured' : 'No insurance'} at TC ${sgn(tc())}`, true); if (!casino || cfg.coach) A.fx.ok(); }
             else { say(`✗ Insurance only at TC ${sgn(insIdx())} or higher (TC is ${sgn(tc())})`, false); if (!casino || cfg.coach) A.fx.bad(); G.st.misses.push({ t: `Insurance at TC ${sgn(tc())}`, a: want ? 'Take it' : 'Decline', w: `Take insurance at ${sgn(insIdx())} or higher` }); }
             if (take) R.ins = R.hands[0].bet / 2;

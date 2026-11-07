@@ -23,19 +23,56 @@
     flags: {}, log: [], wk: { d: '', i: 0 }
   });
   let S;
-  function load() {
+  // Saved data is checked field by field: anything missing, damaged or out of range falls back to its default,
+  // so a corrupted save can never stop the app from opening.
+  const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+  const num = (x, def, lo = -Infinity, hi = Infinity) => (typeof x === 'number' && isFinite(x) ? Math.min(hi, Math.max(lo, x)) : def);
+  const bool = (x, def) => (typeof x === 'boolean' ? x : def);
+  const str = (x, def, max = 500) => (typeof x === 'string' ? x.slice(0, max) : def);
+  const isDay = (x) => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x);
+  const mapObj = (x, fn) => { const o = {}; if (isObj(x)) for (const k of Object.keys(x)) { const v = fn(x[k], k); if (v !== undefined) o[k] = v; } return o; };
+  const srCell = (c) => (isObj(c) ? { b: num(Math.round(c.b), 0, 0, 5), n: num(c.n, 0, 0), ok: num(c.ok, 0, 0), miss: num(c.miss, 0, 0) } : undefined);
+  function sanitize(s) {
     const d = DEF();
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) { const s = JSON.parse(raw); S = Object.assign(d, s); for (const k of ['prof', 'best', 'shoe', 'xpDay', 'wk']) S[k] = Object.assign(DEF()[k], s[k] || {}); return; }
-      const v1 = JSON.parse(localStorage.getItem('bjmc.v1') || 'null');
-      S = d;
-      if (v1) { // migrate v1 progress
-        S.done = v1.done || {}; S.days = v1.days || []; S.log = v1.log || [];
-        if (v1.best) { S.best.strat = v1.best.strat || 0; S.best.deck = v1.best.deck ?? null; S.best.tc = v1.best.tc ?? null; }
-        if (v1.shoe) Object.assign(S.shoe, v1.shoe);
-      }
-    } catch (e) { S = d; }
+    if (!isObj(s)) return d;
+    const p = isObj(s.prof) ? s.prof : {};
+    d.prof = {
+      onboarded: bool(p.onboarded, false), level: ['new', 'basic', 'counter'].includes(p.level) ? p.level : 'new',
+      goal: [100, 250, 500].includes(p.goal) ? p.goal : 250, h17: bool(p.h17, true), ls: bool(p.ls, true), decks: p.decks === 2 ? 2 : 6,
+      gameAsked: bool(p.gameAsked, false), sound: bool(p.sound, true), haptics: bool(p.haptics, true),
+      remind: typeof p.remind === 'string' && /^\d{2}:\d{2}$/.test(p.remind) ? p.remind : '', unlockTo: [1, 5, 9].includes(p.unlockTo) ? p.unlockTo : 1,
+      shoe: isObj(p.shoe) ? p.shoe : null, casino: isObj(p.casino) ? p.casino : null // table settings are re-checked by the table itself
+    };
+    d.xp = num(s.xp, 0, 0, 1e9);
+    d.xpDay = isObj(s.xpDay) && isDay(s.xpDay.d) ? { d: s.xpDay.d, xp: num(s.xpDay.xp, 0, 0, 1e9) } : { d: '', xp: 0 };
+    d.goalDays = Array.isArray(s.goalDays) ? s.goalDays.filter(isDay).slice(-3000) : [];
+    d.days = Array.isArray(s.days) ? s.days.filter(isDay).slice(-3000) : [];
+    d.done = mapObj(s.done, (v) => (v === true ? true : undefined));
+    d.quiz = mapObj(s.quiz, (v) => (typeof v === 'number' && isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : undefined));
+    d.campDone = mapObj(s.campDone, (v) => (v === true ? true : undefined));
+    d.flags = mapObj(s.flags, (v) => (typeof v === 'boolean' ? v : undefined));
+    const b = isObj(s.best) ? s.best : {};
+    for (const k of Object.keys(d.best)) d.best[k] = k === 'deck' || k === 'tc' ? (typeof b[k] === 'number' && isFinite(b[k]) && b[k] > 0 ? b[k] : null) : num(b[k], 0, 0, 1e6);
+    d.cells = mapObj(s.cells, srCell);
+    d.idx = mapObj(s.idx, srCell);
+    d.hist = mapObj(s.hist, (v, k) => (isDay(k) && isObj(v) ? { n: num(v.n, 0, 0), ok: num(v.ok, 0, 0), xp: num(v.xp, 0, 0) } : undefined));
+    const sh = isObj(s.shoe) ? s.shoe : {};
+    for (const k of Object.keys(d.shoe)) d.shoe[k] = Math.round(num(sh[k], 0, 0, 1e9));
+    d.shoe.decOk = Math.min(d.shoe.decOk, d.shoe.dec); d.shoe.checksOk = Math.min(d.shoe.checksOk, d.shoe.checks); d.shoe.betsOk = Math.min(d.shoe.betsOk, d.shoe.bets);
+    d.log = Array.isArray(s.log) ? s.log.filter(isObj).map((e, i) => ({ id: num(e.id, Date.now() + i), date: str(e.date, '', 20), where: str(e.where, '', 120), hours: num(e.hours, 0, 0, 1000), result: num(e.result, 0, -1e9, 1e9), notes: str(e.notes, '', 1000) })) : [];
+    d.wk = isObj(s.wk) && isDay(s.wk.d) ? { d: s.wk.d, i: Math.round(num(s.wk.i, 0, 0, 20)) } : { d: '', i: 0 };
+    if (isObj(s.casino)) { const c = s.casino; d.casino = { bank: num(c.bank, 1000, 0, 1e9), hands: num(c.hands, 0, 0), net: num(c.net, 0, -1e12, 1e12), peak: num(c.peak, 1000, 0, 1e9), shoes: num(c.shoes, 0, 0), reloads: num(c.reloads, 0, 0) }; }
+    return d;
+  }
+  function load() {
+    let raw = null, v1 = null;
+    try { raw = localStorage.getItem(KEY); } catch (e) {}
+    if (raw) { let s = null; try { s = JSON.parse(raw); } catch (e) {} S = sanitize(s); return; }
+    S = DEF();
+    try { v1 = JSON.parse(localStorage.getItem('bjmc.v1') || 'null'); } catch (e) {}
+    if (isObj(v1)) { // migrate the very first version's progress
+      S = sanitize({ done: v1.done, days: v1.days, log: v1.log, best: isObj(v1.best) ? { strat: v1.best.strat, deck: v1.best.deck, tc: v1.best.tc } : {}, shoe: v1.shoe });
+    }
   }
   load();
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };

@@ -363,3 +363,4 @@ html, body { touch-action: manipulation; -webkit-touch-callout: none; }
   .statrow b { font-size: 16px; } .statrow > div { padding: 5px 2px; }
   .act { padding: 13px 4px; }
 }
+.list-item .tx, .miss, .lesson, .card p { overflow-wrap: anywhere; } /* long words or notes can't push the page wider */
