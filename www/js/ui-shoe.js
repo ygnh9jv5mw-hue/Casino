@@ -149,20 +149,25 @@
             else if (G.phase === 'play') { const o = options(R.hands[R.act]); ctl = `${msg}${cfg.clock ? '<div class="tbar"><i></i></div>' : ''}<div class="acts">${['H', 'S', 'D', 'P', 'R'].map((k) => `<button class="act a-${k}" data-a="${k}" ${(k === 'D' && !o.canDouble) || (k === 'P' && !o.canSplit) || (k === 'R' && !o.canSurrender) ? 'disabled' : ''}>${B.NAMES[k]}</button>`).join('')}</div>`; }
             else if (G.phase === 'over') ctl = `${msg}<div class="fb ${R.net > 0 ? 'ok' : R.net < 0 ? 'bad' : 'info'} slim">${R.net > 0 ? `You won ${money(R.net)}` : R.net < 0 ? `You lost ${money(-R.net)}` : 'Push'}</div><button class="btn big" id="nr">${G.cutOut ? 'Shuffle up ›' : 'Next hand ›'}</button>`;
             else ctl = `${msg}<div class="wait">Dealing…</div>`;
+            // when the controls change (new phase), ignore taps for a moment so the second tap of a double-tap
+            // can't land on whatever button just appeared under the finger (e.g. a chip under "Next hand")
+            if (G.phase !== lastPhase) { lastPhase = G.phase; tapGuardUntil = performance.now() + 380; }
             sw.innerHTML = hud + heat + table + `<div class="ctl">${ctl}</div>`;
             if (R) [R.dealer, ...R.seats.map((s) => s.cards || []), ...R.hands.map((h) => h.cards)].forEach((a) => a.forEach((c) => (c.anim = 0)));
             bind();
           }
+          let lastPhase = '', tapGuardUntil = 0;
+          const guard = (fn) => (...a) => { if (performance.now() < tapGuardUntil) return; fn(...a); };
           function bind() {
             const pk = $('#peek', sw); if (pk) pk.onclick = () => { if (!cfg.showRC) { G.st.peeks++; pk.textContent = `RC ${sgn(G.rc)} · TC ${sgn(tc())}`; } };
-            $$('[data-bet]', sw).forEach((b) => (b.onclick = () => placeBet(+b.dataset.bet)));
-            $$('[data-chip]', sw).forEach((b) => (b.onclick = () => { const v = +b.dataset.chip; if (G.pend + v > Math.min(maxBet(), S.casino.bank)) return A.toast(G.pend + v > maxBet() ? `Table maximum is ${fmt$(maxBet())}.` : 'Not enough chips.'); G.pend += v; A.fx.tap(); draw(); }));
+            $$('[data-bet]', sw).forEach((b) => (b.onclick = guard(() => placeBet(+b.dataset.bet))));
+            $$('[data-chip]', sw).forEach((b) => (b.onclick = guard(() => { const v = +b.dataset.chip; if (G.pend + v > Math.min(maxBet(), S.casino.bank)) return A.toast(G.pend + v > maxBet() ? `Table maximum is ${fmt$(maxBet())}.` : 'Not enough chips.'); G.pend += v; A.fx.tap(); draw(); })));
             const clr = $('#clr', sw); if (clr) clr.onclick = () => { G.pend = 0; draw(); };
-            const rb = $('#rebet', sw); if (rb) rb.onclick = () => { if (G.lastBet && G.lastBet <= S.casino.bank) { G.pend = G.lastBet; draw(); } };
-            const db = $('#dealb', sw); if (db) db.onclick = () => { if (G.pend >= cfg.min) { const u = G.pend; G.pend = 0; placeBet(u); } };
-            $$('[data-ins]', sw).forEach((b) => (b.onclick = () => insurance(b.dataset.ins === '1')));
-            $$('[data-a]', sw).forEach((b) => (b.onclick = () => act(b.dataset.a)));
-            const nr = $('#nr', sw); if (nr) nr.onclick = nextHand;
+            const rb = $('#rebet', sw); if (rb) rb.onclick = guard(() => { if (G.lastBet && G.lastBet <= S.casino.bank) { G.pend = G.lastBet; draw(); } });
+            const db = $('#dealb', sw); if (db) db.onclick = guard(() => { if (G.pend >= cfg.min) { const u = G.pend; G.pend = 0; placeBet(u); } });
+            $$('[data-ins]', sw).forEach((b) => (b.onclick = guard(() => insurance(b.dataset.ins === '1'))));
+            $$('[data-a]', sw).forEach((b) => (b.onclick = guard(() => act(b.dataset.a))));
+            const nr = $('#nr', sw); if (nr) nr.onclick = guard(nextHand);
             if (G.phase === 'play' && cfg.clock) { if (clock) clock.stop(); clock = A.timer($('.ctl .tbar i', sw), cfg.clock, () => act('S', true)); }
           }
 
@@ -213,7 +218,7 @@
               if (jump >= 1.5 && !(G.prevWon && u <= G.prevBet * 2)) add = (jump - 1) * 24;
               if (G.st.hands === 0 && units >= B.rampSteps()[3]) add += 25;
               G.heat = Math.max(0, G.heat * 0.93 - 3 + add); G.maxHeat = Math.max(G.maxHeat, G.heat);
-              if (add >= 20 && G.heat < 100) { G.msg += (G.msg ? '<br>' : '') + '🔥 The pit boss glanced over at that bet jump.'; G.msgOk = false; }
+              if (add >= 20 && G.heat < 100) { G.msg += (G.msg ? '<br>' : '') + 'The pit boss glanced over at that bet jump.'; G.msgOk = false; }
               if (G.heat >= 100) return backoff();
             }
             G.bet = u; G.prevBet = u; G.lastBet = u;
@@ -384,14 +389,14 @@
             A.save(); R = null; newShoe(); draw();
           }
           function broke() {
-            A.sheet(`<div class="burst cold">💸</div><h2 class="m0">Out of chips</h2><p class="muted">Variance happens — even to perfect players. Reload ${fmt$(START_BANK)} in practice chips and keep training.</p><button class="btn" id="rl">Reload ${fmt$(START_BANK)}</button>`, (r, close) => {
+            A.sheet(`<div class="burst cold">${A.icon('chip')}</div><h2 class="m0">Out of chips</h2><p class="muted">Variance happens — even to perfect players. Reload ${fmt$(START_BANK)} in practice chips and keep training.</p><button class="btn" id="rl">Reload ${fmt$(START_BANK)}</button>`, (r, close) => {
               r.querySelector('.sheet').setAttribute('data-lock', '1');
               $('#rl', r).onclick = () => { S.casino.bank = START_BANK; S.casino.reloads = (S.casino.reloads || 0) + 1; A.save(); close(); G.phase = 'bet'; draw(); };
             });
           }
           function backoff() {
             G.backoff = true; S.shoe.backoffs++; A.save(); A.fx.bad();
-            A.sheet(`<div class="burst cold">✋</div><div class="kicker">Backed off</div><h2 class="m0">"You're welcome to play any other game, but no more blackjack tonight."</h2>
+            A.sheet(`<div class="burst cold">${A.icon('close')}</div><div class="kicker">Backed off</div><h2 class="m0">"You're welcome to play any other game, but no more blackjack tonight."</h2>
               <p class="muted">Your bet jumps drew too much heat. Ramp more gradually, parlay wins, and avoid big bets right after the shuffle.</p><button class="btn" id="bo">${casino ? 'Walk to another casino' : 'See report'}</button>`, (r, close) => {
               r.querySelector('.sheet').setAttribute('data-lock', '1');
               $('#bo', r).onclick = () => { close(); if (casino) { G.heat = 0; endShoe(undefined, true); } else report(true); };

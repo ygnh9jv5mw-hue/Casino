@@ -27,14 +27,16 @@
       html: `
       <div class="card rankcard"><span class="badge big r${rk.i}">${rk.i + 1}</span><div class="grow"><div class="kicker">Rank</div><h3 class="m0">${esc(rk.name)}</h3>
         <div class="xpbar"><i style="width:${Math.round(rk.pct * 100)}%"></i></div><div class="tiny muted">${S.xp.toLocaleString()} XP${rk.next ? ` · next: ${esc(rk.next)} at ${rk.to.toLocaleString()}` : ''}</div></div></div>
-      <div class="card"><div class="row-sb"><div><div class="kicker">Last 14 days</div><h3 class="m0">${wk.toLocaleString()} XP this week</h3></div><div class="tiny muted">🔥 ${A.streak()} day streak</div></div>${bars(act)}
+      <div class="card"><div class="row-sb"><div><div class="kicker">Last 14 days</div><h3 class="m0">${wk.toLocaleString()} XP this week</h3></div><div class="tiny muted">${A.streak()}-day streak</div></div>${bars(act)}
         <div class="stats"><div><b>${reps.toLocaleString()}</b><span>total reps</span></div><div><b>${reps ? Math.round((100 * right) / reps) + '%' : '–'}</b><span>accuracy</span></div><div><b>${S.days.length}</b><span>days trained</span></div></div></div>
+      <h3 class="sec">Casino-ready</h3>
+      <div class="card checks">${A.readiness().map((i) => A.checkRow(i)).join('')}</div>
       <h3 class="sec">Mastery</h3>
       <button class="card masteries" data-go="mastery">
         <div>${A.ring(A.masteryPct('hard'), 58, 6, Math.round(A.masteryPct('hard') * 100) + '%')}<span>Hard</span></div>
         <div>${A.ring(A.masteryPct('soft'), 58, 6, Math.round(A.masteryPct('soft') * 100) + '%')}<span>Soft</span></div>
         <div>${A.ring(A.masteryPct('pairs'), 58, 6, Math.round(A.masteryPct('pairs') * 100) + '%')}<span>Pairs</span></div>
-        <div>${A.ring(A.idxPct(), 58, 6, Math.round(A.idxPct() * 100) + '%', 'var(--green)')}<span>Indices</span></div></button>
+        <div>${A.ring(A.idxPct(), 58, 6, Math.round(A.idxPct() * 100) + '%', 'var(--good)')}<span>Indices</span></div></button>
       <h3 class="sec">Personal records</h3>
       <div class="records">
         ${rec('Blitz', b.blitz || '–', b.blitz >= 40)}${rec('Best streak', b.strat || '–', b.strat >= 100)}${rec('Reflex', b.reflex || '–', b.reflex >= 60)}
@@ -44,8 +46,10 @@
       <h3 class="sec">Shoe simulator</h3>
       <div class="card stats"><div><b>${S.shoe.hands}</b><span>hands</span></div><div><b>${S.shoe.dec ? Math.round((100 * S.shoe.decOk) / S.shoe.dec) + '%' : '–'}</b><span>plays</span></div><div><b>${S.shoe.checks ? Math.round((100 * S.shoe.checksOk) / S.shoe.checks) + '%' : '–'}</b><span>counts</span></div><div><b>${S.shoe.backoffs}</b><span>backoffs</span></div></div>
       <h3 class="sec">Real-world play</h3>
-      <button class="list-item" data-go="log"><span class="ic">✎</span><span class="tx"><b>Session log</b><span>${S.log.length} sessions logged</span></span><span class="chev">›</span></button>
-      <button class="list-item" data-go="bankroll"><span class="ic">$</span><span class="tx"><b>Bankroll & risk of ruin</b><span>Plan your bets before you play</span></span><span class="chev">›</span></button>`,
+      <div class="group">
+      <button class="list-item" data-go="log"><span class="ic">${A.icon('notebook')}</span><span class="tx"><b>Session log</b><span>${S.log.length} sessions logged</span></span><span class="chev">${A.icon('chevron')}</span></button>
+      <button class="list-item" data-go="bankroll"><span class="ic">${A.icon('calc')}</span><span class="tx"><b>Bankroll & risk of ruin</b><span>Plan your bets before you play</span></span><span class="chev">${A.icon('chevron')}</span></button>
+      </div>`,
       mount: A.bindGo
     };
   };
@@ -95,7 +99,7 @@
           <div class="grid2"><div><label>Date</label><input id="l1" type="date" value="${A.dayKey()}"></div><div><label>Casino</label><input id="l2" placeholder="Where"></div>
           <div><label>Hours</label><input id="l3" inputmode="decimal" placeholder="1.5"></div><div><label>Result ($)</label><input id="l4" inputmode="decimal" placeholder="-200 or 450"></div></div>
           <label>Notes (game, penetration, heat…)</label><textarea id="l5" rows="2"></textarea><div style="height:10px"></div><button class="btn" id="ladd">Save session</button></div>
-        ${S.log.slice().reverse().map((s) => `<div class="list-item"><span class="tx"><b>${esc(s.date)} · ${esc(s.where || 'Session')}</b><span>${s.hours}h · <span class="${s.result >= 0 ? 'pos' : 'neg'}">${fmt$(s.result)}</span>${s.notes ? ' · ' + esc(s.notes) : ''}</span></span><button class="iconbtn sm" data-del="${s.id}" aria-label="Delete">✕</button></div>`).join('')}
+        ${S.log.slice().reverse().map((s) => `<div class="list-item"><span class="tx"><b>${esc(s.date)} · ${esc(s.where || 'Session')}</b><span>${s.hours}h · <span class="${s.result >= 0 ? 'pos' : 'neg'}">${fmt$(s.result)}</span>${s.notes ? ' · ' + esc(s.notes) : ''}</span></span><button class="iconbtn sm" data-del="${s.id}" aria-label="Delete">${A.icon('close')}</button></div>`).join('')}
         <p class="tiny muted">Judge yourself on hours played and accuracy. Short-term results are mostly variance.</p>`,
       mount(root) {
         $('#ladd', root).onclick = () => {

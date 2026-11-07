@@ -102,7 +102,7 @@
     if (!S.days.includes(d)) S.days.push(d);
     if (!hadGoal && S.xpDay.xp >= S.prof.goal) {
       if (!S.goalDays.includes(d)) S.goalDays.push(d);
-      setTimeout(() => { confetti(); toast(`🔥 Daily goal hit — ${streak()} day streak!`, 'good'); fx.win(); }, 250);
+      setTimeout(() => { confetti(); toast(`Daily goal hit · ${streak()}-day streak`, 'good'); fx.win(); }, 250);
     }
     const after = rank().i;
     if (after > before) queueCelebrate(`Rank up!`, `You're now a <b>${RANKS[after][1]}</b>.`);
@@ -339,7 +339,7 @@
   }
   function celebrate(title, body) {
     confetti(); fx.win();
-    sheet(`<div class="celebrate"><div class="burst">★</div><h2>${title}</h2><p class="muted">${body}</p><button class="btn" id="cok">Keep going</button></div>`, (r, close) => { $('#cok', r).onclick = () => { close(); setTimeout(flushCelebrations, 250); }; });
+    sheet(`<div class="celebrate"><div class="burst">${icon('trophy')}</div><h2>${title}</h2><p class="muted">${body}</p><button class="btn" id="cok">Continue</button></div>`, (r, close) => { $('#cok', r).onclick = () => { close(); setTimeout(flushCelebrations, 250); }; });
   }
   // Rank-ups and finished stages wait until you're back on a main tab, so they never cover a drill or a hand.
   const pending = [];
@@ -347,7 +347,7 @@
   function flushCelebrations() { if (stack.length || !pending.length || $('#modal .scrim')) return; const [t, b] = pending.shift(); celebrate(t, b); }
   function confetti() {
     const box = document.createElement('div'); box.className = 'confetti';
-    const cols = ['#f2c14e', '#33d17a', '#59a8ff', '#ff5d5d', '#ffffff'];
+    const cols = ['#d9b46c', '#f1dfb4', '#ffffff', '#b8964f'];
     for (let i = 0; i < 70; i++) {
       const p = document.createElement('i');
       p.style.left = Math.random() * 100 + 'vw'; p.style.background = pick(cols);
@@ -356,9 +356,9 @@
     }
     document.body.appendChild(box); setTimeout(() => box.remove(), 3200);
   }
-  function ring(pct, size = 64, stroke = 7, label = '', color = 'var(--gold)') {
+  function ring(pct, size = 64, stroke = 7, label = '', color = 'var(--accent)') {
     const r = (size - stroke) / 2, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct));
-    return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="#ffffff14" stroke-width="${stroke}" fill="none"/>
+    return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="rgba(255,255,255,.08)" stroke-width="${stroke}" fill="none"/>
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="${color}" stroke-width="${stroke}" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
       ${label ? `<text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" class="ring-t">${label}</text>` : ''}</svg>`;
   }
@@ -386,7 +386,63 @@
     coach: '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>'
   };
-  const icon = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24">${ICON[n]}</svg>`;
+  // one consistent line-icon set (24px grid, 1.75 stroke) used everywhere instead of emoji
+  Object.assign(ICON, {
+    spade: '<path d="M12 3c3.2 3.6 7 6 7 9.6a3.6 3.6 0 0 1-6.2 2.5c.3 2 1 3.6 2.2 4.9H9c1.2-1.3 1.9-2.9 2.2-4.9A3.6 3.6 0 0 1 5 12.6C5 9 8.8 6.6 12 3z"/>',
+    bolt: '<path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/>',
+    grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
+    pulse: '<path d="M3 12h4l2.5-6 5 12 2.5-6h4"/>',
+    swap: '<path d="M7 7.5h13l-3.5-3.5"/><path d="M17 16.5H4l3.5 3.5"/>',
+    layers: '<path d="m12 3.5 8.5 4.5-8.5 4.5L3.5 8z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5"/><path d="m3.5 16.5 8.5 4.5 8.5-4.5"/>',
+    trend: '<path d="M3.5 17 9 11.5l4 4L20.5 8"/><path d="M15 8h5.5v5.5"/>',
+    eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    divide: '<circle cx="12" cy="6.5" r="1.3"/><circle cx="12" cy="17.5" r="1.3"/><path d="M5 12h14"/>',
+    tray: '<path d="M3.5 13.5h4.5l1.5 2.5h5l1.5-2.5h4.5"/><path d="M5.5 5h13l2 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z"/>',
+    coins: '<ellipse cx="12" cy="6.5" rx="7" ry="2.8"/><path d="M5 6.5v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6.5"/><path d="M5 12v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V12"/>',
+    sparkle: '<path d="M12 3.5 13.9 9l5.6 2-5.6 2L12 18.5 10.1 13l-5.6-2 5.6-2z"/>',
+    hash: '<path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/>',
+    cards: '<rect x="3.5" y="6.5" width="11.5" height="14" rx="2"/><path d="M8.5 3.5h9.5a2 2 0 0 1 2 2v12"/>',
+    chip: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 3.5V7M12 17v3.5M3.5 12H7M17 12h3.5"/>',
+    table: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 10h17M9.5 4.5v15"/>',
+    calc: '<rect x="5" y="2.5" width="14" height="19" rx="2.2"/><path d="M8 6.5h8M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h.01M15.5 18h.01"/>',
+    notebook: '<path d="M6 3.5h12a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6z"/><path d="M6 3.5v17M10 8.5h5.5M10 12.5h5.5"/>',
+    calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    chat: '<path d="M20.5 12a8.5 8.5 0 0 1-12.2 7.6L3.5 20.5l1-4.6A8.5 8.5 0 1 1 20.5 12z"/>',
+    lock: '<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.6A6.5 6.5 0 0 1 21.5 20"/>',
+    heart: '<path d="M12 20s-7.5-4.6-9.2-9.3A4.9 4.9 0 0 1 12 7.6a4.9 4.9 0 0 1 9.2 3.1C19.5 15.4 12 20 12 20z"/>',
+    reset: '<path d="M4 4.5v5.5h5.5"/><path d="M4.4 10A8 8 0 1 1 4 14"/>',
+    flame: '<path d="M12 21a6 6 0 0 0 6-6c0-3.6-2.6-5.6-3.6-8.9-.4 2.1-1.4 3.4-2.6 4.1C11.6 7.5 10.4 5 8.3 3 8.5 7 6 9.6 6 15a6 6 0 0 0 6 6z"/>',
+    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    play: '<path d="M8 5.5v13l10.5-6.5z"/>',
+    chevron: '<path d="m9.5 5.5 6.5 6.5-6.5 6.5"/>',
+    lesson: '<path d="M7 3.5h7l5 5v12H7z"/><path d="M14 3.5v5h5M10 13h6M10 17h6"/>',
+    quiz: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.1.9-1.1 1.6v.5M12 17h.01"/>',
+    trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20.5h7M10 17h4"/>',
+    bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+    sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+    close: '<path d="m6 6 12 12M18 6 6 18"/>',
+    medal: '<circle cx="12" cy="14.5" r="5.5"/><path d="M8.5 10 6 3.5h4l2 4 2-4h4L15.5 10"/>'
+  });
+  const icon = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n] || ''}</svg>`;
+
+  // ---------------- "what's next" after a drill ----------------
+  const TITLES = { strategy: 'Adaptive trainer', blitz: 'Strategy Blitz', reflex: 'Reflex', pairs: 'Pair cancellation', deck: 'Deck countdown', ladder: 'Speed ladder',
+    flash: 'Table flash', tc: 'True count', decks: 'Tray reading', ramp: 'Bet ramp', index: 'Index plays', recall: 'Index recall', shoe: 'Simulator', casino: 'Casino table',
+    mastery: 'Mastery map', chart: 'Strategy chart', bankroll: 'Bankroll calculator' };
+  const FLOW = ['strategy', 'blitz', 'reflex', 'pairs', 'deck', 'ladder', 'flash', 'tc', 'decks', 'ramp', 'index', 'recall', 'shoe'];
+  function nextAfter(screen) {
+    // 1) the next unfinished task of the current bootcamp stage (that isn't the drill just finished)
+    const st = CAMP[currentStage()];
+    for (const t of st.tasks) {
+      if (taskDone(t)) continue;
+      const [s, a] = taskGo(t);
+      if (s && s !== screen && SCREENS[s]) return { s, a, label: t.k === 'lesson' ? 'Lesson: ' + ((lessonById(t.id) || {}).title || '') : t.k === 'quiz' ? 'Module quiz' : TITLES[s] || taskLabel(t) };
+    }
+    // 2) otherwise the next drill in the training sequence
+    const i = FLOW.indexOf(screen), s = FLOW[(i + 1) % FLOW.length];
+    return { s, a: {}, label: TITLES[s] };
+  }
 
   window.APP = {
     $, $$, esc, rnd, pick, sgn, fmt$, dayKey, get S() { return S; }, save, DEF, applyRules,
@@ -394,8 +450,8 @@
     pickCell, gradeCell, mastered, masteryPct, groupCells, pickDev, gradeDev, idxPct, record,
     lessons, lessonById, doneCount, taskDone, taskLabel, taskGo, stageDone, stageOpen, currentStage,
     workout, wkIndex, wkNext,
-    SCREENS, go, back, replace, setTab, render, get stackDepth() { return stack.length; },
-    cardHTML, pad, toast, sheet, celebrate, confetti, ring, timer, openUrl, icon, CFG, COURSE, CAMP, B,
+    SCREENS, go, back, replace, setTab, render, get stackDepth() { return stack.length; }, get current() { return stack.length ? stack[stack.length - 1].screen : tab; },
+    cardHTML, pad, toast, sheet, celebrate, confetti, ring, timer, openUrl, icon, CFG, COURSE, CAMP, B, nextAfter, TITLES,
     reset: () => { localStorage.removeItem(KEY); localStorage.removeItem('bjmc.v1'); load(); applyRules(); stack = []; tab = 'today'; render(); }
   };
 })();

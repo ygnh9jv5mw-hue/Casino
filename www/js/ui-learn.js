@@ -6,14 +6,15 @@
     const S = A.S, total = A.lessons().length, done = A.doneCount();
     return {
       title: 'Learn',
-      html: `<div class="card row-sb"><div><div class="kicker">The MasterClass</div><h3 class="m0">${done} of ${total} lessons</h3><div class="muted small">${COURSE.filter((m) => (S.quiz[m.id] || 0) >= 80).length} of ${COURSE.length} quizzes passed</div></div>${A.ring(done / total, 60, 7, Math.round((100 * done) / total) + '%')}</div>` +
+      html: `<div class="card row-sb"><div><h3 class="m0">${done} of ${total} lessons</h3><div class="muted small">${COURSE.filter((m) => (S.quiz[m.id] || 0) >= 80).length} of ${COURSE.length} module quizzes passed</div></div>${A.ring(done / total, 52, 5, Math.round((100 * done) / total) + '%')}</div>
+        <div class="group">` +
         COURSE.map((m, i) => {
-          const d = m.lessons.filter((l) => S.done[l.id]).length, q = S.quiz[m.id];
+          const d = m.lessons.filter((l) => S.done[l.id]).length, q = S.quiz[m.id], all = d === m.lessons.length && q >= 80;
           const mins = m.lessons.reduce((a, l) => a + (l.mins || 3), 0);
-          return `<button class="list-item mod" data-go="module" data-id="${m.id}"><span class="ic">${m.icon}</span><span class="tx">
-            <b>${i + 1}. ${esc(m.title)}</b><span>${m.lessons.length} lessons · ${mins} min${q !== undefined ? ` · quiz ${q}%` : ''}</span>
-            <span class="bar"><i style="width:${(100 * d) / m.lessons.length}%"></i></span></span>${d === m.lessons.length && q >= 80 ? '<span class="pill ok">✓</span>' : '<span class="chev">›</span>'}</button>`;
-        }).join(''),
+          return `<button class="list-item mod" data-go="module" data-id="${m.id}"><span class="ic ${all ? 'ok' : ''}">${all ? A.icon('check') : i + 1}</span><span class="tx">
+            <b>${esc(m.title)}</b><span>${m.lessons.length} lessons · ${mins} min${q !== undefined ? ` · quiz ${q}%` : ''}</span>
+            ${d && !all ? `<span class="bar"><i style="width:${(100 * d) / m.lessons.length}%"></i></span>` : ''}</span><span class="chev">${A.icon('chevron')}</span></button>`;
+        }).join('') + '</div>',
       mount: A.bindGo
     };
   };
@@ -22,9 +23,9 @@
     const S = A.S, m = COURSE.find((x) => x.id === id), q = S.quiz[m.id];
     return {
       title: m.title,
-      html: `<p class="muted">${esc(m.blurb)}</p>` +
-        m.lessons.map((l, i) => `<button class="list-item" data-go="lesson" data-id="${l.id}"><span class="ic ${S.done[l.id] ? 'ok' : ''}">${S.done[l.id] ? '✓' : i + 1}</span><span class="tx"><b>${esc(l.title)}</b><span>${l.mins || 3} min${l.drill ? ' · includes a drill' : ''}</span></span><span class="chev">›</span></button>`).join('') +
-        (m.quiz ? `<button class="list-item quizrow" data-go="quiz" data-id="${m.id}"><span class="ic ${q >= 80 ? 'ok' : ''}">${q >= 80 ? '✓' : '?'}</span><span class="tx"><b>Module quiz</b><span>${m.quiz.length} questions · pass at 80%${q !== undefined ? ` · best ${q}%` : ''}</span></span><span class="chev">›</span></button>` : ''),
+      html: `<p class="muted">${esc(m.blurb)}</p><div class="group">` +
+        m.lessons.map((l, i) => `<button class="list-item" data-go="lesson" data-id="${l.id}"><span class="ic ${S.done[l.id] ? 'ok' : ''}">${S.done[l.id] ? A.icon('check') : i + 1}</span><span class="tx"><b>${esc(l.title)}</b><span>${l.mins || 3} min${l.drill ? ' · with a drill' : ''}</span></span><span class="chev">${A.icon('chevron')}</span></button>`).join('') +
+        (m.quiz ? `<button class="list-item quizrow" data-go="quiz" data-id="${m.id}"><span class="ic ${q >= 80 ? 'ok' : ''}">${q >= 80 ? A.icon('check') : A.icon('quiz')}</span><span class="tx"><b>Module quiz</b><span>${m.quiz.length} questions · pass at 80%${q !== undefined ? ` · best ${q}%` : ''}</span></span><span class="chev">${A.icon('chevron')}</span></button>` : '') + '</div>',
       mount: A.bindGo
     };
   };
@@ -56,11 +57,11 @@
     const nextL = m.lessons[idx + 1];
     return {
       title: l.title,
-      html: `<div class="pill gold">${esc(m.title)} · ${l.mins || 3} min</div>
+      html: `<div class="kicker" style="margin-top:6px">${esc(m.title)} · ${l.mins || 3} min read</div>
         <div class="lesson">${fill(l.body)}</div>
-        ${l.takeaways ? `<div class="card takeaways"><div class="kicker">Key takeaways</div><ul>${l.takeaways.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
-        ${l.drill ? `<button class="btn dark" id="drill">Practice this now ›</button>` : ''}
-        <button class="btn" id="done" style="margin-top:10px">${S.done[l.id] ? (nextL ? 'Next lesson ›' : m.quiz ? 'Take the quiz ›' : 'Back to module') : 'Mark complete' + (nextL ? ' & continue' : '') + ' · +20 XP'}</button>`,
+        ${l.takeaways ? `<div class="card takeaways"><h3>Key takeaways</h3><ul>${l.takeaways.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+        <button class="btn" id="done" style="margin-top:16px">${S.done[l.id] ? (nextL ? 'Next lesson' : m.quiz ? 'Take the quiz' : 'Back to module') : nextL ? 'Complete · next lesson' : m.quiz ? 'Complete · take the quiz' : 'Complete lesson'}</button>
+        ${l.drill ? `<button class="btn ghost" id="drill">Practice this now</button>` : ''}`,
       mount(root) {
         const d = $('#drill', root); if (d) d.onclick = () => { if (!S.done[l.id]) { S.done[l.id] = true; A.addXP(20); } go(l.drill); };
         $('#done', root).onclick = () => {
@@ -93,7 +94,7 @@
             const j = +b.dataset.j, good = j === q.c; if (good) ok++;
             good ? A.fx.ok() : A.fx.bad();
             $$('[data-j]', qz).forEach((x) => { x.disabled = true; if (+x.dataset.j === q.c) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
-            $('#qf', qz).innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}">${good ? 'Correct.' : 'Not quite.'} <span class="small">${esc(q.why)}</span></div><button class="btn" id="qn">${i + 1 < qs.length ? 'Next question ›' : 'See result'}</button>`;
+            $('#qf', qz).innerHTML = `<div class="fb ${good ? 'ok' : 'bad'}">${good ? `${A.icon('check')} Correct` : '<b>Not quite.</b>'} <span class="small">${esc(q.why)}</span></div><button class="btn" id="qn">${i + 1 < qs.length ? 'Next question' : 'See result'}</button>`;
             $('#qn', qz).onclick = () => { i++; show(); };
           }));
         };
@@ -103,10 +104,14 @@
           if (pass && prev < 80) A.addXP(75); else A.addXP(ok * 3);
           A.hist(qs.length, ok); A.save();
           if (pass) A.confetti();
-          qz.innerHTML = `<div class="result"><div class="big-num">${pct}%</div><p class="muted">${ok} of ${qs.length} correct</p>
-            <div class="fb ${pass ? 'ok' : 'bad'}">${pass ? 'Passed! Module quiz complete.' : 'You need 80% to pass. Review the lessons and try again.'}</div>
-            <button class="btn" id="qa">${pass ? 'Done' : 'Try again'}</button></div>`;
-          $('#qa', qz).onclick = () => (pass ? A.back() : A.replace('quiz', { id }));
+          const mi = COURSE.indexOf(m), nm = COURSE[mi + 1];
+          const nx = pass ? (nm ? { s: 'module', a: { id: nm.id }, label: `Module ${mi + 2}: ${nm.title}` } : A.nextAfter('quiz')) : { s: 'module', a: { id }, label: 'Review the lessons' };
+          qz.innerHTML = `<div class="result"><div class="kicker">${pass ? 'Passed' : 'Not yet'}</div><div class="big-num">${pct}%</div><p class="muted">${ok} of ${qs.length} correct${pass ? '' : ' · 80% to pass'}</p>
+            <button class="btn next" id="qnx"><span class="nextlbl">Next</span>${esc(nx.label)}</button>
+            <div class="btnrow"><button class="btn ghost" id="qa">${pass ? 'Retake' : 'Try again'}</button><button class="btn ghost" id="qd">Done</button></div></div>`;
+          $('#qnx', qz).onclick = () => A.replace(nx.s, nx.a);
+          $('#qa', qz).onclick = () => A.replace('quiz', { id });
+          $('#qd', qz).onclick = () => A.back();
         };
         show();
       }

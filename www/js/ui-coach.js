@@ -4,16 +4,18 @@
 
   SCREENS.coach = () => ({
     title: 'Coach',
-    html: `<div class="card hero coach-hero"><div class="kicker">Live every week</div><h2 class="m0">Train with ${esc(CFG.coachName)}</h2>
+    html: `<div class="upnext coach-hero"><div class="eyebrow">${A.icon('calendar')} Live every week</div><h2 class="m0">Train with ${esc(CFG.coachName)}</h2>
         <p class="muted">Live sessions, 1-on-1 coaching and a private community of serious advantage players.</p>
         <button class="btn" data-url="bookingUrl">Book a 1-on-1 with ${esc(CFG.coachName)}</button></div>
       <h3 class="sec">Weekly live trainings</h3>
       <div class="card">${CFG.liveSchedule.map((s) => `<div class="sched"><span class="day">${esc(s.day.slice(0, 3))}</span><span class="ct"><b>${esc(s.title)}</b><small>${esc(s.day)} · ${esc(s.time)}</small></span></div>`).join('')}
         <button class="btn dark" data-url="liveTrainingUrl" style="margin-top:12px">Join the live training</button></div>
       <h3 class="sec">Community</h3>
-      <button class="list-item" data-url="communityUrl"><span class="ic">💬</span><span class="tx"><b>Private community</b><span>Game reports, trip plans, accountability</span></span><span class="chev">›</span></button>
-      <button class="list-item" data-url="osnUrl"><span class="ic">🔒</span><span class="tx"><b>OSN access</b><span>Members-only resources</span></span><span class="chev">›</span></button>
-      <button class="list-item" data-go="team"><span class="ic">🤝</span><span class="tx"><b>Apply to join a team</b><span>Your verified training stats go with it</span></span><span class="chev">›</span></button>
+      <div class="group">
+      <button class="list-item" data-url="communityUrl"><span class="ic">${A.icon('chat')}</span><span class="tx"><b>Private community</b><span>Game reports, trip plans, accountability</span></span><span class="chev">${A.icon('chevron')}</span></button>
+      <button class="list-item" data-url="osnUrl"><span class="ic">${A.icon('lock')}</span><span class="tx"><b>OSN access</b><span>Members-only resources</span></span><span class="chev">${A.icon('chevron')}</span></button>
+      <button class="list-item" data-go="team"><span class="ic">${A.icon('users')}</span><span class="tx"><b>Apply to join a team</b><span>Your training stats go with it</span></span><span class="chev">${A.icon('chevron')}</span></button>
+      </div>
       ${CFG.joinUrl ? '<button class="btn" data-url="joinUrl">Get the full MasterClass</button>' : ''}`,
     mount(root) {
       $$('[data-url]', root).forEach((b) => (b.onclick = () => A.openUrl(CFG[b.dataset.url])));

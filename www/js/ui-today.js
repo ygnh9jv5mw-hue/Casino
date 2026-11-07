@@ -15,75 +15,71 @@
     ];
   }
   A.readiness = readiness;
-  const checkRow = (i, extra = '') => `<button class="check ${i.ok ? 'done' : ''}" ${i.go ? `data-go="${i.go}"` : ''} ${extra}><span class="dot">${i.ok ? '✓' : ''}</span><span class="ct"><span>${esc(i.t)}</span>${i.v ? `<small>${esc(i.v)}</small>` : ''}</span>${i.go && !i.ok ? '<span class="chev">›</span>' : ''}</button>`;
+  const checkRow = (i, extra = '') => `<button class="check ${i.ok ? 'done' : ''}" ${i.go ? `data-go="${i.go}"` : ''} ${extra}><span class="dot">${i.ok ? A.icon('check') : ''}</span><span class="ct"><span>${esc(i.t)}</span>${i.v ? `<small>${esc(i.v)}</small>` : ''}</span>${i.go && !i.ok ? `<span class="chev">${A.icon('chevron')}</span>` : ''}</button>`;
   A.checkRow = checkRow;
   function bindGo(root) { $$('[data-go]', root).forEach((b) => (b.onclick = () => go(b.dataset.go, b.dataset.id ? { id: b.dataset.id } : {}))); }
   A.bindGo = bindGo;
 
   SCREENS.today = () => {
-    const S = A.S, rk = A.rank(), txp = A.todayXP(), goal = S.prof.goal, st = A.currentStage(), stage = CAMP[st];
+    const S = A.S, rk = A.rank(), txp = A.todayXP(), goal = S.prof.goal, stage = CAMP[A.currentStage()];
     const wk = A.workout(), wi = A.wkIndex(), wkDone = wi >= wk.length;
-    const tasks = stage.tasks.map((t) => ({ t: A.taskLabel(t), ok: A.taskDone(t), raw: t }));
-    const nDone = tasks.filter((x) => x.ok).length;
-    const r = readiness(), rd = r.filter((x) => x.ok).length;
+    const tasks = stage.tasks, nDone = tasks.filter(A.taskDone).length;
+    const nextTask = tasks.find((t) => !A.taskDone(t));
     const greet = (() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; })();
+    const upnext = !wkDone
+      ? `<div class="eyebrow">${A.icon('play')} Daily workout</div>
+         <h2>${wi ? `Step ${wi + 1} of ${wk.length}` : `${wk.length} drills · ${wk.length * 3} min`}</h2>
+         <p>${wi ? `Next up: ${esc(wk[wi].t)}` : 'A mixed session built from where you are. +100 XP when you finish.'}</p>
+         <div class="steps-mini">${wk.map((s, i) => `<i class="${i < wi ? 'on' : ''}"></i>`).join('')}</div>
+         <button class="btn" data-go="workout">${wi ? 'Continue workout' : 'Start workout'}</button>`
+      : `<div class="eyebrow">${A.icon('check')} Workout done</div>
+         <h2>${nextTask ? esc(A.taskLabel(nextTask)) : 'Bootcamp complete'}</h2>
+         <p>${nextTask ? `Stage ${stage.id} · ${esc(stage.title)}` : 'Keep your edge with the casino table and the simulator.'}</p>
+         <button class="btn" id="cont">${nextTask ? 'Continue bootcamp' : 'Play the casino table'}</button>`;
     return {
       title: 'Today',
       right: `<button class="iconbtn" id="rbtn" aria-label="Settings">${A.icon('gear')}</button>`,
       onRight: () => go('settings'),
       html: `
-      <div class="hero card">
-        <div class="hero-top">
-          <div><div class="kicker">${greet}</div><div class="rank-name"><span class="badge r${rk.i}">${rk.i + 1}</span>${esc(rk.name)}</div>
-            <div class="xpbar"><i style="width:${Math.round(rk.pct * 100)}%"></i></div>
-            <div class="tiny muted">${S.xp.toLocaleString()} XP${rk.next ? ` · ${(rk.to - S.xp).toLocaleString()} to ${esc(rk.next)}` : ' · max rank'}</div></div>
-          <div class="goal">${A.ring(txp / goal, 84, 8, `${Math.min(txp, 9999)}`)}<div class="tiny muted">of ${goal} XP</div></div>
-        </div>
-        <div class="hero-stats"><div><b>🔥 ${A.streak()}</b><span>day streak</span></div><div><b>${A.doneCount()}/${A.lessons().length}</b><span>lessons</span></div><div><b>${rd}/${r.length}</b><span>casino-ready</span></div></div>
+      <p class="muted" style="margin:0 2px 2px">${greet}</p>
+      <div class="upnext">${upnext}</div>
+      <div class="strip">
+        <div>${A.icon('flame')}<div><b>${A.streak()}</b><span>day streak</span></div></div>
+        <i class="sep"></i>
+        <div>${A.ring(txp / goal, 34, 4)}<div><b>${Math.min(txp, 99999)}<span style="display:inline;color:var(--text-3);font-size:13px"> / ${goal}</span></b><span>XP today</span></div></div>
+        <i class="sep"></i>
+        <div><span class="badge r${rk.i}">${rk.i + 1}</span><div><b>${esc(rk.name)}</b><span>${rk.next ? `${(rk.to - S.xp).toLocaleString()} XP to go` : 'Top rank'}</span></div></div>
       </div>
-
-      <div class="card wk ${wkDone ? 'done' : ''}">
-        <div class="row-sb"><div><div class="kicker">Daily workout</div><h3 class="m0">${wkDone ? 'Workout complete ✓' : wi ? `Step ${wi + 1} of ${wk.length}: ${esc(wk[wi].t)}` : `${wk.length} drills · about ${wk.length * 3} minutes`}</h3></div><div class="wkdots">${wk.map((s, i) => `<i class="${i < wi ? 'on' : i === wi && !wkDone ? 'cur' : ''}"></i>`).join('')}</div></div>
-        <p class="muted small">${wkDone ? 'Come back tomorrow — or keep going in the Train tab.' : 'A fast, mixed session built from your current stage. Finish it for +100 XP.'}</p>
-        <button class="btn" data-go="workout">${wkDone ? 'Review workout' : wi ? 'Continue workout' : 'Start workout'}</button>
-      </div>
-
-      <div class="card">
-        <div class="row-sb"><div><div class="kicker">Bootcamp · Stage ${stage.id} of ${CAMP.length}</div><h3 class="m0">${esc(stage.title)}</h3><div class="muted small">${esc(stage.sub)}</div></div>${A.ring(nDone / tasks.length, 52, 6, `${nDone}/${tasks.length}`, 'var(--green)')}</div>
-        <div class="checks">${tasks.map((x, i) => checkRow({ t: x.t, ok: x.ok, go: '' }, `data-task="${i}"`)).join('')}</div>
-        <button class="btn ghost" data-go="camp">See all ${CAMP.length} stages</button>
-      </div>
-
-      <h3 class="sec">Quick train</h3>
+      <button class="card camp-card" data-go="camp">
+        <div class="camprow"><span class="num">${stage.id}</span><span class="tx"><b>${esc(stage.title)}</b><span>${nextTask ? 'Next: ' + esc(A.taskLabel(nextTask)) : 'Stage complete'}</span></span><span class="chev">${A.icon('chevron')}</span></div>
+        <div class="bar"><i style="width:${Math.round((100 * nDone) / tasks.length)}%"></i></div>
+      </button>
+      <div class="row-sb"><h3 class="sec" style="margin-bottom:12px">Practice</h3><button class="linkbtn" id="alld">All drills</button></div>
       <div class="tiles">
-        ${tile('strategy', '♠', 'Strategy', Math.round(A.masteryPct('all') * 100) + '% mastered')}
-        ${tile('blitz', '⚡', 'Blitz', 'best ' + S.best.blitz)}
-        ${tile('reflex', '±', 'Reflex', 'best ' + S.best.reflex)}
-        ${tile('casino', '♣', 'Casino', S.casino ? A.fmt$(S.casino.bank) : '6 decks')}
-        ${tile('tc', '÷', 'True count', S.best.tc !== null ? S.best.tc.toFixed(1) + 's' : '—')}
-        ${tile('shoe', '🂡', A.B.isDD() ? 'Double deck' : 'Shoe sim', S.shoe.hands + ' hands')}
+        ${tile('strategy', 'spade', 'Strategy', Math.round(A.masteryPct('all') * 100) + '% mastered')}
+        ${tile('reflex', 'pulse', 'Counting', S.best.reflex ? 'Reflex best ' + S.best.reflex : 'Card values')}
+        ${tile('tc', 'divide', 'True count', S.best.tc !== null ? 'Best ' + S.best.tc.toFixed(1) + 's' : 'Convert fast')}
+        ${tile('casino', 'chip', 'Casino table', S.casino ? A.fmt$(S.casino.bank) : '6-deck shoe')}
       </div>
-
-      <h3 class="sec">Casino-ready</h3>
-      <div class="card checks">${r.map((i) => checkRow(i)).join('')}</div>
-      <p class="foot">Training and education only — no betting, no money.</p>`,
+      <p class="foot">Training only — no betting, no money.</p>`,
       mount(root) {
         bindGo(root);
-        $$('[data-task]', root).forEach((b) => (b.onclick = () => { const t = stage.tasks[+b.dataset.task]; const [s, a] = A.taskGo(t); go(s, a); }));
+        const c = $('#cont', root); if (c) c.onclick = () => { if (!nextTask) return go('casino'); const [s, a] = A.taskGo(nextTask); go(s, a); };
+        $('#alld', root).onclick = () => A.setTab('train');
       }
     };
   };
-  const tile = (g, ic, t, s) => `<button class="tile" data-go="${g}"><span class="ti">${ic}</span><b>${esc(t)}</b><small>${esc(s)}</small></button>`;
+  const tile = (g, ic, t, s) => `<button class="tile" data-go="${g}"><span class="ti">${A.icon(ic)}</span><b>${esc(t)}</b><small>${esc(s)}</small></button>`;
   A.tile = tile;
 
   SCREENS.workout = () => {
     const wk = A.workout(), wi = A.wkIndex(), done = wi >= wk.length;
     return {
       title: 'Daily Workout',
-      html: `<p class="muted">Short, intense and mixed. Each drill feeds straight into the next — no browsing, no breaks.</p>
-        <div class="steps">${wk.map((s, i) => `<div class="step ${i < wi ? 'done' : i === wi ? 'cur' : ''}"><span class="sn">${i < wi ? '✓' : i + 1}</span><span class="ct"><b>${esc(s.t)}</b><small>${esc(s.s)}</small></span></div>`).join('')}</div>
-        ${done ? `<div class="fb ok">Workout complete — +100 XP. See you tomorrow.</div><button class="btn ghost" id="again">Run it again (for practice)</button>`
-          : `<button class="btn big" id="go">${wi ? 'Continue' : 'Start'}: ${esc(wk[wi].t)} ›</button>`}`,
+      html: `<p class="muted">Short, mixed and back to back. Each drill leads straight into the next.</p>
+        <div class="steps">${wk.map((s, i) => `<div class="step ${i < wi ? 'done' : i === wi ? 'cur' : ''}"><span class="sn">${i < wi ? A.icon('check') : i + 1}</span><span class="ct"><b>${esc(s.t)}</b><small>${esc(s.s)}</small></span></div>`).join('')}</div>
+        ${done ? `<div class="fb ok">${A.icon('check')} Workout complete · +100 XP</div><button class="btn ghost" id="again">Run it again</button>`
+          : `<button class="btn big" id="go">${wi ? 'Continue' : 'Start'} · ${esc(wk[wi].t)}</button>`}`,
       mount(root) {
         const g = $('#go', root); if (g) g.onclick = () => { const s = wk[wi]; go(s.id, Object.assign({ wk: true }, s.args)); };
         const a = $('#again', root); if (a) a.onclick = () => { A.S.wk = { d: A.dayKey(), i: 0 }; A.S.flags['wk_' + A.dayKey()] = true; A.save(); A.replace('workout', {}); };
@@ -95,12 +91,12 @@
     const cur = A.currentStage();
     return {
       title: 'Bootcamp',
-      html: `<p class="muted">${CAMP.length} stages from zero to casino-ready. Stages unlock on <b>results</b>, not days — move as fast as your accuracy allows.</p>` +
+      html: `<p class="muted">${CAMP.length} stages from zero to casino-ready. Each one unlocks on results, not days.</p>` +
         CAMP.map((st, i) => {
           const open = A.stageOpen(i), dn = A.stageDone(st), tasks = st.tasks;
           const n = tasks.filter(A.taskDone).length;
           return `<details class="stage ${dn ? 'done' : open ? 'open' : 'locked'}" ${i === cur ? 'open' : ''}>
-            <summary><span class="sn">${dn ? '✓' : open ? st.id : '🔒'}</span><span class="ct"><b>${esc(st.title)}</b><small>${esc(st.sub)} · ${n}/${tasks.length}</small></span></summary>
+            <summary><span class="sn">${dn ? A.icon('check') : open ? st.id : A.icon('lock')}</span><span class="ct"><b>${esc(st.title)}</b><small>${esc(st.sub)} · ${n}/${tasks.length}</small></span></summary>
             <div class="checks">${tasks.map((t, j) => checkRow({ t: A.taskLabel(t), ok: A.taskDone(t), go: open ? 'x' : '' }, `data-s="${i}" data-t="${j}"`)).join('')}</div></details>`;
         }).join(''),
       mount(root) {
@@ -114,7 +110,7 @@
     const S = A.S; let step = 0;
     const choice = (k, v, t, s) => `<button class="opt" data-k="${k}" data-v="${v}"><b>${t}</b><small>${s}</small></button>`;
     const steps = [
-      () => `<div class="ob-hero"><div class="logo">♠</div><h2>${esc(A.CFG.brand)}</h2><p class="muted">The fastest way to learn to count cards — properly.</p></div>
+      () => `<div class="ob-hero"><div class="logo">${A.icon('spade')}</div><h2>${esc(A.CFG.brand)}</h2><p class="muted">The fastest way to learn to count cards — properly.</p></div>
         <ul class="ob-list"><li><b>Adaptive drills</b> that hammer the hands you miss</li><li><b>14-stage bootcamp</b> that unlocks on results</li><li><b>A real 6-deck shoe</b> with heat, distractions and count checks</li><li><b>Daily workouts</b>, streaks and ranks to keep you sharp</li></ul>
         <button class="btn big" data-next>Let's set you up</button>`,
       () => `<h2>Where are you starting?</h2><p class="muted">We'll unlock the right stages. You can always go back.</p>
@@ -131,7 +127,7 @@
       () => `<h2>What rules will you play?</h2><p class="muted">Every chart and drill adapts. Most US games are H17. Check the felt: "Dealer hits soft 17".</p>
         ${choice('h17', 1, 'Dealer hits soft 17 (H17)', 'Most common in the US')}
         ${choice('h17', 0, 'Dealer stands on all 17s (S17)', 'Better game, found at higher limits')}`,
-      () => `<div class="ob-hero"><div class="logo">✓</div><h2>You're set.</h2><p class="muted">Your first stage is ready, and so is today's workout.</p></div>
+      () => `<div class="ob-hero"><div class="logo">${A.icon('check')}</div><h2>You're set.</h2><p class="muted">Your first stage is ready, and so is today's workout.</p></div>
         <button class="btn big" data-done>Start training</button>`
     ];
     const draw = (root) => {
@@ -184,8 +180,8 @@
           <div class="tgl"><span>Daily reminder</span><input type="time" id="rem" value="${esc(p.remind)}"></div>
           <p class="tiny muted">Leave the reminder empty to turn it off.</p></div>
         <h3 class="sec">More</h3>
-        <button class="list-item" data-go="about"><span class="ic">♡</span><span class="tx"><b>Responsible play</b><span>Limits, the law, and getting help</span></span><span class="chev">›</span></button>
-        <button class="list-item" id="reset"><span class="ic" style="color:var(--red)">⟲</span><span class="tx"><b>Reset all progress</b><span>Start over from zero</span></span></button>
+        <button class="list-item" data-go="about"><span class="ic">${A.icon('heart')}</span><span class="tx"><b>Responsible play</b><span>Limits, the law, and getting help</span></span><span class="chev">${A.icon('chevron')}</span></button>
+        <button class="list-item" id="reset"><span class="ic" style="color:var(--bad)">${A.icon('reset')}</span><span class="tx"><b>Reset all progress</b><span>Start over from zero</span></span></button>
         <p class="foot">${esc(A.CFG.brand)} · training only, no real money</p>`,
       mount(root) {
         $$('[data-set]', root).forEach((g) => $$('button', g).forEach((b) => (b.onclick = () => {
