@@ -12,7 +12,7 @@
 
   // ---------- storage ----------
   const KEY = 'bjmc.v1';
-  const DEF = { age: false, done: {}, days: [], best: { strat: 0, deck: null, tc: null }, missed: {},
+  const DEF = { done: {}, days: [], best: { strat: 0, deck: null, tc: null }, missed: {},
     shoe: { hands: 0, dec: 0, decOk: 0, checks: 0, checksOk: 0, bets: 0, betsOk: 0 }, log: [], drills: 0 };
   let S;
   try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { S = Object.assign({}, DEF); }
@@ -114,7 +114,7 @@
       ${item('🂡', 'Shoe simulator', 'Real table, real distractions', 'shoe')}
       <h3>Casino-ready checklist</h3>
       <div class="box">${checkHTML(r)}</div>
-      <div class="foot">21+ only. Practice is free; real play has real risk.<br>Problem gambling help: 1-800-GAMBLER</div>`,
+      <div class="foot">Training and education only — no betting, no money.</div>`,
       mount: bindGo
     };
   };
@@ -635,15 +635,5 @@
     };
   };
 
-  // ---------- age gate ----------
-  function gate() {
-    if (S.age) return;
-    $('#modal').innerHTML = `<div class="scrim"><div class="sheet"><h2 style="margin-top:0">Welcome to ${esc(CFG.brand)}</h2>
-      <p class="muted">This app teaches card counting and advantage play for educational purposes. Real gambling carries real risk.</p>
-      <p>Please confirm you are <b>21 or older</b> (or the legal gambling age where you live).</p>
-      <button class="btn" id="ag1">I'm 21+ — let's train</button></div></div>`;
-    $('#ag1').onclick = () => { S.age = true; save(); $('#modal').innerHTML = ''; };
-  }
-
-  render(); gate();
+  render();
 })();
