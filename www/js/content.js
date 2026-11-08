@@ -86,11 +86,12 @@ window.COURSE = [
         <ul>
           <li>Reflex: 60+ correct in 60 seconds</li>
           <li>Deck countdown: under 25 seconds, perfect</li>
+          <li>Speed count: every stop right at 120 cards a minute, over a full deck</li>
           <li>True count conversion: under 2 seconds</li>
           <li>Shoe simulator: right count at every check, with other players at the table</li>
         </ul>
         <p>Don't play for real money until you hit all of them. The Progress tab tracks every record.</p>`,
-        takeaways: ['Deck in under 25s', 'TC in under 2s', 'Perfect counts under distraction'] },
+        takeaways: ['Deck in under 25s', 'Hold the count at 120 cards a minute', 'TC in under 2s', 'Perfect counts under distraction'] },
       { id: 'm2l5', title: 'Double deck: burn card, cut card, pitch games', mins: 5, drill: 'shoe', body: `
         <p>With only 104 cards, <b>every card moves the true count more</b>. A running count of +3 is a true count of +2 with a deck and a half left, +3 with one deck, and +6 with half a deck. Estimate decks left to the nearest half deck — 1½, 1, ½ — and divide.</p>
         <p><b>The burn card.</b> After the shuffle the dealer burns the top card face down. You never see it, so you never count it. It just stays part of the "unseen" cards — your running count still starts at 0.</p>

@@ -21,6 +21,7 @@
         ${it('pairs', 'swap', 'Pair cancellation', 'Two cards at a time', b.pairs ? 'Best ' + b.pairs : '')}
         ${it('deck', 'layers', 'Deck countdown', 'A full deck against the clock', b.deck !== null ? b.deck.toFixed(1) + 's' : '')}
         ${it('ladder', 'trend', 'Speed ladder', 'Faster every time you\'re right', b.ladder ? b.ladder.toFixed(1) + '/s' : '')}
+        ${it('speed', 'gauge', 'Speed count', 'Hold the count at dealer speed', b.speed ? b.speed + '/min' : '')}
         ${it('flash', 'eye', 'Table flash', 'A whole round at a glance', b.flash ? 'Level ' + b.flash : '')}
       </div>
       <h3 class="sec">True count & betting</h3>
@@ -77,8 +78,8 @@
       ${o.note ? `<p class="resnote">${o.note}</p>` : ''}
       ${misses ? `<details><summary>Review ${misses.length} mistake${misses.length > 1 ? 's' : ''}</summary><div class="misses">${misses.map((m) => `<div class="miss"><b>${esc(m.t)}</b><span>${esc(m.a)}</span>${m.w ? `<small>${esc(m.w)}</small>` : ''}</div>`).join('')}</div></details>` : ''}
       ${o.args && o.args.wk
-        ? `<button class="btn big" id="wkn">Continue workout ${A.icon('chevron')}</button><button class="btn ghost" id="ag">Go again</button>`
-        : `<button class="btn next" id="nxt"><span class="nextlbl">Next</span>${esc(nx.label)}</button><div class="btnrow"><button class="btn ghost" id="ag">Go again</button><button class="btn ghost" id="dn">Done</button></div>`}
+        ? `<button class="btn big" id="wkn">Continue workout ${A.icon('chevron')}</button><button class="btn ghost" id="ag">${esc(o.againLabel || 'Go again')}</button>`
+        : `<button class="btn next" id="nxt"><span class="nextlbl">Next</span>${esc(nx.label)}</button><div class="btnrow"><button class="btn ghost" id="ag">${esc(o.againLabel || 'Go again')}</button><button class="btn ghost" id="dn">Done</button></div>`}
     </div>`;
     A.countUp($('.big-num', root), String(o.big));
     if (o.rec) { A.confetti(); A.fx.win(); }
@@ -448,6 +449,163 @@
         };
         $('#st', lw).onclick = round;
         if (args.wk) round();
+        return () => clearTimeout(tid);
+      }
+    };
+  };
+
+  // ---------- Speed count ----------
+  // Hold the running count at dealer speed. The cards keep coming; now and then the stream stops and asks for the count,
+  // the way you need it the moment you bet. A speed (cards a minute) is certified when every stop is right over a deck or more.
+  const SPEED_LVLS = [60, 80, 100, 120, 150, 180, 210, 240];
+  const SPEED_STYLES = [['single', 'One at a time'], ['pair', 'Two at a time'], ['table', 'Table rounds']];
+  const speedName = (v) => (v >= 240 ? 'Pro' : v >= 180 ? 'Fast dealer' : v >= 120 ? 'Casino speed' : v >= 100 ? 'Almost there' : 'Learning');
+  SCREENS.speed = (args) => {
+    const S = A.S, best = () => S.best.speed || 0;
+    const nextLvl = () => SPEED_LVLS.find((v) => v > best()) || SPEED_LVLS[SPEED_LVLS.length - 1];
+    const st = {
+      cpm: SPEED_LVLS.includes(args.cpm) ? args.cpm : nextLvl(),
+      style: SPEED_STYLES.some((s) => s[0] === args.style) ? args.style : 'single',
+      len: [26, 52, 104].includes(args.len) ? args.len : 52
+    };
+    let tid = 0;
+    return {
+      title: 'Speed Count',
+      html: '<div id="sw"></div>',
+      mount(root) {
+        const sw = $('#sw', root);
+        const later = (fn, ms) => { clearTimeout(tid); tid = setTimeout(fn, ms); };
+
+        function setup() {
+          clearTimeout(tid);
+          sw.innerHTML = `<div class="card">
+            <div class="kicker">Your certified speed</div>
+            <h3 class="m0">${best() ? `${best()} cards a minute · ${speedName(best())}` : 'None yet'}</h3>
+            <p class="muted small">Cards keep coming at dealer speed. Now and then the stream stops: enter the running count. Get every stop right over a deck or more and that speed is yours.</p>
+            <label>Speed (cards a minute)</label>
+            <div class="lvls">${SPEED_LVLS.map((v) => `<button class="lvl ${v === st.cpm ? 'on' : ''} ${v <= best() ? 'done' : ''}" data-v="${v}" aria-label="${v} cards a minute${v <= best() ? ', certified' : ''}"><b>${v}</b><small>${+(v / 60).toFixed(1)}/sec</small></button>`).join('')}</div>
+            <label>How the cards come</label>
+            <div class="seg" data-g="style">${SPEED_STYLES.map(([v, t]) => `<button data-v="${v}" class="${st.style === v ? 'on' : ''}">${t}</button>`).join('')}</div>
+            <label>Length</label>
+            <div class="seg" data-g="len">${[[26, 'Half deck'], [52, '1 deck'], [104, '2 decks']].map(([v, t]) => `<button data-v="${v}" class="${st.len === v ? 'on' : ''}">${t}</button>`).join('')}</div>
+            <p class="tiny muted">${st.style === 'table' ? 'Table rounds: two or three players and the dealer. The hole card only counts once it is turned over. ' : ''}Casino speed is about 120 a minute, a deck in 26 seconds. Half-deck runs are practice and don't certify a speed.</p>
+            <button class="btn big" id="go">Start · ${st.cpm} a minute</button></div>`;
+          $$('.lvl', sw).forEach((b) => (b.onclick = () => { st.cpm = +b.dataset.v; setup(); }));
+          $$('.seg', sw).forEach((g) => $$('button', g).forEach((b) => (b.onclick = () => { const k = g.dataset.g; st[k] = k === 'len' ? +b.dataset.v : b.dataset.v; setup(); })));
+          $('#go', sw).onclick = run;
+        }
+
+        function run() {
+          clearTimeout(tid);
+          const ms = 60000 / st.cpm, table = st.style === 'table', per = st.style === 'pair' ? 2 : 1;
+          let rc = 0, shown = 0, stops = 0, right = 0, sinceStop = 0, nextStop = 13 + rnd(14);
+          const misses = [];
+          sw.innerHTML = `${meta([['', 'sp', st.cpm + '/min'], ['Cards', 'cn', `0/${st.len}`], ['Stops', 'ck', '0/0']])}
+            <div id="stage">${table
+              ? `<div class="felt sptable"><div class="lbl">Dealer</div><div class="dl" id="dl"></div><div class="seats">${[0, 1, 2].map((k) => `<div class="seat" id="s${k}"></div>`).join('')}</div></div>`
+              : '<div class="flashcard tall" id="fc"></div>'}
+            <div class="prog"><i id="pg"></i></div></div><div id="ckp"></div>`;
+          const stage = $('#stage', sw), ckp = $('#ckp', sw);
+          const upd = () => {
+            $('#cn', sw).textContent = `${Math.min(shown, st.len)}/${st.len}`; $('#ck', sw).textContent = `${right}/${stops}`;
+            $('#pg', sw).style.width = Math.min(100, (100 * shown) / st.len) + '%';
+          };
+          const see = (c) => { rc += B.hilo(c.r); shown++; sinceStop++; };
+
+          // a stop: the cards are hidden, you give the running count, then the stream carries on (or the run ends)
+          function stop(last, resume) {
+            stops++; stage.style.display = 'none';
+            const p = A.pad((g) => {
+              const good = g === rc; if (good) right++;
+              A.hist(1, good ? 1 : 0); good ? A.fx.ok() : A.fx.bad(); upd();
+              if (!good) misses.push({ t: `Stop ${stops}, after ${shown} cards`, a: `The count was ${sgn(rc)}`, w: `You said ${sgn(g)}` });
+              if (last) return finish();
+              const go = () => { ckp.innerHTML = ''; stage.style.display = ''; sinceStop = 0; nextStop = 13 + rnd(14); resume(); };
+              if (good) { ckp.innerHTML = `<div class="fb ok">${A.icon('check')} ${sgn(rc)}, keep going</div>`; return later(go, 700); }
+              ckp.innerHTML = `<div class="fb bad"><b>It's ${sgn(rc)}</b><span class="small">You said ${sgn(g)}. Carry on from ${sgn(rc)}.</span><button class="btn sm" id="kg">Keep going ${A.icon('chevron')}</button></div>`;
+              $('#kg', ckp).onclick = go;
+            }, { label: 'Check' });
+            ckp.innerHTML = `<div class="stopcard"><div class="kicker">${last ? 'End of the run' : `Stop ${stops}`}</div><h2 class="m0">What's the running count?</h2></div>${p.html}`;
+            p.bind(ckp); A.fx.tap();
+          }
+
+          if (!table) {
+            // one or two cards at a time, each group on screen for its share of the minute
+            const cards = B.shoe(Math.ceil(st.len / 52)).slice(0, st.len), fc = $('#fc', sw), anim = ms >= 400 ? 1 : 0; let i = 0;
+            const step = () => {
+              if (i >= cards.length) return stop(true);
+              if (sinceStop >= nextStop && cards.length - i > 8) return stop(false, step);
+              const grp = cards.slice(i, i + per); i += grp.length;
+              fc.innerHTML = grp.map((c) => A.cardHTML(Object.assign(c, { anim }), 'big')).join('');
+              grp.forEach(see); upd();
+              later(step, ms * grp.length);
+            };
+            upd(); return later(step, 500);
+          }
+
+          // table rounds: dealt in casino order, players hit, the hole card is turned over, the dealer draws, the cards are scooped
+          const shoe = B.shoe(Math.ceil(st.len / 52) + 1), dl = $('#dl', sw), seatEl = [0, 1, 2].map((k) => $('#s' + k, sw));
+          const dealerHits = (cards) => { const v = B.value(cards); return v.total < 17 || (B.rules().h17 && v.total === 17 && v.soft); };
+          function round() {
+            if (shown + 10 > st.len) return stop(true);
+            if (sinceStop >= nextStop) return stop(false, round);
+            const seats = [0, 1, 2]; if (Math.random() < 0.45) seats.splice(rnd(3), 1); // two or three players
+            const hands = [[], [], []], dealer = [], ev = [];
+            for (let pass = 0; pass < 2; pass++) {
+              for (const s of seats) { const c = shoe.pop(); hands[s].push(c); ev.push({ s, c }); }
+              const c = shoe.pop(); dealer.push(c); ev.push({ s: 'd', c, down: pass === 1 });
+            }
+            const up = B.rv(dealer[0].r);
+            for (const s of seats) {
+              for (;;) { // the other players play roughly by the book
+                const v = B.value(hands[s]); if (v.total >= 21) break;
+                const hit = v.total <= 11 || (v.soft && v.total <= 17) || (!v.soft && v.total <= 16 && up >= 7) || (!v.soft && v.total === 12 && up <= 3);
+                if (!hit) break;
+                const c = shoe.pop(); hands[s].push(c); ev.push({ s, c });
+              }
+            }
+            ev.push({ s: 'd', flip: dealer[1] });
+            if (seats.some((s) => B.value(hands[s]).total <= 21 && !B.isBJ(hands[s]))) while (dealerHits(dealer)) { const c = shoe.pop(); dealer.push(c); ev.push({ s: 'd', c }); }
+            dl.innerHTML = ''; seatEl.forEach((el, k) => { el.innerHTML = ''; el.className = 'seat' + (seats.includes(k) ? '' : ' empty'); });
+            let j = 0;
+            const next = () => {
+              if (j >= ev.length) { // let the finished round sit for a moment, then scoop it
+                return later(() => { dl.innerHTML = ''; seatEl.forEach((el) => (el.innerHTML = '')); later(round, Math.max(300, ms)); }, Math.max(700, 2 * ms));
+              }
+              const e = ev[j++];
+              if (e.flip) { const h = dl.children[1]; const html = A.cardHTML(Object.assign(e.flip, { flip: 1 }), 'sm'); e.flip.flip = 0; if (h) h.outerHTML = html; see(e.flip); }
+              else if (e.down) dl.insertAdjacentHTML('beforeend', A.cardHTML(null, 'sm deal'));
+              else {
+                const el = e.s === 'd' ? dl : seatEl[e.s];
+                el.insertAdjacentHTML('beforeend', A.cardHTML(Object.assign(e.c, { anim: 1 }), 'sm')); e.c.anim = 0;
+                if (el !== dl && el.children.length >= 4) el.classList.add('many');
+                see(e.c);
+              }
+              upd(); later(next, ms);
+            };
+            next();
+          }
+          upd(); later(round, 500);
+
+          function finish() {
+            clearTimeout(tid);
+            const clean = right === stops, cert = clean && st.len >= 52, newBest = cert && st.cpm > best();
+            if (newBest) { S.best.speed = st.cpm; A.save(); }
+            A.addXP(right * 3 + (cert ? 20 : 0));
+            const up = SPEED_LVLS.find((v) => v > st.cpm);
+            result(sw, {
+              kicker: `${st.cpm} a minute · ${SPEED_STYLES.find((s) => s[0] === st.style)[1].toLowerCase()}`,
+              big: `${right}/${stops}`, sub: `stops right · ${shown} cards`, rec: newBest, args, misses, good: clean,
+              note: cert ? (up ? `${st.cpm} a minute is certified. Next up: ${up}.` : 'Top speed certified. Faster than nearly any dealer.')
+                : clean ? 'Clean run. Count a full deck or more to certify this speed.' : 'Drop a speed until every stop is right, then push again.',
+              againLabel: cert && up && !args.wk ? `Try ${up} a minute` : 'Go again',
+              again: () => { if (cert && up && !args.wk) st.cpm = up; run(); }
+            });
+            if (!args.wk) { const b2 = document.createElement('button'); b2.className = 'btn ghost'; b2.textContent = 'Change settings'; b2.onclick = setup; $('.result', sw).appendChild(b2); }
+          }
+        }
+
+        if (args.wk) run(); else setup();
         return () => clearTimeout(tid);
       }
     };

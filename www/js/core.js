@@ -17,7 +17,7 @@
     prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, playOut: true, remind: '', unlockTo: 1 },
     xp: 0, xpDay: { d: '', xp: 0 }, goalDays: [], days: [],
     done: {}, quiz: {}, campDone: {},
-    best: { strat: 0, blitz: 0, reflex: 0, pairs: 0, deck: null, ladder: 0, flash: 0, tc: null, decks: 0, ramp: 0, recall: 0, index: 0, shoeClean: 0 },
+    best: { strat: 0, blitz: 0, reflex: 0, pairs: 0, deck: null, ladder: 0, flash: 0, tc: null, decks: 0, ramp: 0, recall: 0, index: 0, shoeClean: 0, speed: 0 },
     cells: {}, idx: {}, hist: {},
     shoe: { hands: 0, dec: 0, decOk: 0, checks: 0, checksOk: 0, bets: 0, betsOk: 0, shoes: 0, backoffs: 0 },
     flags: {}, log: [], wk: { d: '', i: 0, plan: [] }
@@ -52,7 +52,7 @@
     d.campDone = mapObj(s.campDone, (v) => (v === true ? true : undefined));
     d.flags = mapObj(s.flags, (v) => (typeof v === 'boolean' ? v : undefined));
     const b = isObj(s.best) ? s.best : {};
-    for (const k of Object.keys(d.best)) d.best[k] = k === 'deck' || k === 'tc' ? (typeof b[k] === 'number' && isFinite(b[k]) && b[k] > 0 ? b[k] : null) : num(b[k], 0, 0, 1e6);
+    for (const k of Object.keys(d.best)) d.best[k] = k === 'deck' || k === 'tc' ? (typeof b[k] === 'number' && isFinite(b[k]) && b[k] > 0 ? b[k] : null) : num(b[k], 0, 0, k === 'speed' ? 240 : 1e6);
     d.cells = mapObj(s.cells, srCell);
     d.idx = mapObj(s.idx, srCell);
     d.hist = mapObj(s.hist, (v, k) => (isDay(k) && isObj(v) ? { n: num(v.n, 0, 0), ok: num(v.ok, 0, 0), xp: num(v.xp, 0, 0) } : undefined));
@@ -60,11 +60,12 @@
     for (const k of Object.keys(d.shoe)) d.shoe[k] = Math.round(num(sh[k], 0, 0, 1e9));
     d.shoe.decOk = Math.min(d.shoe.decOk, d.shoe.dec); d.shoe.checksOk = Math.min(d.shoe.checksOk, d.shoe.checks); d.shoe.betsOk = Math.min(d.shoe.betsOk, d.shoe.bets);
     d.log = Array.isArray(s.log) ? s.log.filter(isObj).map((e, i) => ({ id: num(e.id, Date.now() + i), date: str(e.date, '', 20), where: str(e.where, '', 120), hours: num(e.hours, 0, 0, 1000), result: num(e.result, 0, -1e9, 1e9), notes: str(e.notes, '', 1000) })) : [];
-    const WK_IDS = ['reflex', 'strategy', 'tc', 'pairs', 'index', 'blitz', 'flash', 'deck', 'shoe', 'ladder', 'recall'];
+    const WK_IDS = ['reflex', 'strategy', 'tc', 'pairs', 'index', 'blitz', 'flash', 'deck', 'shoe', 'ladder', 'recall', 'speed'];
     const plan = isObj(s.wk) && Array.isArray(s.wk.plan) ? s.wk.plan.filter((x) => isObj(x) && WK_IDS.includes(x.id)).slice(0, 10).map((x) => {
       const a = isObj(x.args) ? x.args : {}, args = {};
       if (typeof a.reps === 'number' && a.reps >= 1 && a.reps <= 100) args.reps = Math.round(a.reps);
       if (typeof a.hands === 'number' && a.hands >= 1 && a.hands <= 200) args.hands = Math.round(a.hands);
+      if ([26, 52, 104].includes(a.len)) args.len = a.len;
       return { id: x.id, t: str(x.t, '', 60), s: str(x.s, '', 80), args };
     }) : [];
     d.wk = isObj(s.wk) && isDay(s.wk.d) ? { d: s.wk.d, i: Math.round(num(s.wk.i, 0, 0, 20)), plan } : { d: '', i: 0, plan: [] };
@@ -234,9 +235,9 @@
   function taskGo(t) {
     if (t.k === 'lesson') return ['lesson', { id: t.id }];
     if (t.k === 'quiz') return ['quiz', { id: t.id }];
-    return [t.go, {}];
+    return [t.go, t.args || {}];
   }
-  const stageDone = (st) => st.tasks.every(taskDone);
+  const stageDone = (st) => !!S.campDone[st.id] || st.tasks.every(taskDone);
   const stageOpen = (i) => i === 0 || CAMP[i].id <= (S.prof.unlockTo || 1) || stageDone(CAMP[i - 1]);
   function currentStage() {
     // players who chose a later starting point see that stage first; earlier stages stay open behind it
@@ -267,7 +268,7 @@
       st >= 9 ? { id: 'index', t: 'Index plays', s: `${big ? 25 : 15} reps`, args: { reps: big ? 25 : 15 } } : { id: 'blitz', t: 'Strategy Blitz', s: '60 seconds, beat your best', args: {} },
       st >= 8 ? { id: 'flash', t: 'Table Flash', s: 'Whole rounds at a glance', args: {} } : { id: 'deck', t: 'Deck countdown', s: 'Full deck, against the clock', args: {} }
     ];
-    if (mid) steps.push(st >= 9 ? { id: 'shoe', t: 'Shoe simulator', s: `${big ? 40 : 20} hands`, args: { hands: big ? 40 : 20 } } : { id: 'ladder', t: 'Speed Ladder', s: 'Push your counting speed', args: {} });
+    if (mid) steps.push(st >= 9 ? { id: 'shoe', t: 'Shoe simulator', s: `${big ? 40 : 20} hands`, args: { hands: big ? 40 : 20 } } : { id: 'speed', t: 'Speed count', s: 'A deck at your next speed', args: { len: 52 } });
     if (big) steps.push({ id: 'recall', t: 'Index recall', s: 'Name the numbers', args: { reps: 15 } });
     return steps;
   }
@@ -407,6 +408,7 @@
   }
   function openUrl(u) { if (!u) return toast('Coming soon — this link hasn\'t been set up yet.'); window.open(u, '_blank'); }
   const ICON = {
+    gauge: '<path d="M5.07 17A8 8 0 1 1 18.93 17"/><path d="M12 13l4.2-4.2"/><circle cx="12" cy="13" r="1.2"/>',
     today: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
     learn: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M9 7h6"/>',
     train: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".5"/>',
@@ -455,10 +457,10 @@
   const icon = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n] || ''}</svg>`;
 
   // ---------------- "what's next" after a drill ----------------
-  const TITLES = { strategy: 'Adaptive trainer', blitz: 'Strategy Blitz', reflex: 'Reflex', pairs: 'Pair cancellation', deck: 'Deck countdown', ladder: 'Speed ladder',
+  const TITLES = { strategy: 'Adaptive trainer', blitz: 'Strategy Blitz', reflex: 'Reflex', pairs: 'Pair cancellation', deck: 'Deck countdown', ladder: 'Speed ladder', speed: 'Speed count',
     flash: 'Table flash', tc: 'True count', decks: 'Tray reading', ramp: 'Bet ramp', index: 'Index plays', recall: 'Index recall', shoe: 'Simulator', casino: 'Casino table',
     mastery: 'Mastery map', chart: 'Strategy chart', bankroll: 'Bankroll calculator' };
-  const FLOW = ['strategy', 'blitz', 'reflex', 'pairs', 'deck', 'ladder', 'flash', 'tc', 'decks', 'ramp', 'index', 'recall', 'shoe'];
+  const FLOW = ['strategy', 'blitz', 'reflex', 'pairs', 'deck', 'ladder', 'speed', 'flash', 'tc', 'decks', 'ramp', 'index', 'recall', 'shoe'];
   function nextAfter(screen) {
     // 1) the next unfinished task of the current bootcamp stage (that isn't the drill just finished)
     const st = CAMP[currentStage()];

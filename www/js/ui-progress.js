@@ -40,7 +40,7 @@
       <h3 class="sec">Personal records</h3>
       <div class="records">
         ${rec('Blitz', b.blitz || '–', b.blitz >= 40)}${rec('Best streak', b.strat || '–', b.strat >= 100)}${rec('Reflex', b.reflex || '–', b.reflex >= 60)}
-        ${rec('Pairs', b.pairs || '–', b.pairs >= 40)}${rec('Deck', b.deck !== null ? b.deck.toFixed(1) + 's' : '–', b.deck !== null && b.deck <= 25)}${rec('Ladder', b.ladder ? b.ladder.toFixed(1) + '/s' : '–', b.ladder >= 3)}
+        ${rec('Pairs', b.pairs || '–', b.pairs >= 40)}${rec('Deck', b.deck !== null ? b.deck.toFixed(1) + 's' : '–', b.deck !== null && b.deck <= 25)}${rec('Ladder', b.ladder ? b.ladder.toFixed(1) + '/s' : '–', b.ladder >= 3)}${rec('Speed count', b.speed ? b.speed + '/min' : '–', b.speed >= 120)}
         ${rec('Table flash', b.flash ? 'Lvl ' + b.flash : '–', b.flash >= 8)}${rec('True count', b.tc !== null ? b.tc.toFixed(1) + 's' : '–', b.tc !== null && b.tc <= 2)}${rec('Index recall', b.recall || '–', b.recall >= 20)}
       </div>
       <h3 class="sec">Shoe simulator</h3>
