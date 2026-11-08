@@ -12,6 +12,17 @@
 
   // ---------------- state ----------------
   const KEY = 'bjmc.v2';
+  // Speed Count tables: dealer speed in cards a minute, how many other players sit down, seconds to decide and to answer.
+  const SC_TABLES = [
+    { name: 'Practice Table', cpm: 60, min: 1, max: 3, clock: 0, ask: 9000 },
+    { name: 'Downtown', cpm: 80, min: 1, max: 4, clock: 0, ask: 8000 },
+    { name: 'Riverboat', cpm: 100, min: 1, max: 5, clock: 9000, ask: 7000 },
+    { name: 'Main Floor', cpm: 120, min: 2, max: 5, clock: 8000, ask: 6500 },
+    { name: 'Late Night', cpm: 150, min: 2, max: 5, clock: 7000, ask: 6000 },
+    { name: 'High Limit', cpm: 180, min: 3, max: 5, clock: 6000, ask: 5500 },
+    { name: 'Tournament', cpm: 210, min: 4, max: 5, clock: 5000, ask: 5000 },
+    { name: 'Pro Room', cpm: 240, min: 4, max: 5, clock: 4500, ask: 4500 }
+  ];
   const DEF = () => ({
     v: 2,
     prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, playOut: true, remind: '', unlockTo: 1 },
@@ -20,7 +31,8 @@
     best: { strat: 0, blitz: 0, reflex: 0, pairs: 0, deck: null, ladder: 0, flash: 0, tc: null, decks: 0, ramp: 0, recall: 0, index: 0, shoeClean: 0, speed: 0 },
     cells: {}, idx: {}, hist: {},
     shoe: { hands: 0, dec: 0, decOk: 0, checks: 0, checksOk: 0, bets: 0, betsOk: 0, shoes: 0, backoffs: 0 },
-    flags: {}, log: [], wk: { d: '', i: 0, plan: [] }
+    flags: {}, log: [], wk: { d: '', i: 0, plan: [] },
+    spd: { stars: SC_TABLES.map(() => 0), hi: SC_TABLES.map(() => 0) }
   });
   let S;
   // Saved data is checked field by field: anything missing, damaged or out of range falls back to its default,
@@ -69,6 +81,9 @@
       return { id: x.id, t: str(x.t, '', 60), s: str(x.s, '', 80), args };
     }) : [];
     d.wk = isObj(s.wk) && isDay(s.wk.d) ? { d: s.wk.d, i: Math.round(num(s.wk.i, 0, 0, 20)), plan } : { d: '', i: 0, plan: [] };
+    const sp = isObj(s.spd) ? s.spd : {}, per = (a, max) => SC_TABLES.map((t, i) => Math.round(num(Array.isArray(a) ? a[i] : 0, 0, 0, max)));
+    d.spd = { stars: per(sp.stars, 3), hi: per(sp.hi, 1e7) };
+    SC_TABLES.forEach((t, i) => { if (d.best.speed >= t.cpm && !d.spd.stars[i]) d.spd.stars[i] = 1; }); // a speed certified before the live table opens those tables
     if (isObj(s.casino)) { const c = s.casino; d.casino = { bank: num(c.bank, 1000, 0, 1e9), hands: num(c.hands, 0, 0), net: num(c.net, 0, -1e12, 1e12), peak: num(c.peak, 1000, 0, 1e9), shoes: num(c.shoes, 0, 0), reloads: num(c.reloads, 0, 0) }; }
     return d;
   }
@@ -268,7 +283,7 @@
       st >= 9 ? { id: 'index', t: 'Index plays', s: `${big ? 25 : 15} reps`, args: { reps: big ? 25 : 15 } } : { id: 'blitz', t: 'Strategy Blitz', s: '60 seconds, beat your best', args: {} },
       st >= 8 ? { id: 'flash', t: 'Table Flash', s: 'Whole rounds at a glance', args: {} } : { id: 'deck', t: 'Deck countdown', s: 'Full deck, against the clock', args: {} }
     ];
-    if (mid) steps.push(st >= 9 ? { id: 'shoe', t: 'Shoe simulator', s: `${big ? 40 : 20} hands`, args: { hands: big ? 40 : 20 } } : { id: 'speed', t: 'Speed count', s: 'A deck at your next speed', args: { len: 52 } });
+    if (mid) steps.push(st >= 9 ? { id: 'shoe', t: 'Shoe simulator', s: `${big ? 40 : 20} hands`, args: { hands: big ? 40 : 20 } } : { id: 'speed', t: 'Speed count', s: 'A live table at your level', args: {} });
     if (big) steps.push({ id: 'recall', t: 'Index recall', s: 'Name the numbers', args: { reps: 15 } });
     return steps;
   }
@@ -408,6 +423,7 @@
   }
   function openUrl(u) { if (!u) return toast('Coming soon — this link hasn\'t been set up yet.'); window.open(u, '_blank'); }
   const ICON = {
+    star: '<path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/>',
     gauge: '<path d="M5.07 17A8 8 0 1 1 18.93 17"/><path d="M12 13l4.2-4.2"/><circle cx="12" cy="13" r="1.2"/>',
     today: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
     learn: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M9 7h6"/>',
@@ -481,7 +497,7 @@
     lessons, lessonById, doneCount, taskDone, taskLabel, taskGo, stageDone, stageOpen, currentStage,
     workout, startWorkout, wkIndex, wkNext, popTo,
     SCREENS, go, back, replace, setTab, render, get stackDepth() { return stack.length; }, get current() { return stack.length ? stack[stack.length - 1].screen : tab; },
-    cardHTML, pad, toast, sheet, celebrate, confetti, ring, countUp, timer, openUrl, icon, CFG, COURSE, CAMP, B, nextAfter, TITLES,
+    cardHTML, pad, toast, sheet, celebrate, confetti, ring, countUp, timer, openUrl, icon, CFG, COURSE, CAMP, B, nextAfter, TITLES, SC_TABLES,
     reset: () => { localStorage.removeItem(KEY); localStorage.removeItem('bjmc.v1'); load(); applyRules(); stack = []; tab = 'today'; render(); }
   };
 })();

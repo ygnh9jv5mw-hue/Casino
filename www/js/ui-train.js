@@ -21,7 +21,7 @@
         ${it('pairs', 'swap', 'Pair cancellation', 'Two cards at a time', b.pairs ? 'Best ' + b.pairs : '')}
         ${it('deck', 'layers', 'Deck countdown', 'A full deck against the clock', b.deck !== null ? b.deck.toFixed(1) + 's' : '')}
         ${it('ladder', 'trend', 'Speed ladder', 'Faster every time you\'re right', b.ladder ? b.ladder.toFixed(1) + '/s' : '')}
-        ${it('speed', 'gauge', 'Speed count', 'Hold the count at dealer speed', b.speed ? b.speed + '/min' : '')}
+        ${it('speed', 'gauge', 'Speed count', 'A live table at dealer speed', scTotal() ? scTotal() + '/24 stars' : '')}
         ${it('flash', 'eye', 'Table flash', 'A whole round at a glance', b.flash ? 'Level ' + b.flash : '')}
       </div>
       <h3 class="sec">True count & betting</h3>
@@ -454,159 +454,287 @@
     };
   };
 
-  // ---------- Speed count ----------
-  // Hold the running count at dealer speed. The cards keep coming; now and then the stream stops and asks for the count,
-  // the way you need it the moment you bet. A speed (cards a minute) is certified when every stop is right over a deck or more.
-  const SPEED_LVLS = [60, 80, 100, 120, 150, 180, 210, 240];
-  const SPEED_STYLES = [['single', 'One at a time'], ['pair', 'Two at a time'], ['table', 'Table rounds']];
-  const speedName = (v) => (v >= 240 ? 'Pro' : v >= 180 ? 'Fast dealer' : v >= 120 ? 'Casino speed' : v >= 100 ? 'Almost there' : 'Learning');
+  // ---------- Speed count: a live table ----------
+  // You, the dealer and 1–5 other players on a six-spot table. Count every card you see while you play your own hand;
+  // between rounds the pit boss asks for the running count. Three misses and you're walked. Eight tables, each faster
+  // and busier than the last. Double deck is dealt as a pitch game: other players' first two cards stay face down
+  // until they bust, double, split, show a blackjack or the dealer turns them over.
+  const SC_NAMES = ['Mike', 'Dana', 'Rita', 'Lou', 'Ken', 'Ana', 'Sam', 'Joe', 'Vic', 'Bea', 'Tony', 'Mei', 'Raj', 'Gus', 'Lena', 'Omar', 'Ivy', 'Hal'];
+  const SC_ROUNDS = 6, SC_SPOTS = 6;
+  const scStars = (n) => [0, 1, 2].map((k) => `<span class="star ${k < n ? 'on' : ''}">${A.icon('star')}</span>`).join('');
+  const scTotal = () => A.S.spd.stars.reduce((a, b) => a + b, 0);
+  const scOpen = (i) => i === 0 || A.S.spd.stars[i - 1] >= 1;
+  const scNext = () => { const st = A.S.spd.stars; let i = 0; while (i < st.length - 1 && st[i] >= 1) i++; return i; };
+  // spot 0 is first base, the dealer's left, which is on your right as you face the dealer
+  const SC_POS = Array.from({ length: SC_SPOTS }, (_, i) => { const x = 91 - (82 * i) / (SC_SPOTS - 1); return { x, y: Math.round(6 + 62 * (1 - Math.pow((x - 50) / 41, 2))) }; });
+
   SCREENS.speed = (args) => {
-    const S = A.S, best = () => S.best.speed || 0;
-    const nextLvl = () => SPEED_LVLS.find((v) => v > best()) || SPEED_LVLS[SPEED_LVLS.length - 1];
-    const st = {
-      cpm: SPEED_LVLS.includes(args.cpm) ? args.cpm : nextLvl(),
-      style: SPEED_STYLES.some((s) => s[0] === args.style) ? args.style : 'single',
-      len: [26, 52, 104].includes(args.len) ? args.len : 52
-    };
-    let tid = 0;
+    const S = A.S, TB = A.SC_TABLES;
+    const timers = new Set(); let clock = null, ask = null;
+    const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
+    const halt = () => { timers.forEach(clearTimeout); timers.clear(); if (clock) clock.stop(); if (ask) ask.stop(); clock = ask = null; };
     return {
       title: 'Speed Count',
       html: '<div id="sw"></div>',
       mount(root) {
         const sw = $('#sw', root);
-        const later = (fn, ms) => { clearTimeout(tid); tid = setTimeout(fn, ms); };
 
-        function setup() {
-          clearTimeout(tid);
-          sw.innerHTML = `<div class="card">
-            <div class="kicker">Your certified speed</div>
-            <h3 class="m0">${best() ? `${best()} cards a minute · ${speedName(best())}` : 'None yet'}</h3>
-            <p class="muted small">Cards keep coming at dealer speed. Now and then the stream stops: enter the running count. Get every stop right over a deck or more and that speed is yours.</p>
-            <label>Speed (cards a minute)</label>
-            <div class="lvls">${SPEED_LVLS.map((v) => `<button class="lvl ${v === st.cpm ? 'on' : ''} ${v <= best() ? 'done' : ''}" data-v="${v}" aria-label="${v} cards a minute${v <= best() ? ', certified' : ''}"><b>${v}</b><small>${+(v / 60).toFixed(1)}/sec</small></button>`).join('')}</div>
-            <label>How the cards come</label>
-            <div class="seg" data-g="style">${SPEED_STYLES.map(([v, t]) => `<button data-v="${v}" class="${st.style === v ? 'on' : ''}">${t}</button>`).join('')}</div>
-            <label>Length</label>
-            <div class="seg" data-g="len">${[[26, 'Half deck'], [52, '1 deck'], [104, '2 decks']].map(([v, t]) => `<button data-v="${v}" class="${st.len === v ? 'on' : ''}">${t}</button>`).join('')}</div>
-            <p class="tiny muted">${st.style === 'table' ? 'Table rounds: two or three players and the dealer. The hole card only counts once it is turned over. ' : ''}Casino speed is about 120 a minute, a deck in 26 seconds. Half-deck runs are practice and don't certify a speed.</p>
-            <button class="btn big" id="go">Start · ${st.cpm} a minute</button></div>`;
-          $$('.lvl', sw).forEach((b) => (b.onclick = () => { st.cpm = +b.dataset.v; setup(); }));
-          $$('.seg', sw).forEach((g) => $$('button', g).forEach((b) => (b.onclick = () => { const k = g.dataset.g; st[k] = k === 'len' ? +b.dataset.v : b.dataset.v; setup(); })));
-          $('#go', sw).onclick = run;
+        function lobby() {
+          halt();
+          const tot = scTotal();
+          sw.innerHTML = `<div class="card sc-intro"><div class="kicker">A live table at dealer speed</div>
+            <h3 class="m0">${tot ? `${tot} of ${TB.length * 3} stars` : 'Take a seat'}</h3>
+            <p class="muted small">You, the dealer and 1–5 other players. Count every card you see while you play your own hand. Between rounds the pit boss asks for the running count. Three misses and you're walked.${B.isDD() ? ' Double deck is dealt as a pitch game: other players\' cards stay face down until they bust, double or the dealer turns them over.' : ''}</p></div>
+            <div class="group">${TB.map((t, i) => { const open = scOpen(i), st = S.spd.stars[i]; return `<button class="list-item sc-tbl ${open ? '' : 'locked'}" data-t="${i}" ${open ? '' : 'disabled'}>
+              <span class="ic ${st ? 'ok' : ''}">${open ? i + 1 : A.icon('lock')}</span>
+              <span class="tx"><b>${esc(t.name)}</b><span>${t.cpm} cards a minute · ${t.min}–${t.max} other players${S.spd.hi[i] ? ` · best ${S.spd.hi[i].toLocaleString()}` : ''}</span></span>
+              <span class="stars">${scStars(st)}</span></button>`; }).join('')}</div>
+            <p class="tiny muted center">Clear a table to open the next. A perfect table, no misses, certifies that speed.</p>`;
+          $$('[data-t]', sw).forEach((b) => (b.onclick = () => play(+b.dataset.t)));
         }
 
-        function run() {
-          clearTimeout(tid);
-          const ms = 60000 / st.cpm, table = st.style === 'table', per = st.style === 'pair' ? 2 : 1;
-          let rc = 0, shown = 0, stops = 0, right = 0, sinceStop = 0, nextStop = 13 + rnd(14);
+        function play(ti) {
+          halt();
+          const T = TB[ti], ms = 60000 / T.cpm, pitch = B.isDD(), rules = B.rules();
+          const shoe = B.shoe(pitch ? 2 : 6); shoe.forEach((c, i) => (c.k = i + 1)); // every card gets an identity
+          shoe.pop(); // the burn card: face down, never seen
+          const names = SC_NAMES.slice().sort(() => Math.random() - 0.5);
+          // who sits where: you and 1–5 others on six spots
+          const spots = Array(SC_SPOTS).fill(null), free = () => spots.map((p, i) => (p ? -1 : i)).filter((i) => i >= 0);
+          spots[rnd(SC_SPOTS)] = { you: true };
+          for (let n = T.min + rnd(T.max - T.min + 1); n > 0; n--) { const f = free(); spots[f[rnd(f.length)]] = { name: names.shift() }; }
+          const D = { cards: [] }; let seats = [];
+          let round = 0, rc = 0, hearts = 3, pts = 0, streak = 0, best = 0, checks = 0, checksOk = 0, plays = 0, playsOk = 0, sinceCheck = 0, msg = '', turn = null, choose = null;
           const misses = [];
-          sw.innerHTML = `${meta([['', 'sp', st.cpm + '/min'], ['Cards', 'cn', `0/${st.len}`], ['Stops', 'ck', '0/0']])}
-            <div id="stage">${table
-              ? `<div class="felt sptable"><div class="lbl">Dealer</div><div class="dl" id="dl"></div><div class="seats">${[0, 1, 2].map((k) => `<div class="seat" id="s${k}"></div>`).join('')}</div></div>`
-              : '<div class="flashcard tall" id="fc"></div>'}
-            <div class="prog"><i id="pg"></i></div></div><div id="ckp"></div>`;
-          const stage = $('#stage', sw), ckp = $('#ckp', sw);
-          const upd = () => {
-            $('#cn', sw).textContent = `${Math.min(shown, st.len)}/${st.len}`; $('#ck', sw).textContent = `${right}/${stops}`;
-            $('#pg', sw).style.width = Math.min(100, (100 * shown) / st.len) + '%';
+          const ALL = { H: 1, S: 1, D: 1, P: 1, R: 1 };
+          sw.innerHTML = `<div class="sc-hud"><span><b>${esc(T.name)}</b> · ${T.cpm}/min</span><span class="hearts" id="hp" aria-label="lives"></span><span><b id="pts">0</b> pts</span></div>
+            <div class="felt sc-felt" id="felt">
+              <div class="sc-top"><div class="lbl">Dealer</div><div class="sc-dcards" id="dl"></div></div>
+              <svg class="arc" viewBox="0 0 300 70" aria-hidden="true"><path id="scap" d="M10,10 Q150,70 290,10" fill="none"/><text><textPath href="#scap" startOffset="50%" text-anchor="middle">BLACKJACK PAYS 3 TO 2</textPath></text></svg>
+              <div class="sc-seats" id="seats"></div><div class="sc-msg" id="msg"></div><div class="sc-check" id="chk" hidden></div></div>
+            <div id="tb" class="tbar hide"><i></i></div>
+            ${actBtns({ dis: ALL })}
+            <div class="sc-foot"><span id="rd"></span><span id="stk"></span></div>`;
+          const felt = $('#felt', sw), chk = $('#chk', sw);
+
+          const see = (c) => { if (!c.seen) { c.seen = true; rc += B.hilo(c.r); } };
+          const deal = (h, down) => { const c = shoe.pop(); c.anim = 1; c.down = !!down; if (!c.down) see(c); h.cards.push(c); return c; };
+          const reveal = (cards) => cards.forEach((c) => { if (c.down) { c.down = false; c.flip = 1; see(c); } });
+          const cardEl = (c) => (c.down ? A.cardHTML(null, 'sm' + (c.anim ? ' deal' : '')) : A.cardHTML(c, 'sm').replace('<div class="pc', `<div data-k="${c.k}" class="pc`));
+          const hud = () => {
+            $('#hp', sw).innerHTML = [0, 1, 2].map((k) => `<span class="${k < hearts ? 'on' : ''}">${A.icon('heart')}</span>`).join('');
+            $('#pts', sw).textContent = pts.toLocaleString();
+            $('#rd', sw).textContent = round ? `Round ${Math.min(round, SC_ROUNDS)} of ${SC_ROUNDS}` : '';
+            $('#stk', sw).textContent = streak > 1 ? `Streak ×${streak}` : '';
           };
-          const see = (c) => { rc += B.hilo(c.r); shown++; sinceStop++; };
-
-          // a stop: the cards are hidden, you give the running count, then the stream carries on (or the run ends)
-          function stop(last, resume) {
-            stops++; stage.style.display = 'none';
-            const p = A.pad((g) => {
-              const good = g === rc; if (good) right++;
-              A.hist(1, good ? 1 : 0); good ? A.fx.ok() : A.fx.bad(); upd();
-              if (!good) misses.push({ t: `Stop ${stops}, after ${shown} cards`, a: `The count was ${sgn(rc)}`, w: `You said ${sgn(g)}` });
-              if (last) return finish();
-              const go = () => { ckp.innerHTML = ''; stage.style.display = ''; sinceStop = 0; nextStop = 13 + rnd(14); resume(); };
-              if (good) { ckp.innerHTML = `<div class="fb ok">${A.icon('check')} ${sgn(rc)}, keep going</div>`; return later(go, 700); }
-              ckp.innerHTML = `<div class="fb bad"><b>It's ${sgn(rc)}</b><span class="small">You said ${sgn(g)}. Carry on from ${sgn(rc)}.</span><button class="btn sm" id="kg">Keep going ${A.icon('chevron')}</button></div>`;
-              $('#kg', ckp).onclick = go;
-            }, { label: 'Check' });
-            ckp.innerHTML = `<div class="stopcard"><div class="kicker">${last ? 'End of the run' : `Stop ${stops}`}</div><h2 class="m0">What's the running count?</h2></div>${p.html}`;
-            p.bind(ckp); A.fx.tap();
+          function paint() {
+            $('#dl', sw).innerHTML = D.cards.map(cardEl).join('');
+            $('#seats', sw).innerHTML = SC_POS.map((pos, i) => {
+              const s = seats.find((x) => x.spot === i), p = spots[i];
+              if (!s && !p) return `<div class="sc-seat open" style="left:${pos.x}%;top:${pos.y}px"><div class="sc-spot"></div></div>`;
+              const who = s || p, live = s ? s.hands.filter((h) => !h.gone) : [];
+              const hands = live.map((h) => `<div class="sc-hand ${turn && turn.h === h ? 'act' : ''}" style="--n:${h.cards.length}">${h.cards.map((c, j) => `<span style="left:${j * 7}px;top:${j * 15}px">${cardEl(c)}</span>`).join('')}${h.res !== undefined && who.you ? `<b class="sc-res ${h.res > 0 ? 'win' : h.res < 0 ? 'lose' : 'push'}">${h.res > 0 ? 'Win' : h.res < 0 ? 'Lose' : 'Push'}</b>` : ''}</div>`).join('');
+              const one = who.you && live.length === 1 && live[0].cards.length && !live[0].cards.some((c) => c.down) ? ` · ${handTotal(live[0].cards)}` : '';
+              return `<div class="sc-seat ${who.you ? 'you' : ''}" style="left:${pos.x}%;top:${pos.y}px"><div class="sc-name">${who.you ? 'You' : esc(who.name)}${one}</div><div class="sc-hands">${hands || '<div class="sc-spot"></div>'}</div></div>`;
+            }).join('');
+            $('#msg', sw).textContent = msg;
+            [D.cards, ...seats.flatMap((s) => s.hands.map((h) => h.cards))].forEach((a) => a.forEach((c) => { c.anim = 0; c.flip = 0; }));
+            hud();
           }
+          const run = (steps, done) => { let i = 0; const nx = () => { if (i >= steps.length) return done(); steps[i++](); paint(); later(nx, ms); }; nx(); };
 
-          if (!table) {
-            // one or two cards at a time, each group on screen for its share of the minute
-            const cards = B.shoe(Math.ceil(st.len / 52)).slice(0, st.len), fc = $('#fc', sw), anim = ms >= 400 ? 1 : 0; let i = 0;
-            const step = () => {
-              if (i >= cards.length) return stop(true);
-              if (sinceStop >= nextStop && cards.length - i > 8) return stop(false, step);
-              const grp = cards.slice(i, i + per); i += grp.length;
-              fc.innerHTML = grp.map((c) => A.cardHTML(Object.assign(c, { anim }), 'big')).join('');
-              grp.forEach(see); upd();
-              later(step, ms * grp.length);
-            };
-            upd(); return later(step, 500);
-          }
-
-          // table rounds: dealt in casino order, players hit, the hole card is turned over, the dealer draws, the cards are scooped
-          const shoe = B.shoe(Math.ceil(st.len / 52) + 1), dl = $('#dl', sw), seatEl = [0, 1, 2].map((k) => $('#s' + k, sw));
-          const dealerHits = (cards) => { const v = B.value(cards); return v.total < 17 || (B.rules().h17 && v.total === 17 && v.soft); };
-          function round() {
-            if (shown + 10 > st.len) return stop(true);
-            if (sinceStop >= nextStop) return stop(false, round);
-            const seats = [0, 1, 2]; if (Math.random() < 0.45) seats.splice(rnd(3), 1); // two or three players
-            const hands = [[], [], []], dealer = [], ev = [];
+          // ----- a round -----
+          function newRound() {
+            round++;
+            if (round > 1 && Math.random() < 0.3) { // players come and go between hands
+              const others = spots.map((p, i) => (p && !p.you ? i : -1)).filter((i) => i >= 0), f = free();
+              const leave = others.length > T.min && (others.length >= T.max || !f.length || Math.random() < 0.5);
+              if (leave) { const i = others[rnd(others.length)]; names.push(spots[i].name); msg = `${spots[i].name} left the table`; spots[i] = null; }
+              else if (others.length < T.max && f.length) { const i = f[rnd(f.length)]; spots[i] = { name: names.shift() }; msg = `${spots[i].name} sat down`; }
+            } else msg = '';
+            seats = spots.map((p, i) => (p ? Object.assign({ spot: i, hands: [{ cards: [] }] }, p) : null)).filter(Boolean);
+            D.cards = []; paint();
+            const steps = [];
             for (let pass = 0; pass < 2; pass++) {
-              for (const s of seats) { const c = shoe.pop(); hands[s].push(c); ev.push({ s, c }); }
-              const c = shoe.pop(); dealer.push(c); ev.push({ s: 'd', c, down: pass === 1 });
+              seats.forEach((s) => steps.push(() => deal(s.hands[0], pitch && !s.you))); // you look at your own cards
+              steps.push(() => deal(D, pass === 1)); // the hole card stays face down
             }
-            const up = B.rv(dealer[0].r);
-            for (const s of seats) {
-              for (;;) { // the other players play roughly by the book
-                const v = B.value(hands[s]); if (v.total >= 21) break;
-                const hit = v.total <= 11 || (v.soft && v.total <= 17) || (!v.soft && v.total <= 16 && up >= 7) || (!v.soft && v.total === 12 && up <= 3);
-                if (!hit) break;
-                const c = shoe.pop(); hands[s].push(c); ev.push({ s, c });
+            later(() => run(steps, afterDeal), msg ? ms + 400 : ms);
+          }
+          function afterDeal() {
+            const up = B.rv(D.cards[0].r);
+            if ((up === 11 || up === 10) && B.isBJ(D.cards)) { msg = 'Dealer has blackjack'; reveal([D.cards[1]]); paint(); return later(settle, ms); }
+            act(0);
+          }
+          function act(i) {
+            if (i >= seats.length) return dealerTurn();
+            const s = seats[i], h = s.hands[0];
+            if (B.isBJ(h.cards)) { // a natural is turned up and paid at once
+              reveal(h.cards); h.done = true; msg = s.you ? 'Blackjack!' : `${s.name}: blackjack`; if (s.you) A.fx.win(); paint();
+              return later(() => { h.gone = true; paint(); later(() => act(i + 1), ms * 0.5); }, ms);
+            }
+            if (s.you) return yours(i);
+            bot(s, () => act(i + 1));
+          }
+          const bust = (s, h, next) => { // busted cards are turned up and taken away at once
+            h.bust = h.done = true; reveal(h.cards); msg = s.you ? 'Bust' : `${s.name} busts`; paint();
+            later(() => { h.gone = true; paint(); next(); }, ms);
+          };
+          function split(s, hi) {
+            const h = s.hands[hi]; reveal(h.cards);
+            const c2 = h.cards.pop(), nh = { cards: [c2], split: true }; h.split = true; s.hands.splice(hi + 1, 0, nh);
+            deal(h, false); deal(nh, false); if (c2.r === 'A') h.done = nh.done = true;
+          }
+          function bot(s, done) {
+            const up = B.rv(D.cards[0].r); let hi = 0;
+            const step = () => {
+              const h = s.hands[hi]; if (!h) return later(done, ms * 0.4);
+              if (h.done || B.value(h.cards).total >= 21) { hi++; return step(); }
+              const two = h.cards.length === 2, v = B.value(h.cards);
+              let a = B.play(h.cards, up, null, { canDouble: two && !h.split, canSplit: two && B.isPair(h.cards) && s.hands.length < 2, canSurrender: false });
+              if ((a === 'H' || a === 'S') && v.total >= 12 && v.total <= 16 && Math.random() < 0.12) a = a === 'H' ? 'S' : 'H'; // real players get it wrong
+              if (a === 'S') { h.done = true; hi++; return later(step, ms * 0.5); }
+              if (a === 'P') { split(s, hi); msg = `${s.name} splits`; paint(); return later(step, ms); }
+              if (a === 'D') {
+                reveal(h.cards); h.doubled = h.done = true; deal(h, pitch); msg = `${s.name} doubles`; paint(); hi++; // the double card is tucked face down in a pitch game
+                return later(() => (!pitch && B.value(h.cards).total > 21 ? bust(s, h, step) : step()), ms);
               }
-            }
-            ev.push({ s: 'd', flip: dealer[1] });
-            if (seats.some((s) => B.value(hands[s]).total <= 21 && !B.isBJ(hands[s]))) while (dealerHits(dealer)) { const c = shoe.pop(); dealer.push(c); ev.push({ s: 'd', c }); }
-            dl.innerHTML = ''; seatEl.forEach((el, k) => { el.innerHTML = ''; el.className = 'seat' + (seats.includes(k) ? '' : ' empty'); });
-            let j = 0;
+              deal(h, false); paint(); // a hit is dealt face up
+              later(() => (B.value(h.cards).total > 21 ? bust(s, h, () => { hi++; step(); }) : step()), ms);
+            };
+            step();
+          }
+          function yours(i) {
+            const s = seats[i], up = B.rv(D.cards[0].r); let hi = 0;
             const next = () => {
-              if (j >= ev.length) { // let the finished round sit for a moment, then scoop it
-                return later(() => { dl.innerHTML = ''; seatEl.forEach((el) => (el.innerHTML = '')); later(round, Math.max(300, ms)); }, Math.max(700, 2 * ms));
+              const h = s.hands[hi];
+              if (!h) { turn = null; setActs(sw, ALL); msg = ''; paint(); return later(() => act(i + 1), ms * 0.5); }
+              if (h.done || B.value(h.cards).total >= 21) { hi++; return next(); }
+              const two = h.cards.length === 2;
+              const op = { canDouble: two && !(h.split && h.cards[0].r === 'A'), canSplit: two && B.isPair(h.cards) && s.hands.length < 4, canSurrender: rules.ls && two && s.hands.length === 1 };
+              turn = { h, op }; msg = 'Your turn'; paint();
+              setActs(sw, { H: 0, S: 0, D: !op.canDouble, P: !op.canSplit, R: !op.canSurrender });
+              if (T.clock) { $('#tb', sw).classList.remove('hide'); clock = A.timer($('#tb i', sw), T.clock, () => choose(null)); }
+              A.fx.tap();
+            };
+            choose = (a) => {
+              if (!turn) return;
+              const { h, op } = turn; turn = null;
+              if (clock) { clock.stop(); clock = null; }
+              $('#tb', sw).classList.add('hide'); setActs(sw, ALL);
+              const book = B.play(h.cards, up, null, op), good = a === book; plays++;
+              if (good) { playsOk++; pts += 20; } else misses.push({ t: `Your ${handTotal(h.cards)} vs ${B.upName(up)}`, a: B.NAMES[book], w: a ? `You chose ${B.NAMES[a]}` : 'Too slow: you stood' });
+              msg = good ? '' : `${B.NAMES[book]} was the play`;
+              const x = a || 'S';
+              if (x === 'S') { h.done = true; hi++; paint(); return later(next, ms * 0.4); }
+              if (x === 'R') { h.surr = h.done = true; msg = 'You surrender'; paint(); return later(() => { h.gone = true; paint(); hi++; next(); }, ms); }
+              if (x === 'P') { split(s, hi); paint(); return later(next, ms); }
+              if (x === 'D') {
+                h.doubled = h.done = true; deal(h, pitch); paint(); hi++; // in a pitch game your double card comes face down too
+                return later(() => (!pitch && B.value(h.cards).total > 21 ? bust(s, h, next) : next()), ms);
               }
-              const e = ev[j++];
-              if (e.flip) { const h = dl.children[1]; const html = A.cardHTML(Object.assign(e.flip, { flip: 1 }), 'sm'); e.flip.flip = 0; if (h) h.outerHTML = html; see(e.flip); }
-              else if (e.down) dl.insertAdjacentHTML('beforeend', A.cardHTML(null, 'sm deal'));
-              else {
-                const el = e.s === 'd' ? dl : seatEl[e.s];
-                el.insertAdjacentHTML('beforeend', A.cardHTML(Object.assign(e.c, { anim: 1 }), 'sm')); e.c.anim = 0;
-                if (el !== dl && el.children.length >= 4) el.classList.add('many');
-                see(e.c);
-              }
-              upd(); later(next, ms);
+              deal(h, false); paint();
+              later(() => (B.value(h.cards).total > 21 ? bust(s, h, () => { hi++; next(); }) : next()), ms);
             };
             next();
           }
-          upd(); later(round, 500);
-
-          function finish() {
-            clearTimeout(tid);
-            const clean = right === stops, cert = clean && st.len >= 52, newBest = cert && st.cpm > best();
-            if (newBest) { S.best.speed = st.cpm; A.save(); }
-            A.addXP(right * 3 + (cert ? 20 : 0));
-            const up = SPEED_LVLS.find((v) => v > st.cpm);
-            result(sw, {
-              kicker: `${st.cpm} a minute · ${SPEED_STYLES.find((s) => s[0] === st.style)[1].toLowerCase()}`,
-              big: `${right}/${stops}`, sub: `stops right · ${shown} cards`, rec: newBest, args, misses, good: clean,
-              note: cert ? (up ? `${st.cpm} a minute is certified. Next up: ${up}.` : 'Top speed certified. Faster than nearly any dealer.')
-                : clean ? 'Clean run. Count a full deck or more to certify this speed.' : 'Drop a speed until every stop is right, then push again.',
-              againLabel: cert && up && !args.wk ? `Try ${up} a minute` : 'Go again',
-              again: () => { if (cert && up && !args.wk) st.cpm = up; run(); }
-            });
-            if (!args.wk) { const b2 = document.createElement('button'); b2.className = 'btn ghost'; b2.textContent = 'Change settings'; b2.onclick = setup; $('.result', sw).appendChild(b2); }
+          $$('[data-a]', sw).forEach((b) => (b.onclick = () => choose && choose(b.dataset.a)));
+          function dealerTurn() {
+            reveal([D.cards[1]]); msg = ''; paint();
+            const live = seats.some((s) => s.hands.some((h) => !h.gone && !h.bust && !h.surr));
+            const step = () => {
+              const v = B.value(D.cards);
+              if (live && (v.total < 17 || (rules.h17 && v.total === 17 && v.soft))) { deal(D, false); paint(); return later(step, ms); }
+              msg = !live ? '' : v.total > 21 ? 'Dealer busts' : `Dealer has ${v.total}`; paint(); later(settle, ms);
+            };
+            later(step, ms);
           }
+          function settle() { // the dealer turns over any hands still face down, one at a time, and pays or takes them
+            const dv = B.value(D.cards).total, dBJ = B.isBJ(D.cards), todo = [];
+            seats.forEach((s) => s.hands.forEach((h) => { if (!h.gone) todo.push({ s, h }); }));
+            let k = 0;
+            const step = () => {
+              if (k >= todo.length) return later(scoop, Math.max(900, 2 * ms));
+              const { s, h } = todo[k++], hidden = h.cards.some((c) => c.down);
+              reveal(h.cards);
+              const p = B.value(h.cards).total;
+              h.res = h.surr ? -0.5 : dBJ ? (B.isBJ(h.cards) ? 0 : -1) : p > 21 ? -1 : dv > 21 || p > dv ? 1 : p === dv ? 0 : -1;
+              if (s.you && h.res > 0) A.fx.ok();
+              paint(); later(step, hidden ? ms : Math.min(ms, 300));
+            };
+            step();
+          }
+          function scoop() {
+            seats.forEach((s) => s.hands.forEach((h) => (h.gone = true))); D.cards = []; msg = ''; paint();
+            later(between, Math.max(300, ms * 0.6));
+          }
+          function between() {
+            sinceCheck++;
+            if (round >= SC_ROUNDS || shoe.length < 30) return pitCheck(true);
+            if (sinceCheck >= 3 || (sinceCheck >= 2 && Math.random() < 0.55)) return pitCheck(false);
+            newRound();
+          }
+
+          // ----- the pit boss: what's the count? one tap, against the clock -----
+          function pitCheck(last) {
+            checks++; sinceCheck = 0;
+            const lo = rc - rnd(5), vals = [0, 1, 2, 3, 4].map((d) => lo + d);
+            chk.innerHTML = `<div class="sc-q"><div class="kicker">${last ? 'Last check' : 'Pit check'}</div><h3 class="m0">What's the running count?</h3>
+              <div class="sc-opts">${vals.map((v) => `<button data-v="${v}">${sgn(v)}</button>`).join('')}</div><div class="tbar"><i></i></div><div class="sc-fb" id="scfb"></div></div>`;
+            chk.hidden = false; A.fx.tap();
+            let answered = false;
+            const answer = (v) => {
+              if (answered) return; answered = true;
+              const left = ask ? Math.max(0, ask.left()) : 0; if (ask) { ask.stop(); ask = null; }
+              const good = v === rc; A.hist(1, good ? 1 : 0);
+              $$('[data-v]', chk).forEach((b) => { b.disabled = true; b.classList.toggle('right', +b.dataset.v === rc); b.classList.toggle('wrong', v !== null && +b.dataset.v === v && !good); });
+              if (good) {
+                checksOk++; streak++; best = Math.max(best, streak);
+                const gain = 100 + 25 * (streak - 1) + Math.round((50 * left) / T.ask); pts += gain; A.fx.ok();
+                $('#scfb', chk).innerHTML = `<span class="pos">+${gain}</span>${streak > 1 ? ` · streak ×${streak}` : ''}`;
+              } else {
+                hearts--; streak = 0; A.fx.bad(); felt.classList.remove('badf'); void felt.offsetWidth; felt.classList.add('badf');
+                misses.push({ t: `Pit check after round ${round}`, a: `The count was ${sgn(rc)}`, w: v === null ? 'Out of time' : `You said ${sgn(v)}` });
+                $('#scfb', chk).innerHTML = `<span class="neg">${v === null ? 'Time' : 'Miss'}</span> · it was ${sgn(rc)}${hearts ? ` · ${hearts} ${hearts === 1 ? 'life' : 'lives'} left` : ''}`;
+              }
+              hud();
+              later(() => { chk.hidden = true; chk.innerHTML = ''; if (hearts <= 0) return finish(false); if (last) return finish(true); newRound(); }, good ? 900 : 1700);
+            };
+            $$('[data-v]', chk).forEach((b) => (b.onclick = () => answer(+b.dataset.v)));
+            ask = A.timer($('.tbar i', chk), T.ask, () => answer(null));
+          }
+
+          function finish(survived) {
+            halt(); choose = null;
+            const stars = survived ? hearts : 0, prev = S.spd.stars[ti], prevHi = S.spd.hi[ti] || 0, nextT = TB[ti + 1];
+            if (stars > prev) S.spd.stars[ti] = stars;
+            const newHi = pts > prevHi; if (newHi) S.spd.hi[ti] = pts;
+            const cert = stars === 3 && T.cpm > (S.best.speed || 0); if (cert) S.best.speed = T.cpm;
+            const opened = prev === 0 && stars > 0 && !!nextT;
+            A.addXP(Math.round(pts / 40) + stars * 5); A.save();
+            result(sw, {
+              kicker: `${T.name} · ${T.cpm} a minute`,
+              big: String(pts), sub: `points · ${checksOk}/${checks} pit checks · ${playsOk}/${plays} plays right${best > 1 ? ` · best streak ${best}` : ''}`,
+              rec: newHi && prevHi > 0, args, misses, good: stars === 3,
+              note: !survived ? 'Three misses and the pit boss walked you. Take it a table slower, or try again.'
+                : opened ? `${esc(nextT.name)} is open: ${nextT.cpm} cards a minute, ${nextT.min}–${nextT.max} players.`
+                : stars === 3 ? `A perfect table. ${T.cpm} cards a minute is certified.` : 'Clear it with no misses for three stars.',
+              againLabel: stars && nextT && !args.wk ? `Play ${nextT.name}` : 'Play again',
+              again: () => (stars && nextT && !args.wk ? play(ti + 1) : play(ti))
+            });
+            $('.result .kicker', sw).insertAdjacentHTML('afterend', `<div class="sc-stars big">${scStars(stars)}</div>`);
+            if ((opened || cert) && !(newHi && prevHi > 0)) A.confetti();
+            if (!args.wk) { const b2 = document.createElement('button'); b2.className = 'btn ghost'; b2.textContent = 'All tables'; b2.onclick = lobby; $('.result', sw).appendChild(b2); }
+          }
+
+          // shuffle up and deal
+          msg = `${pitch ? 'Double deck' : 'Six-deck shoe'}: the burn card is out. Count from 0.`; seats = []; paint();
+          later(newRound, 1600);
         }
 
-        if (args.wk) run(); else setup();
-        return () => clearTimeout(tid);
+        const want = TB.findIndex((t) => t.cpm === args.cpm);
+        if (args.wk) play(scNext()); else if (want >= 0 && scOpen(want)) play(want); else lobby();
+        return halt;
       }
     };
   };

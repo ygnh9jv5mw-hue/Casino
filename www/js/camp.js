@@ -27,7 +27,7 @@ window.CAMP = [
     { k: 'fastest', key: 'deck', max: 45, t: 'Deck countdown: perfect in 45s', go: 'deck' },
     { k: 'best', key: 'ladder', min: 2, t: 'Speed Ladder: 2 cards/sec', go: 'ladder' },
     { k: 'best', key: 'reflex', min: 55, t: 'Reflex: 55+ in 60s', go: 'reflex' },
-    { k: 'best', key: 'speed', min: 100, t: 'Speed count: every stop right at 100 a minute', go: 'speed', args: { cpm: 100 } } ] },
+    { k: 'best', key: 'speed', min: 100, t: 'Speed count: a perfect table at 100 a minute', go: 'speed', args: { cpm: 100 } } ] },
   { id: 7, title: 'True Count', sub: 'Divide fast, read the tray', tasks: [
     { k: 'lesson', id: 'm2l3' },
     { k: 'fastest', key: 'tc', max: 3, t: 'True count: 10/10, under 3s each', go: 'tc' },
@@ -36,7 +36,7 @@ window.CAMP = [
     { k: 'lesson', id: 'm2l4' }, { k: 'lesson', id: 'm2l5' },
     { k: 'fastest', key: 'deck', max: 30, t: 'Deck countdown: perfect in 30s', go: 'deck' },
     { k: 'best', key: 'flash', min: 6, t: 'Table Flash: level 6', go: 'flash' },
-    { k: 'best', key: 'speed', min: 120, t: 'Speed count: every stop right at 120 a minute', go: 'speed', args: { cpm: 120 } },
+    { k: 'best', key: 'speed', min: 120, t: 'Speed count: a perfect table at 120 a minute', go: 'speed', args: { cpm: 120 } },
     { k: 'quiz', id: 'm2', pct: 80 } ] },
   { id: 9, title: 'Index Plays I', sub: 'Insurance and the Illustrious 18', tasks: [
     { k: 'lesson', id: 'm3l1' }, { k: 'lesson', id: 'm3l2' }, { k: 'lesson', id: 'm3l3' },

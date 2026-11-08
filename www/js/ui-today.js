@@ -8,7 +8,7 @@
       { t: 'Basic strategy: 95% of the chart mastered', ok: A.masteryPct('all') >= 0.95, v: Math.round(A.masteryPct('all') * 100) + '% mastered', go: 'strategy' },
       { t: 'Strategy Blitz: 40+ in 60 seconds', ok: b.blitz >= 40, v: `best ${b.blitz}`, go: 'blitz' },
       { t: 'Deck countdown: perfect in 25s', ok: b.deck !== null && b.deck <= 25, v: b.deck !== null ? `best ${b.deck.toFixed(1)}s` : 'not done yet', go: 'deck' },
-      { t: 'Speed count: every stop right at 120 a minute', ok: b.speed >= 120, v: b.speed ? `best ${b.speed} a minute` : 'not done yet', go: 'speed' },
+      { t: 'Speed count: a perfect table at 120 a minute', ok: b.speed >= 120, v: b.speed ? `best ${b.speed} a minute` : 'not done yet', go: 'speed' },
       { t: 'True count: 10/10 under 2s each', ok: b.tc !== null && b.tc <= 2, v: b.tc !== null ? `best ${b.tc.toFixed(2)}s avg` : 'not done yet', go: 'tc' },
       { t: 'Index plays: 90% mastered', ok: A.idxPct() >= 0.9, v: Math.round(A.idxPct() * 100) + '% mastered', go: 'index' },
       { t: 'Shoe sim: 150 hands, 98% plays, 95% counts', ok: sh.hands >= 150 && sh.dec && sh.decOk / sh.dec >= 0.98 && sh.checks >= 20 && sh.checksOk / sh.checks >= 0.95,

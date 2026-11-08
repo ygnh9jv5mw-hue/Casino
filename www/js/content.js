@@ -86,7 +86,7 @@ window.COURSE = [
         <ul>
           <li>Reflex: 60+ correct in 60 seconds</li>
           <li>Deck countdown: under 25 seconds, perfect</li>
-          <li>Speed count: every stop right at 120 cards a minute, over a full deck</li>
+          <li>Speed count: a perfect table at 120 cards a minute, other players and all</li>
           <li>True count conversion: under 2 seconds</li>
           <li>Shoe simulator: right count at every check, with other players at the table</li>
         </ul>
