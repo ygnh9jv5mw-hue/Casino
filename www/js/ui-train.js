@@ -470,9 +470,9 @@
 
   SCREENS.speed = (args) => {
     const S = A.S, TB = A.SC_TABLES;
-    const timers = new Set(); let clock = null, ask = null;
+    const timers = new Set(); let clock = null, ask = null, noise = null;
     const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
-    const halt = () => { timers.forEach(clearTimeout); timers.clear(); if (clock) clock.stop(); if (ask) ask.stop(); clock = ask = null; };
+    const halt = () => { timers.forEach(clearTimeout); timers.clear(); if (clock) clock.stop(); if (ask) ask.stop(); if (noise) noise.stop(); clock = ask = noise = null; };
     return {
       title: 'Speed Count',
       html: '<div id="sw"></div>',
@@ -485,12 +485,15 @@
           sw.innerHTML = `<div class="card sc-intro"><div class="kicker">A live table at dealer speed</div>
             <h3 class="m0">${tot ? `${tot} of ${TB.length * 3} stars` : 'Take a seat'}</h3>
             <p class="muted small">You, the dealer and 1–5 other players. Count every card you see while you play your own hand. Between rounds the pit boss asks for the running count. Three misses and you're walked.${B.isDD() ? ' Double deck is dealt as a pitch game: other players\' cards stay face down until they bust, double or the dealer turns them over.' : ''}</p></div>
+            <div class="card sc-set"><div class="tgl"><span>Distractions<small>Waitress, pit boss, your phone, table talk</small></span><button class="switch ${S.prof.spdDistract ? 'on' : ''}" id="scd" aria-label="Distractions"><i></i></button></div>
+              <div class="tgl"><span>Casino sound<small>${S.prof.sound ? 'Crowd, chips and machines' : 'Turn on sound effects in Settings first'}</small></span><button class="switch ${S.prof.spdNoise ? 'on' : ''}" id="scn" aria-label="Casino sound"><i></i></button></div></div>
             <div class="group">${TB.map((t, i) => { const open = scOpen(i), st = S.spd.stars[i]; return `<button class="list-item sc-tbl ${open ? '' : 'locked'}" data-t="${i}" ${open ? '' : 'disabled'}>
               <span class="ic ${st ? 'ok' : ''}">${open ? i + 1 : A.icon('lock')}</span>
               <span class="tx"><b>${esc(t.name)}</b><span>${t.cpm} cards a minute · ${t.min}–${t.max} other players${S.spd.hi[i] ? ` · best ${S.spd.hi[i].toLocaleString()}` : ''}</span></span>
               <span class="stars">${scStars(st)}</span></button>`; }).join('')}</div>
             <p class="tiny muted center">Clear a table to open the next. A perfect table, no misses, certifies that speed.</p>`;
           $$('[data-t]', sw).forEach((b) => (b.onclick = () => play(+b.dataset.t)));
+          [['#scd', 'spdDistract'], ['#scn', 'spdNoise']].forEach(([id, k]) => ($(id, sw).onclick = (e) => { S.prof[k] = !S.prof[k]; A.save(); e.currentTarget.classList.toggle('on', S.prof[k]); A.fx.tap(); }));
         }
 
         function play(ti) {
@@ -503,7 +506,9 @@
           const spots = Array(SC_SPOTS).fill(null), free = () => spots.map((p, i) => (p ? -1 : i)).filter((i) => i >= 0);
           spots[rnd(SC_SPOTS)] = { you: true };
           for (let n = T.min + rnd(T.max - T.min + 1); n > 0; n--) { const f = free(); spots[f[rnd(f.length)]] = { name: names.shift() }; }
-          const D = { cards: [] }; let seats = [];
+          const D = { cards: [], who: 'Dealer' }; let seats = [];
+          let seenLog = [], rcAtCheck = 0, sinceDist = 0, nextDist = 9 + rnd(12), dist = null, distN = 0, distOk = 0;
+          if (S.prof.spdNoise) noise = A.ambience();
           let round = 0, rc = 0, hearts = 3, pts = 0, streak = 0, best = 0, checks = 0, checksOk = 0, plays = 0, playsOk = 0, sinceCheck = 0, msg = '', turn = null, choose = null;
           const misses = [];
           const ALL = { H: 1, S: 1, D: 1, P: 1, R: 1 };
@@ -514,11 +519,33 @@
               <div class="sc-seats" id="seats"></div><div class="sc-msg" id="msg"></div><div class="sc-check" id="chk" hidden></div></div>
             <div id="tb" class="tbar hide"><i></i></div>
             ${actBtns({ dis: ALL })}
-            <div class="sc-foot"><span id="rd"></span><span id="stk"></span></div>`;
+            <div class="sc-foot"><span id="rd"></span><span id="stk"></span></div><div class="sc-dist" id="dist" hidden role="status"></div>`;
           const felt = $('#felt', sw), chk = $('#chk', sw);
 
-          const see = (c) => { if (!c.seen) { c.seen = true; rc += B.hilo(c.r); } };
-          const deal = (h, down) => { const c = shoe.pop(); c.anim = 1; c.down = !!down; if (!c.down) see(c); h.cards.push(c); return c; };
+          const see = (c) => {
+            if (c.seen) return; c.seen = true; rc += B.hilo(c.r);
+            seenLog.push({ c: { r: c.r, s: c.s }, rc, who: c.who, g: round });
+            if (S.prof.spdDistract && !dist && chk.hidden && ++sinceDist >= nextDist) distract();
+          };
+          const deal = (h, down) => { const c = shoe.pop(); c.anim = 1; c.down = !!down; c.who = h.who; if (!c.down) see(c); h.cards.push(c); return c; };
+          // ----- distractions: the table keeps dealing while you deal with them -----
+          const DISTRACT = [
+            () => ({ who: 'Cocktail waitress', say: 'Can I get you anything to drink?', opts: ['Water', 'Coffee', "I'm good"] }),
+            () => ({ who: 'Pit boss', say: 'Evening! Where are you in from tonight?', opts: ['Local', 'Out of town', 'Work trip'] }),
+            () => ({ who: 'Pit boss', say: 'You keeping track of something over there?', opts: ['My drink', 'My losses', 'Nope'] }),
+            () => ({ who: 'Your phone', say: pick(['Mom: call me back when you can', 'Your ride is arriving', 'Dinner at 9?']), opts: ['Ignore'], buzz: true }),
+            () => { const o = seats.filter((s) => !s.you); return { who: o.length ? pick(o).name : 'A player', say: pick(['This shoe is killing me.', 'Is it me or is this dealer hot?', 'What would you do with 16 here?', 'Third blackjack tonight!']), opts: ['Nod', 'Shrug'] }; },
+            () => ({ who: 'Dealer', say: pick(['Good luck, everybody.', 'Coloring up, anyone?', 'Hands off the cards, please.']), opts: ['Smile'] })
+          ];
+          function distract() {
+            const d = pick(DISTRACT)(), el = $('#dist', sw), t0 = performance.now(); dist = d; distN++; sinceDist = 0; nextDist = 9 + rnd(12);
+            el.innerHTML = `<div class="who">${esc(d.who)}</div><div class="say">${esc(d.say)}</div><div class="dopts">${d.opts.map((o, i) => `<button data-d="${i}">${esc(o)}</button>`).join('')}</div>`;
+            el.hidden = false; d.buzz ? A.fx.buzz() : A.fx.tap();
+            const clear = (handled) => { if (dist !== d) return; dist = null; el.hidden = true; el.innerHTML = ''; if (handled) { distOk++; pts += 15; hud(); } };
+            $$('[data-d]', el).forEach((b) => (b.onclick = () => clear(performance.now() - t0 < 6000)));
+            later(() => clear(false), 6500);
+          }
+          const hideDist = () => { dist = null; const el = $('#dist', sw); el.hidden = true; el.innerHTML = ''; };
           const reveal = (cards) => cards.forEach((c) => { if (c.down) { c.down = false; c.flip = 1; see(c); } });
           const cardEl = (c) => (c.down ? A.cardHTML(null, 'sm' + (c.anim ? ' deal' : '')) : A.cardHTML(c, 'sm').replace('<div class="pc', `<div data-k="${c.k}" class="pc`));
           const hud = () => {
@@ -552,7 +579,7 @@
               if (leave) { const i = others[rnd(others.length)]; names.push(spots[i].name); msg = `${spots[i].name} left the table`; spots[i] = null; }
               else if (others.length < T.max && f.length) { const i = f[rnd(f.length)]; spots[i] = { name: names.shift() }; msg = `${spots[i].name} sat down`; }
             } else msg = '';
-            seats = spots.map((p, i) => (p ? Object.assign({ spot: i, hands: [{ cards: [] }] }, p) : null)).filter(Boolean);
+            seats = spots.map((p, i) => (p ? Object.assign({ spot: i, hands: [{ cards: [], who: p.you ? 'You' : p.name }] }, p) : null)).filter(Boolean);
             D.cards = []; paint();
             const steps = [];
             for (let pass = 0; pass < 2; pass++) {
@@ -582,7 +609,7 @@
           };
           function split(s, hi) {
             const h = s.hands[hi]; reveal(h.cards);
-            const c2 = h.cards.pop(), nh = { cards: [c2], split: true }; h.split = true; s.hands.splice(hi + 1, 0, nh);
+            const c2 = h.cards.pop(), nh = { cards: [c2], split: true, who: h.who }; h.split = true; s.hands.splice(hi + 1, 0, nh);
             deal(h, false); deal(nh, false); if (c2.r === 'A') h.done = nh.done = true;
           }
           function bot(s, done) {
@@ -676,29 +703,38 @@
           }
 
           // ----- the pit boss: what's the count? one tap, against the clock -----
+          const half = (x) => (x % 1 ? `${Math.floor(x) || ''}½` : String(x));
           function pitCheck(last) {
-            checks++; sinceCheck = 0;
-            const lo = rc - rnd(5), vals = [0, 1, 2, 3, 4].map((d) => lo + d);
-            chk.innerHTML = `<div class="sc-q"><div class="kicker">${last ? 'Last check' : 'Pit check'}</div><h3 class="m0">What's the running count?</h3>
+            hideDist(); checks++; sinceCheck = 0;
+            // from High Limit up, half the checks ask for the true count, with the decks left as the dealer's tray would show them
+            const tcAsk = ti >= 5 && Math.random() < 0.5, decks = Math.max(0.5, Math.round(shoe.length / 26) / 2), want = tcAsk ? B.trueCount(rc, decks) : rc;
+            const since = seenLog.splice(0), start = rcAtCheck; rcAtCheck = rc;
+            const lo = want - rnd(5), vals = [0, 1, 2, 3, 4].map((d) => lo + d);
+            chk.innerHTML = `<div class="sc-q" data-kind="${tcAsk ? 'tc' : 'rc'}" data-decks="${decks}"><div class="kicker">${last ? 'Last check' : 'Pit check'}</div><h3 class="m0">${tcAsk ? "What's the true count?" : "What's the running count?"}</h3>
+              ${tcAsk ? `<p class="small muted sc-sub">About ${half(decks)} ${decks === 1 ? 'deck' : 'decks'} left to deal</p>` : ''}
               <div class="sc-opts">${vals.map((v) => `<button data-v="${v}">${sgn(v)}</button>`).join('')}</div><div class="tbar"><i></i></div><div class="sc-fb" id="scfb"></div></div>`;
             chk.hidden = false; A.fx.tap();
             let answered = false;
+            const next = () => { chk.hidden = true; chk.innerHTML = ''; if (hearts <= 0) return finish(false); if (last) return finish(true); newRound(); };
             const answer = (v) => {
               if (answered) return; answered = true;
               const left = ask ? Math.max(0, ask.left()) : 0; if (ask) { ask.stop(); ask = null; }
-              const good = v === rc; A.hist(1, good ? 1 : 0);
-              $$('[data-v]', chk).forEach((b) => { b.disabled = true; b.classList.toggle('right', +b.dataset.v === rc); b.classList.toggle('wrong', v !== null && +b.dataset.v === v && !good); });
+              const good = v === want; A.hist(1, good ? 1 : 0);
+              $$('[data-v]', chk).forEach((b) => { b.disabled = true; b.classList.toggle('right', +b.dataset.v === want); b.classList.toggle('wrong', v !== null && +b.dataset.v === v && !good); });
+              const truth = tcAsk ? `the true count was ${sgn(want)}: running ${sgn(rc)} ÷ ${half(decks)} ${decks === 1 ? 'deck' : 'decks'}, rounded down` : `it was ${sgn(rc)}`;
               if (good) {
                 checksOk++; streak++; best = Math.max(best, streak);
-                const gain = 100 + 25 * (streak - 1) + Math.round((50 * left) / T.ask); pts += gain; A.fx.ok();
+                const gain = 100 + 25 * (streak - 1) + Math.round((50 * left) / T.ask) + (tcAsk ? 50 : 0); pts += gain; A.fx.ok();
                 $('#scfb', chk).innerHTML = `<span class="pos">+${gain}</span>${streak > 1 ? ` · streak ×${streak}` : ''}`;
-              } else {
-                hearts--; streak = 0; A.fx.bad(); felt.classList.remove('badf'); void felt.offsetWidth; felt.classList.add('badf');
-                misses.push({ t: `Pit check after round ${round}`, a: `The count was ${sgn(rc)}`, w: v === null ? 'Out of time' : `You said ${sgn(v)}` });
-                $('#scfb', chk).innerHTML = `<span class="neg">${v === null ? 'Time' : 'Miss'}</span> · it was ${sgn(rc)}${hearts ? ` · ${hearts} ${hearts === 1 ? 'life' : 'lives'} left` : ''}`;
+                hud(); return later(next, 900);
               }
+              hearts--; streak = 0; A.fx.bad(); felt.classList.remove('badf'); void felt.offsetWidth; felt.classList.add('badf');
+              misses.push({ t: `${tcAsk ? 'True' : 'Running'} count after round ${round}`, a: tcAsk ? `${sgn(want)} (running ${sgn(rc)} ÷ ${half(decks)})` : `The count was ${sgn(rc)}`, w: v === null ? 'Out of time' : `You said ${sgn(v)}` });
+              $('#scfb', chk).innerHTML = `<span class="neg">${v === null ? 'Time' : 'Miss'}</span> · ${truth}${hearts ? ` · ${hearts} ${hearts === 1 ? 'life' : 'lives'} left` : ''}
+                <div class="sc-fbtn"><button class="btn ghost" id="scrp">See the hands</button><button class="btn" id="sckp">${hearts <= 0 || last ? 'See results' : 'Keep playing'}</button></div>`;
+              $('#scrp', chk).onclick = () => A.replaySheet(since, start, 'Round');
+              $('#sckp', chk).onclick = next;
               hud();
-              later(() => { chk.hidden = true; chk.innerHTML = ''; if (hearts <= 0) return finish(false); if (last) return finish(true); newRound(); }, good ? 900 : 1700);
             };
             $$('[data-v]', chk).forEach((b) => (b.onclick = () => answer(+b.dataset.v)));
             ask = A.timer($('.tbar i', chk), T.ask, () => answer(null));
@@ -714,7 +750,8 @@
             A.addXP(Math.round(pts / 40) + stars * 5); A.save();
             result(sw, {
               kicker: `${T.name} · ${T.cpm} a minute`,
-              big: String(pts), sub: `points · ${checksOk}/${checks} pit checks · ${playsOk}/${plays} plays right${best > 1 ? ` · best streak ${best}` : ''}`,
+              big: String(pts), sub: 'points',
+              stats: [['pit checks', `${checksOk}/${checks}`], ['plays right', `${playsOk}/${plays}`], ['best streak', best || 0]].concat(distN ? [['distractions', `${distOk}/${distN}`]] : []),
               rec: newHi && prevHi > 0, args, misses, good: stars === 3,
               note: !survived ? 'Three misses and the pit boss walked you. Take it a table slower, or try again.'
                 : opened ? `${esc(nextT.name)} is open: ${nextT.cpm} cards a minute, ${nextT.min}–${nextT.max} players.`

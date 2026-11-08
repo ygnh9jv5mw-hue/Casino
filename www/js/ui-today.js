@@ -192,6 +192,8 @@
           <p class="tiny muted">Leave the reminder empty to turn it off.</p></div>
         <h3 class="sec">More</h3>
         <button class="list-item" data-go="about"><span class="ic">${A.icon('heart')}</span><span class="tx"><b>Responsible play</b><span>Limits, the law, and getting help</span></span><span class="chev">${A.icon('chevron')}</span></button>
+        <button class="list-item" id="bkup"><span class="ic">${A.icon('tray')}</span><span class="tx"><b>Back up progress</b><span>A code to keep in Notes or email to yourself</span></span><span class="chev">${A.icon('chevron')}</span></button>
+        <button class="list-item" id="rstr"><span class="ic">${A.icon('swap')}</span><span class="tx"><b>Restore from a code</b><span>Bring your progress to this phone</span></span><span class="chev">${A.icon('chevron')}</span></button>
         <button class="list-item" id="reset"><span class="ic" style="color:var(--bad)">${A.icon('reset')}</span><span class="tx"><b>Reset all progress</b><span>Start over from zero</span></span></button>
         <p class="foot">${esc(A.CFG.brand)} · training only, no real money</p>`,
       mount(root) {
@@ -204,6 +206,35 @@
         $$('[data-sw]', root).forEach((b) => (b.onclick = () => { p[b.dataset.sw] = !p[b.dataset.sw]; A.save(); b.classList.toggle('on', p[b.dataset.sw]); A.fx.tap(); }));
         $('#rem', root).onchange = async (e) => { p.remind = e.target.value; A.save(); const ok = await A.scheduleReminder(); A.toast(p.remind ? (ok ? `Reminder set for ${p.remind}` : 'Reminder saved (allow notifications in iOS Settings)') : 'Reminder off'); };
         bindGo(root);
+        $('#bkup', root).onclick = () => {
+          const code = A.backupCode();
+          A.sheet(`<h3 class="m0">Your backup code</h3><p class="muted small">It holds everything: XP, mastery, records, lessons, logs and settings. Keep it in Notes or email it to yourself, then paste it into Restore from a code on any phone.</p>
+            <textarea id="bcode" class="code" rows="5" readonly>${esc(code)}</textarea><div style="height:10px"></div>
+            <button class="btn" id="bcopy">Copy code</button>${navigator.share ? '<button class="btn ghost" id="bshare">Share</button>' : ''}<button class="btn ghost" id="bdone">Done</button>`, (r, close) => {
+            const ta = $('#bcode', r);
+            $('#bcopy', r).onclick = () => {
+              const done = () => A.toast('Copied. Paste it somewhere safe.', 'good');
+              const fallback = () => { ta.focus(); ta.select(); try { document.execCommand('copy') ? done() : A.toast('Select the code and copy it.'); } catch (e) { A.toast('Select the code and copy it.'); } };
+              try { navigator.clipboard.writeText(code).then(done, fallback); } catch (e) { fallback(); }
+            };
+            const sh = $('#bshare', r); if (sh) sh.onclick = () => { navigator.share({ title: 'BJ MasterClass backup', text: code }).catch(() => {}); };
+            $('#bdone', r).onclick = close;
+          });
+        };
+        $('#rstr', root).onclick = () => A.sheet(`<h3 class="m0">Restore from a code</h3><p class="muted small">Paste a backup code. It replaces the progress on this phone.</p>
+          <textarea id="rcode" class="code" rows="5" placeholder="BJMC-…"></textarea><div style="height:10px"></div><button class="btn" id="rgo">Check the code</button><button class="btn ghost" id="rno">Cancel</button>`, (r, close) => {
+          $('#rno', r).onclick = close;
+          $('#rgo', r).onclick = () => {
+            const st = A.readBackup($('#rcode', r).value);
+            if (!st) return A.toast('That code didn\'t work. Copy the whole code, starting with BJMC-.', 'bad');
+            close();
+            A.sheet(`<h3 class="m0">Replace this phone's progress?</h3><p class="muted">The code has ${st.xp.toLocaleString()} XP, ${Object.keys(st.done).length} lessons done and ${st.days.length} days of training. Everything on this phone now will be replaced.</p>
+              <button class="btn" id="ryes">Restore</button><button class="btn ghost" id="rcan">Cancel</button>`, (r2, close2) => {
+              $('#rcan', r2).onclick = close2;
+              $('#ryes', r2).onclick = () => { close2(); A.restoreBackup(st); A.toast('Progress restored.', 'good'); };
+            });
+          };
+        });
         $('#reset', root).onclick = () => A.sheet(`<h3 class="m0">Reset everything?</h3><p class="muted">XP, mastery, records, lessons and logs will be erased.</p><button class="btn danger" id="y">Erase progress</button><button class="btn ghost" id="n">Cancel</button>`,
           (r, close) => { $('#n', r).onclick = close; $('#y', r).onclick = () => { close(); A.reset(); setTimeout(onboard, 50); }; });
       }

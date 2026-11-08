@@ -59,7 +59,7 @@
         const [lo, hi] = CUT_RANGE[casino ? 'casino' : dd ? 'dd' : 'shoe'];
         const pen = cfg.cut === 'random' ? lo + Math.random() * (hi - lo) : +cfg.cut;
         G = { shoe: B.shoe(cfg.decks), burned: 0, rc: 0, phase: casino ? 'shuffle' : 'bet', msg: msg || '', msgOk: true, untilCheck: 3 + rnd(3), heat: G ? G.heat * 0.5 : 0, maxHeat: 0,
-          prevBet: 0, prevWon: false, pen, cutOut: false, pend: 0, lastBet: G ? G.lastBet : 0,
+          prevBet: 0, prevWon: false, pen, cutOut: false, pend: 0, lastBet: G ? G.lastBet : 0, seen: [], rcAtCheck: 0, replay: null,
           seats: cfg.seats === 'random' ? 1 + rnd(5) : +cfg.seats,
           st: { hands: 0, dec: 0, decOk: 0, checks: 0, checksOk: 0, bets: 0, betsOk: 0, units: 0, peeks: 0, misses: [] }, backoff: false };
         G.cut = Math.round(N() * (1 - pen));
@@ -72,18 +72,20 @@
       }
       newShoe();
       const total = { hands: 0 }; // hands this session (for workout targets)
+      // every card you see, in order, with the count after it: what a replay shows after a missed count
+      const seeC = (c) => { G.rc += B.hilo(c.r); G.seen.push({ c: { r: c.r, s: c.s }, rc: G.rc, g: G.st.hands + 1 }); };
       const drawC = (vis = true) => {
         if (!G.shoe.length) { // out of cards mid-round: like a real dealer, shuffle the discards (everything not on the table) and finish the hand
           const fresh = B.shoe(cfg.decks), onTable = R ? [...R.dealer, ...R.seats.flatMap((s) => s.cards || []), ...R.hands.flatMap((h) => h.cards)] : [];
           for (const t of onTable) { const i = fresh.findIndex((x) => x.r === t.r && x.s === t.s); if (i >= 0) fresh.splice(i, 1); }
-          G.shoe = fresh; G.rc = 0; G.burned = 0; G.cutOut = true;
+          G.shoe = fresh; G.rc = 0; G.burned = 0; G.cutOut = true; G.seen = []; G.rcAtCheck = 0;
           G.msg = 'Out of cards — the dealer shuffled the discards to finish this hand. The count restarts at 0.'; G.msgOk = true;
         }
-        const c = G.shoe.pop(); c.anim = 1; c.down = !vis; if (vis) G.rc += B.hilo(c.r);
+        const c = G.shoe.pop(); c.anim = 1; c.down = !vis; if (vis) seeC(c);
         if (!G.cutOut && G.shoe.length < G.cut) G.cutOut = true; // the cut card comes out — this round is the last
         return c;
       };
-      const reveal = (c) => { if (c && c.down) { c.down = false; c.flip = 1; G.rc += B.hilo(c.r); } };
+      const reveal = (c) => { if (c && c.down) { c.down = false; c.flip = 1; seeC(c); } };
       const unseen = () => G.shoe.length + G.burned;
       const decksLeft = () => Math.max(0.5, Math.round(unseen() / 26) / 2);
       const tc = () => B.trueCount(G.rc, decksLeft());
@@ -138,13 +140,14 @@
                 <div class="you"><div class="place${casino && G.pend !== shownPend ? ' drop' : ''}">${casino && G.pend ? `<span class="pend">${fmt$(G.pend)}</span>` : 'Place your bet'}</div></div></div>`;
             }
             let ctl = '';
+            const rp = G.replay ? '<button class="linkbtn rply" id="rply">See the hands</button>' : '';
             const msg = G.msg ? `<div class="fb ${G.msgOk ? 'ok' : 'bad'} slim">${G.msg}</div>` : '';
             if (G.phase === 'bet') {
               if (casino) {
-                ctl = `${msg}${CASINO_CHIPS.length ? `<div class="chips">${CASINO_CHIPS.map(([v, c]) => `<button class="chip ${c}" data-chip="${v}" ${v > S.casino.bank ? 'disabled' : ''}><span>${v}</span></button>`).join('')}</div>` : ''}
+                ctl = `${msg}${rp}${CASINO_CHIPS.length ? `<div class="chips">${CASINO_CHIPS.map(([v, c]) => `<button class="chip ${c}" data-chip="${v}" ${v > S.casino.bank ? 'disabled' : ''}><span>${v}</span></button>`).join('')}</div>` : ''}
                   <div class="betbtns"><button class="btn dark" id="clr">Clear</button><button class="btn dark" id="rebet" ${G.lastBet && G.lastBet <= S.casino.bank ? '' : 'disabled'}>Rebet${G.lastBet ? ' ' + fmt$(G.lastBet) : ''}</button><button class="btn" id="dealb" ${G.pend >= cfg.min ? '' : 'disabled'}>Deal</button></div>
                   <p class="center tiny muted">${G.pend && G.pend < cfg.min ? `Table minimum is $${cfg.min}.` : `Bet with the count: 1 unit = $${cfg.min} · ${B.rampText()}`}</p>`;
-              } else ctl = `${msg}<p class="center tiny muted">Bet by the true count: ${B.rampText()}${cfg.heat ? ' · jump too fast and you\'ll get heat' : ''}</p>${A.chips()}`;
+              } else ctl = `${msg}${rp}<p class="center tiny muted">Bet by the true count: ${B.rampText()}${cfg.heat ? ' · jump too fast and you\'ll get heat' : ''}</p>${A.chips()}`;
             } else if (G.phase === 'ins') { const can = canInsure(); ctl = `${msg}<p class="center"><b>Insurance?</b>${can ? '' : ' <span class="tiny muted">— not enough chips</span>'}</p><div class="acts two"><button class="act a-Y" data-ins="1" ${can ? '' : 'disabled'}>Take insurance</button><button class="act a-N" data-ins="0">No insurance</button></div>`; }
             else if (G.phase === 'play') { const o = options(R.hands[R.act]); ctl = `${msg}${cfg.clock ? '<div class="tbar"><i></i></div>' : ''}<div class="acts">${['H', 'S', 'D', 'P', 'R'].map((k) => `<button class="act a-${k}" data-a="${k}" ${(k === 'D' && !o.canDouble) || (k === 'P' && !o.canSplit) || (k === 'R' && !o.canSurrender) ? 'disabled' : ''}>${B.NAMES[k]}</button>`).join('')}</div>`; }
             else if (G.phase === 'over') ctl = `${msg}<div class="fb ${R.net > 0 ? 'ok' : R.net < 0 ? 'bad' : 'info'} slim">${R.net > 0 ? `You won ${money(R.net)}` : R.net < 0 ? `You lost ${money(-R.net)}` : 'Push'}</div><button class="btn big" id="nr">${G.cutOut ? 'Shuffle up ›' : 'Next hand ›'}</button>`;
@@ -163,6 +166,7 @@
             $$('[data-bet]', sw).forEach((b) => (b.onclick = guard(() => placeBet(+b.dataset.bet))));
             $$('[data-chip]', sw).forEach((b) => (b.onclick = guard(() => { const v = +b.dataset.chip; if (G.pend + v > Math.min(maxBet(), S.casino.bank)) return A.toast(G.pend + v > maxBet() ? `Table maximum is ${fmt$(maxBet())}.` : 'Not enough chips.'); G.pend += v; A.fx.tap(); draw(); })));
             const clr = $('#clr', sw); if (clr) clr.onclick = () => { G.pend = 0; draw(); };
+            const rpl = $('#rply', sw); if (rpl) rpl.onclick = () => G.replay && A.replaySheet(G.replay.since, G.replay.start, 'Hand');
             const rb = $('#rebet', sw); if (rb) rb.onclick = guard(() => { if (G.lastBet && G.lastBet <= S.casino.bank) { G.pend = G.lastBet; draw(); } });
             const db = $('#dealb', sw); if (db) db.onclick = guard(() => { if (G.pend >= cfg.min) { const u = G.pend; G.pend = 0; placeBet(u); } });
             $$('[data-ins]', sw).forEach((b) => (b.onclick = guard(() => insurance(b.dataset.ins === '1'))));
@@ -176,6 +180,7 @@
             const sum = lastShoe;
             const summary = sum ? `<div class="card shoesum"><div class="kicker">${sum.backoff ? 'Backed off — new casino' : 'Last shoe'}</div>
               <div class="stats"><div><b class="${sum.net >= 0 ? 'pos' : 'neg'}">${signed(sum.net)}</b><span>${sum.hands} hands</span></div><div><b>${sum.dec ? Math.round((100 * sum.decOk) / sum.dec) + '%' : '–'}</b><span>plays</span></div><div><b>${sum.bets ? Math.round((100 * sum.betsOk) / sum.bets) + '%' : '–'}</b><span>bets on ramp</span></div><div><b>${sum.quiz === null ? '–' : sum.quiz ? '✓' : '✗'}</b><span>count</span></div></div>
+              ${sum.replay ? '<button class="linkbtn rply" id="sumrp">See the hands before the shuffle</button>' : ''}
               ${sum.misses.length ? `<details><summary class="small">Review ${sum.misses.length} mistake${sum.misses.length > 1 ? 's' : ''}</summary><div class="misses">${sum.misses.slice(-8).map((m) => `<div class="miss"><b>${esc(m.t)}</b><span>${esc(m.a)}</span><small>${esc(m.w)}</small></div>`).join('')}</div></details>` : ''}</div>` : '';
             let body = '';
             if (G.phase === 'shuffle') body = `<div class="card center ceremony"><div class="riffle"><i></i><i></i><i></i></div><h3 class="m0">Shuffling ${cfg.decks} decks…</h3><p class="tiny muted">${G.seats} other player${G.seats === 1 ? '' : 's'} at the table this shoe.</p><button class="btn ghost" id="skip">Skip</button></div>`;
@@ -191,6 +196,7 @@
                 <button class="btn big" id="goBet">Place your bets ›</button></div>`;
             }
             sw.innerHTML = summary + body;
+            const sr = $('#sumrp', sw); if (sr) sr.onclick = () => A.replaySheet(sum.replay.since, sum.replay.start, 'Hand');
             const sk = $('#skip', sw); if (sk) sk.onclick = () => { G.phase = 'cut'; draw(); };
             const cs = $('#cstack', sw); if (cs) cs.onclick = (e) => { const r = cs.getBoundingClientRect(); cutAt((e.clientX - r.left) / r.width, 'you'); };
             const ps = $('#pass', sw); if (ps) ps.onclick = () => cutAt(0.3 + Math.random() * 0.4, 'dealer');
@@ -234,7 +240,7 @@
           }
           function deal() {
             const n = G.seats, ya = youAt();
-            R = { dealer: [], seats: [], hands: [], act: 0, turn: -1, net: 0 };
+            R = { dealer: [], seats: [], hands: [], act: 0, turn: -1, net: 0 }; G.replay = null;
             for (let i = 0; i <= n; i++) R.seats.push(i === ya ? { you: true } : { cards: [] });
             R.hands.push({ cards: [], bet: G.bet });
             G.phase = 'deal';
@@ -362,6 +368,7 @@
             const p = A.pad((g) => {
               const good = g === G.rc; G.st.checks++; S.shoe.checks++; if (good) { G.st.checksOk++; S.shoe.checksOk++; A.fx.ok(); A.addXP(5); } else A.fx.bad();
               A.hist(1, good ? 1 : 0);
+              const since = G.seen.splice(0), start = G.rcAtCheck; G.rcAtCheck = G.rc; G.replay = good ? null : { since, start };
               G.msg = good ? `✓ Count check: ${sgn(G.rc)}` : `✗ The count was ${sgn(G.rc)} — you said ${sgn(g)}`; G.msgOk = good;
               G.untilCheck = 3 + rnd(4); G.phase = 'bet'; A.save(); draw();
             }, { label: 'Check count', small: true });
@@ -374,6 +381,7 @@
             const p = A.pad((g) => {
               const good = g === G.rc; G.st.checks++; S.shoe.checks++; if (good) { G.st.checksOk++; S.shoe.checksOk++; A.fx.ok(); A.addXP(5); } else A.fx.bad();
               A.hist(1, good ? 1 : 0); A.save();
+              const since = G.seen.splice(0), start = G.rcAtCheck; G.quizReplay = good ? null : { since, start };
               A.toast(good ? `✓ Right — the count was ${sgn(G.rc)}` : `✗ The count was ${sgn(G.rc)} (you said ${sgn(g)})`, good ? 'good' : 'bad');
               endShoe(good);
             }, { label: 'Answer', small: true });
@@ -385,7 +393,7 @@
             if (!backedOff) { S.shoe.shoes++; S.best.shoeClean = (S.best.shoeClean || 0) + 1; }
             S.casino.shoes = (S.casino.shoes || 0) + 1;
             A.addXP(Math.round(st.decOk * 0.4 + st.betsOk * 0.4 + st.checksOk * 3) + (backedOff ? 0 : 10));
-            lastShoe = { net: st.units, hands: st.hands, dec: st.dec, decOk: st.decOk, bets: st.bets, betsOk: st.betsOk, quiz: quizOk === undefined ? null : quizOk, misses: st.misses.slice(), backoff: !!backedOff };
+            lastShoe = { replay: G.quizReplay || null, net: st.units, hands: st.hands, dec: st.dec, decOk: st.decOk, bets: st.bets, betsOk: st.betsOk, quiz: quizOk === undefined ? null : quizOk, misses: st.misses.slice(), backoff: !!backedOff };
             A.save(); R = null; newShoe(); draw();
           }
           function broke() {

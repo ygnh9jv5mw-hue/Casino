@@ -25,7 +25,7 @@
   ];
   const DEF = () => ({
     v: 2,
-    prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, playOut: true, remind: '', unlockTo: 1 },
+    prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, playOut: true, spdDistract: true, spdNoise: false, remind: '', unlockTo: 1 },
     xp: 0, xpDay: { d: '', xp: 0 }, goalDays: [], days: [],
     done: {}, quiz: {}, campDone: {},
     best: { strat: 0, blitz: 0, reflex: 0, pairs: 0, deck: null, ladder: 0, flash: 0, tc: null, decks: 0, ramp: 0, recall: 0, index: 0, shoeClean: 0, speed: 0 },
@@ -51,7 +51,7 @@
     d.prof = {
       onboarded: bool(p.onboarded, false), level: ['new', 'basic', 'counter'].includes(p.level) ? p.level : 'new',
       goal: [100, 250, 500].includes(p.goal) ? p.goal : 250, h17: bool(p.h17, true), ls: bool(p.ls, true), decks: p.decks === 2 ? 2 : 6,
-      gameAsked: bool(p.gameAsked, false), sound: bool(p.sound, true), haptics: bool(p.haptics, true), playOut: bool(p.playOut, true),
+      gameAsked: bool(p.gameAsked, false), sound: bool(p.sound, true), haptics: bool(p.haptics, true), playOut: bool(p.playOut, true), spdDistract: bool(p.spdDistract, true), spdNoise: bool(p.spdNoise, false),
       remind: typeof p.remind === 'string' && /^\d{2}:\d{2}$/.test(p.remind) ? p.remind : '', unlockTo: [1, 5, 9].includes(p.unlockTo) ? p.unlockTo : 1,
       shoe: isObj(p.shoe) ? p.shoe : null, casino: isObj(p.casino) ? p.casino : null // table settings are re-checked by the table itself
     };
@@ -160,6 +160,7 @@
       if (kind === 'ok') cap.nativePromise('Haptics', 'impact', { style: 'LIGHT' }).catch(() => {});
       else if (kind === 'bad') cap.nativePromise('Haptics', 'notification', { type: 'ERROR' }).catch(() => {});
       else if (kind === 'win') cap.nativePromise('Haptics', 'notification', { type: 'SUCCESS' }).catch(() => {});
+      else if (kind === 'buzz') cap.nativePromise('Haptics', 'vibrate', { duration: 350 }).catch(() => {});
       else cap.nativePromise('Haptics', 'selectionChanged', {}).catch(() => {});
     } catch (e) {}
   }
@@ -168,8 +169,65 @@
     bad: () => { tone([180, 140], 0.12, 'square', 0.05); haptic('bad'); },
     tick: () => { tone(1500, 0.02, 'square', 0.02); },
     tap: () => haptic('tap'),
-    win: () => { tone([660, 880, 1100, 1320], 0.09); haptic('win'); }
+    win: () => { tone([660, 880, 1100, 1320], 0.09); haptic('win'); },
+    buzz: () => { tone([110, 110, 110], 0.07, 'square', 0.025); haptic('buzz'); }
   };
+
+  // Casino floor sound for the live table: a low crowd, chips now and then, machines somewhere across the room.
+  // Plays only with sound effects on; stop() fades it out.
+  function ambience() {
+    if (!S.prof.sound) return { stop() {} };
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === 'suspended') ac.resume();
+      const out = ac.createGain(); out.gain.setValueAtTime(0, ac.currentTime); out.gain.linearRampToValueAtTime(1, ac.currentTime + 1.5); out.connect(ac.destination);
+      const len = ac.sampleRate * 2, crowd = ac.createBuffer(1, len, ac.sampleRate), d = crowd.getChannelData(0); let last = 0;
+      for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
+      const src = ac.createBufferSource(); src.buffer = crowd; src.loop = true;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650;
+      const cg = ac.createGain(); cg.gain.value = 0.07; src.connect(lp); lp.connect(cg); cg.connect(out); src.start();
+      const n = Math.floor(ac.sampleRate * 0.02), click = ac.createBuffer(1, n, ac.sampleRate), x = click.getChannelData(0);
+      for (let i = 0; i < n; i++) x[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 6);
+      const pan = (node) => { if (!ac.createStereoPanner) return node.connect(out); const p = ac.createStereoPanner(); p.pan.value = Math.random() * 1.6 - 0.8; node.connect(p); p.connect(out); };
+      let tid = 0, stopped = false;
+      const blip = () => {
+        if (stopped) return;
+        const t = ac.currentTime + 0.02;
+        if (Math.random() < 0.55) { // a machine across the room
+          const base = [784, 880, 988, 1175, 1319][rnd(5)];
+          for (let k = 0, m = 3 + rnd(4); k < m; k++) {
+            const o = ac.createOscillator(), g = ac.createGain(); o.type = 'triangle'; o.frequency.value = base * [1, 1.25, 1.5, 2][rnd(4)];
+            g.gain.setValueAtTime(0.011, t + k * 0.09); g.gain.exponentialRampToValueAtTime(0.0001, t + k * 0.09 + 0.12);
+            o.connect(g); pan(g); o.start(t + k * 0.09); o.stop(t + k * 0.09 + 0.14);
+          }
+        } else { // chips
+          for (let k = 0, m = 2 + rnd(3); k < m; k++) {
+            const b = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain(); b.buffer = click;
+            bp.type = 'bandpass'; bp.frequency.value = 2400 + Math.random() * 1600; g.gain.value = 0.05;
+            b.connect(bp); bp.connect(g); pan(g); b.start(t + k * 0.06);
+          }
+        }
+        tid = setTimeout(blip, 1800 + Math.random() * 4500);
+      };
+      tid = setTimeout(blip, 1200);
+      return { stop() {
+        if (stopped) return; stopped = true; clearTimeout(tid);
+        try { out.gain.cancelScheduledValues(ac.currentTime); out.gain.setValueAtTime(out.gain.value, ac.currentTime); out.gain.linearRampToValueAtTime(0, ac.currentTime + 0.4); } catch (e) {}
+        setTimeout(() => { try { src.stop(); out.disconnect(); } catch (e) {} }, 500);
+      } };
+    } catch (e) { return { stop() {} }; }
+  }
+
+  // ---------------- backup ----------------
+  // All progress as one text code: keep it in Notes or email it to yourself, and paste it back on any phone.
+  function toB64(str) { const bytes = new TextEncoder().encode(str); let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); }
+  function fromB64(b64) { const bin = atob(b64), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return new TextDecoder().decode(bytes); }
+  const backupCode = () => 'BJMC-' + toB64(JSON.stringify(S));
+  function readBackup(code) { // the progress inside a code, checked like a normal load, or null
+    const m = /BJMC-([A-Za-z0-9+/=\s]+)/.exec(String(code || '')); if (!m) return null;
+    try { const o = JSON.parse(fromB64(m[1].replace(/\s+/g, ''))); return isObj(o) && o.v === 2 ? sanitize(o) : null; } catch (e) { return null; }
+  }
+  function restoreBackup(state) { S = state; save(); applyRules(); stack = []; tab = 'today'; dir = 0; render(); }
 
   async function scheduleReminder() {
     const cap = window.Capacitor; if (!cap || !cap.nativePromise || !cap.isNativePlatform || !cap.isNativePlatform()) return false;
@@ -373,6 +431,16 @@
     if (onMount) onMount(m.firstElementChild, close);
     return close;
   }
+  function replaySheet(events, startRc, unit = 'Round') {
+    const groups = [];
+    for (const e of events) { let g = groups[groups.length - 1]; if (!g || g.n !== e.g) groups.push((g = { n: e.g, ev: [] })); g.ev.push(e); }
+    const html = `<h3 class="m0">Since the last check</h3><p class="muted small">The count started at <b>${sgn(startRc)}</b>. Here is every card in the order it was turned face up, its value, and the running count after it.</p>
+      ${groups.length ? groups.map((g) => `<div class="rp-g"><div class="kicker">${esc(unit)} ${g.n}</div><div class="rp-seq">${g.ev.map((e) => { const h = B.hilo(e.c.r);
+        return `<div class="rp-c">${cardHTML({ r: e.c.r, s: e.c.s }, 'sm')}<span class="rp-v ${h > 0 ? 'pos' : h < 0 ? 'neg' : ''}">${h > 0 ? '+1' : h < 0 ? '−1' : '0'}</span><span class="rp-rc">${sgn(e.rc)}</span>${e.who ? `<span class="rp-who">${esc(e.who)}</span>` : ''}</div>`; }).join('')}</div></div>`).join('')
+        : '<p class="muted">No cards were turned up since the last check.</p>'}
+      <button class="btn" id="rpok" style="margin-top:14px">Back to the table</button>`;
+    sheet(html, (r, close) => { $('#rpok', r).onclick = close; });
+  }
   function celebrate(title, body) {
     confetti(); fx.win();
     sheet(`<div class="celebrate"><div class="burst">${icon('trophy')}</div><h2>${title}</h2><p class="muted">${body}</p><button class="btn" id="cok">Continue</button></div>`, (r, close) => { $('#cok', r).onclick = () => { close(); setTimeout(flushCelebrations, 250); }; });
@@ -495,7 +563,7 @@
     RANKS, rank, todayXP, addXP, hist, streak, fx, scheduleReminder,
     pickCell, gradeCell, mastered, masteryPct, groupCells, pickDev, gradeDev, idxPct, record,
     lessons, lessonById, doneCount, taskDone, taskLabel, taskGo, stageDone, stageOpen, currentStage,
-    workout, startWorkout, wkIndex, wkNext, popTo,
+    workout, startWorkout, wkIndex, wkNext, popTo, backupCode, readBackup, restoreBackup, replaySheet, ambience,
     SCREENS, go, back, replace, setTab, render, get stackDepth() { return stack.length; }, get current() { return stack.length ? stack[stack.length - 1].screen : tab; },
     cardHTML, pad, toast, sheet, celebrate, confetti, ring, countUp, timer, openUrl, icon, CFG, COURSE, CAMP, B, nextAfter, TITLES, SC_TABLES,
     reset: () => { localStorage.removeItem(KEY); localStorage.removeItem('bjmc.v1'); load(); applyRules(); stack = []; tab = 'today'; render(); }

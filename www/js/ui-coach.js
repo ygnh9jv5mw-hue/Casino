@@ -2,26 +2,32 @@
 (function () {
   const A = window.APP, { $, $$, esc, SCREENS, go, CFG } = A;
 
-  SCREENS.coach = () => ({
-    title: 'Coach',
-    html: `<div class="upnext coach-hero"><div class="eyebrow">${A.icon('calendar')} Live every week</div><h2 class="m0">Train with ${esc(CFG.coachName)}</h2>
-        <p class="muted">Live sessions, 1-on-1 coaching and a private community of serious advantage players.</p>
-        <button class="btn" data-url="bookingUrl">Book a 1-on-1 with ${esc(CFG.coachName)}</button></div>
-      <h3 class="sec">Weekly live trainings</h3>
-      <div class="card">${CFG.liveSchedule.map((s) => `<div class="sched"><span class="day">${esc(s.day.slice(0, 3))}</span><span class="ct"><b>${esc(s.title)}</b><small>${esc(s.day)} · ${esc(s.time)}</small></span></div>`).join('')}
-        <button class="btn dark" data-url="liveTrainingUrl" style="margin-top:12px">Join the live training</button></div>
-      <h3 class="sec">Community</h3>
-      <div class="group">
-      <button class="list-item" data-url="communityUrl"><span class="ic">${A.icon('chat')}</span><span class="tx"><b>Private community</b><span>Game reports, trip plans, accountability</span></span><span class="chev">${A.icon('chevron')}</span></button>
-      <button class="list-item" data-url="osnUrl"><span class="ic">${A.icon('lock')}</span><span class="tx"><b>OSN access</b><span>Members-only resources</span></span><span class="chev">${A.icon('chevron')}</span></button>
-      <button class="list-item" data-go="team"><span class="ic">${A.icon('users')}</span><span class="tx"><b>Apply to join a team</b><span>Your training stats go with it</span></span><span class="chev">${A.icon('chevron')}</span></button>
-      </div>
-      ${CFG.joinUrl ? '<button class="btn" data-url="joinUrl">Get the full MasterClass</button>' : ''}`,
-    mount(root) {
-      $$('[data-url]', root).forEach((b) => (b.onclick = () => A.openUrl(CFG[b.dataset.url])));
-      A.bindGo(root);
-    }
-  });
+  // Only links that are set up appear: a row that leads nowhere is worse than no row.
+  const has = (k) => typeof CFG[k] === 'string' && /^https?:\/\//i.test(CFG[k].trim());
+  SCREENS.coach = () => {
+    const row = (k, ic, t, s) => (has(k) ? `<button class="list-item" data-url="${k}"><span class="ic">${A.icon(ic)}</span><span class="tx"><b>${t}</b><span>${s}</span></span><span class="chev">${A.icon('chevron')}</span></button>` : '');
+    const sched = Array.isArray(CFG.liveSchedule) ? CFG.liveSchedule : [];
+    return {
+      title: 'Coach',
+      html: `<div class="upnext coach-hero"><div class="eyebrow">${A.icon('calendar')} ${sched.length ? 'Live every week' : 'Coaching'}</div><h2 class="m0">Train with ${esc(CFG.coachName)}</h2>
+          <p class="muted">Live sessions, 1-on-1 coaching and a private community of serious advantage players.</p>
+          ${has('bookingUrl') ? `<button class="btn" data-url="bookingUrl">Book a 1-on-1 with ${esc(CFG.coachName)}</button>` : ''}</div>
+        ${sched.length ? `<h3 class="sec">Weekly live trainings</h3>
+        <div class="card">${sched.map((s) => `<div class="sched"><span class="day">${esc(String(s.day).slice(0, 3))}</span><span class="ct"><b>${esc(s.title)}</b><small>${esc(s.day)} · ${esc(s.time)}</small></span></div>`).join('')}
+          ${has('liveTrainingUrl') ? '<button class="btn dark" data-url="liveTrainingUrl" style="margin-top:12px">Join the live training</button>' : '<p class="tiny muted" style="margin:10px 0 0">The join link shows up here before each session.</p>'}</div>` : ''}
+        <h3 class="sec">Community</h3>
+        <div class="group">
+        ${row('communityUrl', 'chat', 'Private community', 'Game reports, trip plans, accountability')}
+        ${row('osnUrl', 'lock', 'OSN access', 'Members-only resources')}
+        <button class="list-item" data-go="team"><span class="ic">${A.icon('users')}</span><span class="tx"><b>Apply to join a team</b><span>Your training stats go with it</span></span><span class="chev">${A.icon('chevron')}</span></button>
+        </div>
+        ${has('joinUrl') ? '<button class="btn" data-url="joinUrl">Get the full MasterClass</button>' : ''}`,
+      mount(root) {
+        $$('[data-url]', root).forEach((b) => (b.onclick = () => A.openUrl(CFG[b.dataset.url])));
+        A.bindGo(root);
+      }
+    };
+  };
 
   SCREENS.team = () => {
     const r = A.readiness(), ready = r.filter((x) => x.ok).length, rk = A.rank();

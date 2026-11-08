@@ -1,4 +1,4 @@
-// Edit these to connect the app to your real links. Empty strings show "Coming soon".
+// Edit these to connect the app to your real links (full https:// addresses). A link left empty is hidden in the app.
 window.APP_CONFIG = {
   brand: 'Blackjack MasterClass',
   coachName: 'Circus',
