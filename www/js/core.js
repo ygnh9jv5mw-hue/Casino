@@ -25,7 +25,7 @@
   ];
   const DEF = () => ({
     v: 2,
-    prof: { onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, playOut: true, spdDistract: true, spdNoise: false, remind: '', unlockTo: 1 },
+    prof: { name: '', onboarded: false, level: 'new', goal: 250, h17: true, ls: true, decks: 6, gameAsked: false, sound: true, haptics: true, playOut: true, spdDistract: true, spdNoise: false, remind: '', unlockTo: 1 },
     xp: 0, xpDay: { d: '', xp: 0 }, goalDays: [], days: [],
     done: {}, quiz: {}, campDone: {},
     best: { strat: 0, blitz: 0, reflex: 0, pairs: 0, deck: null, ladder: 0, flash: 0, tc: null, decks: 0, ramp: 0, recall: 0, index: 0, shoeClean: 0, speed: 0 },
@@ -49,7 +49,7 @@
     if (!isObj(s)) return d;
     const p = isObj(s.prof) ? s.prof : {};
     d.prof = {
-      onboarded: bool(p.onboarded, false), level: ['new', 'basic', 'counter'].includes(p.level) ? p.level : 'new',
+      name: str(p.name, '', 40).trim(), onboarded: bool(p.onboarded, false), level: ['new', 'basic', 'counter'].includes(p.level) ? p.level : 'new',
       goal: [100, 250, 500].includes(p.goal) ? p.goal : 250, h17: bool(p.h17, true), ls: bool(p.ls, true), decks: p.decks === 2 ? 2 : 6,
       gameAsked: bool(p.gameAsked, false), sound: bool(p.sound, true), haptics: bool(p.haptics, true), playOut: bool(p.playOut, true), spdDistract: bool(p.spdDistract, true), spdNoise: bool(p.spdNoise, false),
       remind: typeof p.remind === 'string' && /^\d{2}:\d{2}$/.test(p.remind) ? p.remind : '', unlockTo: [1, 5, 9].includes(p.unlockTo) ? p.unlockTo : 1,
@@ -128,7 +128,7 @@
       setTimeout(() => { confetti(); toast(`Daily goal hit · ${streak()}-day streak`, 'good'); fx.win(); }, 250);
     }
     const after = rank().i;
-    if (after > before) queueCelebrate(`Rank up!`, `You're now a <b>${RANKS[after][1]}</b>.`);
+    if (after > before) queueCelebrate(`Rank up!`, `You're now a <b>${RANKS[after][1]}</b>.`, medal(after + 1, 'big'));
     save(); xpBadge(n);
   }
   function streak() {
@@ -322,7 +322,7 @@
   function checkCamp() { // award newly completed stages
     let any = false;
     CAMP.forEach((st) => { if (!S.campDone[st.id] && stageDone(st)) { S.campDone[st.id] = true; any = st; } });
-    if (any) { save(); addXP(150); queueCelebrate('Stage complete!', `<b>${esc(any.title)}</b> is done. The next stage is unlocked.`); }
+    if (any) { save(); addXP(150); queueCelebrate('Stage complete!', `<b>${esc(any.title)}</b> is done. The next stage is unlocked.`, medal(icon('check'), 'big done')); }
   }
 
   // ---------------- daily workout ----------------
@@ -369,13 +369,13 @@
   function setTab(t) { tab = t; stack = []; dir = 0; render(); }
   function render() {
     if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
-    checkCamp();
+    checkCamp(); if (window.APP && window.APP.checkAch) window.APP.checkAch();
     const cur = stack.length ? stack[stack.length - 1] : { screen: tab, args: {} };
     const scr = SCREENS[cur.screen](cur.args || {});
     const top = $('#top');
-    top.className = 'top' + (stack.length ? '' : ' big');
+    top.className = 'top' + (stack.length ? '' : ' big') + (scr.topClass ? ' ' + scr.topClass : '');
     top.innerHTML = (stack.length ? '<button class="back" id="bk" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>' : '') +
-      `<h1>${esc(scr.title)}</h1>` + (scr.right || '');
+      `<h1>${scr.kicker ? `<small>${esc(scr.kicker)}</small>` : ''}${esc(scr.title)}</h1>` + (scr.right || '');
     if (stack.length) $('#bk').onclick = back;
     const v = $('#view');
     v.innerHTML = `<div class="page ${dir > 0 ? 'in-r' : dir < 0 ? 'in-l' : 'in-f'}">${scr.html}</div>`; v.scrollTop = 0;
@@ -441,17 +441,19 @@
       <button class="btn" id="rpok" style="margin-top:14px">Back to the table</button>`;
     sheet(html, (r, close) => { $('#rpok', r).onclick = close; });
   }
-  function celebrate(title, body) {
+  // a round badge: a rank, a stage
+  const medal = (txt, cls = '') => `<span class="medal ${cls}"><b>${txt}</b></span>`;
+  function celebrate(title, body, badge) {
     confetti(); fx.win();
-    sheet(`<div class="celebrate"><div class="burst">${icon('trophy')}</div><h2>${title}</h2><p class="muted">${body}</p><button class="btn" id="cok">Continue</button></div>`, (r, close) => { $('#cok', r).onclick = () => { close(); setTimeout(flushCelebrations, 250); }; });
+    sheet(`<div class="celebrate"><div class="burst ${badge ? 'medal-burst' : ''}">${badge || icon('trophy')}</div><h2>${title}</h2><p class="muted">${body}</p><button class="btn" id="cok">Continue</button></div>`, (r, close) => { $('#cok', r).onclick = () => { close(); if (!stack.length) render(); setTimeout(flushCelebrations, 250); }; });
   }
   // Rank-ups and finished stages wait until you're back on a main tab, so they never cover a drill or a hand.
   const pending = [];
-  function queueCelebrate(title, body) { pending.push([title, body]); if (!stack.length) setTimeout(flushCelebrations, 400); }
-  function flushCelebrations() { if (stack.length || !pending.length || $('#modal .scrim')) return; const [t, b] = pending.shift(); celebrate(t, b); }
+  function queueCelebrate(title, body, badge) { pending.push([title, body, badge]); if (!stack.length) setTimeout(flushCelebrations, 400); }
+  function flushCelebrations() { if (stack.length || !pending.length || $('#modal .scrim')) return; const [t, b, m] = pending.shift(); celebrate(t, b, m); }
   function confetti() {
     const box = document.createElement('div'); box.className = 'confetti';
-    const cols = ['#d9b46c', '#f1dfb4', '#ffffff', '#b8964f'];
+    const cols = ['#e5484d', '#ffffff', '#f5c451', '#ff8a8e', '#9a9aa2'];
     for (let i = 0; i < 70; i++) {
       const p = document.createElement('i');
       p.style.left = Math.random() * 100 + 'vw'; p.style.background = pick(cols);
@@ -536,7 +538,10 @@
     bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
     sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
     close: '<path d="m6 6 12 12M18 6 6 18"/>',
-    medal: '<circle cx="12" cy="14.5" r="5.5"/><path d="M8.5 10 6 3.5h4l2 4 2-4h4L15.5 10"/>'
+    medal: '<circle cx="12" cy="14.5" r="5.5"/><path d="M8.5 10 6 3.5h4l2 4 2-4h4L15.5 10"/>',
+    pencil: '<path d="M4.5 19.5h4l10-10-4-4-10 10z"/><path d="m13 7 4 4"/>',
+    // the app icon's spade, drawn solid
+    spadeSolid: '<path transform="scale(.24)" d="M50 6C58 20 92 38 92 60C92 74 80 82 68 82C61 82 55 78 52 72C53 82 57 90 64 95L36 95C43 90 47 82 48 72C45 78 39 82 32 82C20 82 8 74 8 60C8 38 42 20 50 6Z"/>'
   });
   const icon = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n] || ''}</svg>`;
 
@@ -565,7 +570,7 @@
     lessons, lessonById, doneCount, taskDone, taskLabel, taskGo, stageDone, stageOpen, currentStage,
     workout, startWorkout, wkIndex, wkNext, popTo, backupCode, readBackup, restoreBackup, replaySheet, ambience,
     SCREENS, go, back, replace, setTab, render, get stackDepth() { return stack.length; }, get current() { return stack.length ? stack[stack.length - 1].screen : tab; },
-    cardHTML, pad, toast, sheet, celebrate, confetti, ring, countUp, timer, openUrl, icon, CFG, COURSE, CAMP, B, nextAfter, TITLES, SC_TABLES,
+    cardHTML, pad, toast, sheet, celebrate, queueCelebrate, confetti, medal, ICON, ring, countUp, timer, openUrl, icon, CFG, COURSE, CAMP, B, nextAfter, TITLES, SC_TABLES,
     reset: () => { localStorage.removeItem(KEY); localStorage.removeItem('bjmc.v1'); load(); applyRules(); stack = []; tab = 'today'; render(); }
   };
 })();

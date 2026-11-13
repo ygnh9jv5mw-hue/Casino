@@ -2,18 +2,29 @@
 (function () {
   const A = window.APP, { $, $$, esc, SCREENS, go, COURSE } = A;
 
+  const MOD_IC = ['spade', 'pulse', 'sparkle', 'coins', 'eye', 'layers', 'trend', 'users'];
   SCREENS.learn = () => {
     const S = A.S, total = A.lessons().length, done = A.doneCount();
+    const quizzes = COURSE.filter((m) => (S.quiz[m.id] || 0) >= 80).length;
+    // the next lesson to read, straight from the top of the tab
+    let nm = null, nl = null, ni = 0;
+    for (const m of COURSE) { const i = m.lessons.findIndex((l) => !S.done[l.id]); if (i >= 0) { nm = m; nl = m.lessons[i]; ni = i; break; } }
+    const top = nl
+      ? `<div class="card learn-next"><div class="row-sb"><div class="grow"><div class="kicker">Module ${COURSE.indexOf(nm) + 1} · lesson ${ni + 1} of ${nm.lessons.length}</div><h3>${esc(nl.title)}</h3><div class="muted small">${nl.mins || 3} min read · ${done} of ${total} lessons done</div></div>${A.ring(done / total, 52, 5, Math.round((100 * done) / total) + '%')}</div>
+        <button class="btn" data-go="lesson" data-id="${nl.id}">${done ? 'Continue reading' : 'Start the first lesson'}</button></div>`
+      : `<div class="card row-sb"><div><h3 class="m0">All ${total} lessons done</h3><div class="muted small">${quizzes} of ${COURSE.length} module quizzes passed</div></div>${A.ring(1, 52, 5, '100%', 'var(--good)')}</div>`;
     return {
       title: 'Learn',
-      html: `<div class="card row-sb"><div><h3 class="m0">${done} of ${total} lessons</h3><div class="muted small">${COURSE.filter((m) => (S.quiz[m.id] || 0) >= 80).length} of ${COURSE.length} module quizzes passed</div></div>${A.ring(done / total, 52, 5, Math.round((100 * done) / total) + '%')}</div>
-        <div class="group">` +
+      html: `${top}
+        <h3 class="sec">Modules</h3>
+        <div class="mcards">` +
         COURSE.map((m, i) => {
           const d = m.lessons.filter((l) => S.done[l.id]).length, q = S.quiz[m.id], all = d === m.lessons.length && q >= 80;
           const mins = m.lessons.reduce((a, l) => a + (l.mins || 3), 0);
-          return `<button class="list-item mod" data-go="module" data-id="${m.id}"><span class="ic ${all ? 'ok' : ''}">${all ? A.icon('check') : i + 1}</span><span class="tx">
-            <b>${esc(m.title)}</b><span>${m.lessons.length} lessons · ${mins} min${q !== undefined ? ` · quiz ${q}%` : ''}</span>
-            ${d && !all ? `<span class="bar"><i style="width:${(100 * d) / m.lessons.length}%"></i></span>` : ''}</span><span class="chev">${A.icon('chevron')}</span></button>`;
+          const tag = all ? '<span class="tag green">Done</span>' : d || q !== undefined ? '<span class="tag gold">In progress</span>' : `<span class="tag">Module ${i + 1}</span>`;
+          return `<button class="mcard ${all ? 'done' : ''}" data-go="module" data-id="${m.id}"><span class="mcard-top"><span class="mtile">${A.icon(all ? 'check' : MOD_IC[i % MOD_IC.length])}</span>${tag}</span>
+            <b>${esc(m.title)}</b><span class="mcard-sub">${esc(m.blurb || '')}</span><span class="mcard-meta">${m.lessons.length} lessons · ${mins} min${q !== undefined ? ` · quiz ${q}%` : ''}</span>
+            ${d && !all ? `<span class="bar"><i style="width:${(100 * d) / m.lessons.length}%"></i></span>` : ''}</button>`;
         }).join('') + '</div>',
       mount: A.bindGo
     };

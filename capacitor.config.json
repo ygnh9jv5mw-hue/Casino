@@ -4,12 +4,12 @@
   "webDir": "www",
   "ios": {
     "contentInset": "never",
-    "backgroundColor": "#06110b",
+    "backgroundColor": "#121212",
     "scrollEnabled": false
   },
   "plugins": {
     "LocalNotifications": {
-      "iconColor": "#F4C55A"
+      "iconColor": "#E5484D"
     }
   }
 }

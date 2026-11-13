@@ -9,6 +9,10 @@
     return {
       title: 'Train',
       html: `
+      <div class="feat">
+        <button class="drill" data-go="speed">${A.art('speed')}<b>Speed Count</b><small>${scTotal() ? scTotal() + '/24 stars' : 'A live table at dealer speed'}</small></button>
+        <button class="drill" data-go="casino">${A.art('casino')}<b>Casino table</b><small>${A.S.casino ? A.fmt$(A.S.casino.bank) + ' bankroll' : 'Six decks, chips, heat'}</small></button>
+      </div>
       <h3 class="sec">Basic strategy</h3>
       <div class="group">
         ${it('strategy', 'spade', 'Adaptive trainer', 'Real hands, played out · misses come back', Math.round(A.masteryPct('all') * 100) + '%')}
@@ -463,6 +467,7 @@
   const SC_ROUNDS = 6, SC_SPOTS = 6;
   const scStars = (n) => [0, 1, 2].map((k) => `<span class="star ${k < n ? 'on' : ''}">${A.icon('star')}</span>`).join('');
   const scTotal = () => A.S.spd.stars.reduce((a, b) => a + b, 0);
+  A.scTotal = scTotal;
   const scOpen = (i) => i === 0 || A.S.spd.stars[i - 1] >= 1;
   const scNext = () => { const st = A.S.spd.stars; let i = 0; while (i < st.length - 1 && st[i] >= 1) i++; return i; };
   // spot 0 is first base, the dealer's left, which is on your right as you face the dealer
@@ -833,7 +838,7 @@
     };
     return {
       title: 'True Count',
-      html: `<div class="seg" id="md"><button class="on" data-v="0">Decks left shown</button><button data-v="1">Read the tray</button></div><div id="tw"></div>`,
+      html: `<div class="seg gold" id="md"><button class="on" data-v="0">Decks left shown</button><button data-v="1">Read the tray</button></div><div id="tw"></div>`,
       mount(root) {
         const tw = $('#tw', root);
         $$('#md button', root).forEach((b) => (b.onclick = () => { hard = b.dataset.v === '1'; $$('#md button', root).forEach((x) => x.classList.toggle('on', x === b)); q = 0; ok = 0; times = []; ask(); }));

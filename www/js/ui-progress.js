@@ -17,20 +17,94 @@
         <text x="${i * bw + bw / 2}" y="${h - 4}" text-anchor="middle">${'SMTWTFS'[x.d.getDay()]}</text>`; }).join('')}</svg>`;
   }
 
+  // ---------------- achievements ----------------
+  // id, group, name, what it takes, picture, metal (bronze, silver, gold), earned?
+  const ACH = [
+    ['bs1', 'Basic strategy', 'Clean Hands', '25 right in a row in the trainer', 'spade', 'b', (S) => S.best.strat >= 25],
+    ['bs2', 'Basic strategy', 'Autopilot', '100 right in a row', 'spade', 's', (S) => S.best.strat >= 100],
+    ['bs3', 'Basic strategy', 'The Whole Chart', '95% of the chart mastered', 'spade', 'g', () => A.masteryPct('all') >= 0.95],
+    ['rc1', 'Running count', 'Quick Eye', '40 cards in 60 seconds in Reflex', 'eye', 'b', (S) => S.best.reflex >= 40],
+    ['rc2', 'Running count', 'Deck Runner', 'A full deck in 25 seconds', 'layers', 's', (S) => S.best.deck !== null && S.best.deck <= 25],
+    ['rc3', 'Running count', 'Dealer Speed', 'A perfect table at 120 a minute', 'gauge', 'g', (S) => S.best.speed >= 120],
+    ['tc1', 'True count', 'Divider', 'True counts in under 3 seconds', 'divide', 'b', (S) => S.best.tc !== null && S.best.tc <= 3],
+    ['tc2', 'True count', 'Tray Reader', '8 of 10 in Tray reading', 'tray', 's', (S) => S.best.decks >= 8],
+    ['tc3', 'True count', 'Bet the Count', '10 of 10 in Bet ramp', 'coins', 'g', (S) => S.best.ramp >= 10],
+    ['ix1', 'Deviations', 'Off Script', '10 index numbers recalled', 'hash', 'b', (S) => S.best.recall >= 10],
+    ['ix2', 'Deviations', 'Illustrious', 'Half the index plays mastered', 'sparkle', 's', () => A.idxPct() >= 0.5],
+    ['ix3', 'Deviations', 'Every Index', '90% of index plays mastered', 'sparkle', 'g', () => A.idxPct() >= 0.9],
+    ['tb1', 'At the table', 'First Shoe', 'Play a shoe to the cut card', 'cards', 'b', (S) => S.shoe.shoes >= 1],
+    ['tb2', 'At the table', 'Doubled Up', 'Grow the casino bankroll to $2,000', 'chip', 's', (S) => !!S.casino && S.casino.peak >= 2000],
+    ['tb3', 'At the table', 'Pro Room', 'Clear the Pro Room at Speed Count', 'trophy', 'g', (S) => S.spd.stars[7] >= 1],
+    ['hb1', 'Habit', 'On a Roll', 'Your goal 3 days in a row', 'flame', 'b', () => bestStreak() >= 3],
+    ['hb2', 'Habit', 'Every Day', 'A 7-day streak', 'flame', 's', () => bestStreak() >= 7],
+    ['hb3', 'Habit', 'Iron Will', 'A 30-day streak', 'flame', 'g', () => bestStreak() >= 30]
+  ];
+  A.ACH = ACH;
+  // the longest run of days with the goal hit
+  function bestStreak() {
+    const days = [...new Set(A.S.goalDays)].sort(); let best = 0, run = 0, prev = null;
+    for (const d of days) { const t = Date.parse(d + 'T12:00:00Z'); run = prev !== null && Math.round((t - prev) / 864e5) === 1 ? run + 1 : 1; if (run > best) best = run; prev = t; }
+    return best;
+  }
+  A.bestStreak = bestStreak;
+  // A medal drawn in metal: a laurel, a coin, the skill's picture struck into it. Locked medals are dark, with a lock.
+  const METAL = { b: ['#f6c79a', '#c67d3e', '#7a4214'], s: ['#fbfcfd', '#b6bcc7', '#6a707c'], g: ['#fff0b8', '#e6b84c', '#9a6a10'], x: ['#4a4a4c', '#2e2e30', '#1d1d1f'] };
+  let mid = 0;
+  function medallion(ic, tier, locked) {
+    const [hi, mi, lo] = METAL[locked ? 'x' : tier], id = 'mdl' + (++mid);
+    const leaf = (a, side) => { const r = (a * Math.PI) / 180, x = (50 + 42 * Math.cos(r)).toFixed(1), y = (50 + 42 * Math.sin(r)).toFixed(1); return `<ellipse cx="${x}" cy="${y}" rx="3.1" ry="6.8" transform="rotate(${Math.round(a + 90 + side * 24)} ${x} ${y})"/>`; };
+    let leaves = ''; for (let i = 0; i < 8; i++) leaves += leaf(122 + i * 16, 1) + leaf(58 - i * 16, -1);
+    const pic = ic === 'spadeSolid' ? `<g transform="translate(34.5 35) scale(1.3)" fill="${lo}">${A.ICON.spadeSolid}</g>`
+      : `<g transform="translate(33.5 33.5) scale(1.375)" fill="none" stroke="${locked ? '#58585c' : lo}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${A.ICON[ic] || ''}</g>`;
+    return `<svg class="mdl" viewBox="0 0 100 100" aria-hidden="true"><defs><radialGradient id="${id}" cx="34%" cy="28%" r="80%"><stop offset="0" stop-color="${hi}"/><stop offset=".5" stop-color="${mi}"/><stop offset="1" stop-color="${lo}"/></radialGradient></defs>
+      <g fill="${locked ? '#38383b' : mi}">${leaves}</g><circle cx="50" cy="50" r="32" fill="url(#${id})"/>
+      <circle cx="50" cy="50" r="31.4" fill="none" stroke="${hi}" stroke-opacity=".6"/><circle cx="50" cy="50" r="26" fill="none" stroke="${lo}" stroke-opacity=".5" stroke-width="1.5"/>${pic}
+      ${locked ? '<path d="M43 49v-4.5a7 7 0 0 1 14 0V49" fill="none" stroke="#fff" stroke-width="3.4"/><rect x="38.5" y="48" width="23" height="17" rx="3.5" fill="#fff"/>' : ''}</svg>`;
+  }
+  A.medallion = medallion;
+  // new medals are celebrated once you are back on a main tab; medals already earned before this version are simply marked
+  A.checkAch = () => {
+    const S = A.S, first = !S.flags.achInit; let changed = first;
+    for (const a of ACH) {
+      const k = 'ach_' + a[0]; if (S.flags[k]) continue;
+      let won = false; try { won = !!a[6](S); } catch (e) {}
+      if (!won) continue;
+      S.flags[k] = true; changed = true;
+      if (!first) A.queueCelebrate('Achievement unlocked', `<b>${esc(a[2])}</b> · ${esc(a[3])}`, `<span class="ach-burst">${medallion(a[4], a[5], false)}</span>`);
+    }
+    if (first) S.flags.achInit = true;
+    if (changed) A.save();
+  };
+
+  let view = 'stats'; // My stats or Achievements, remembered while the app is open
   SCREENS.progress = () => {
     const S = A.S, rk = A.rank(), act = activity(), b = S.best;
     const reps = Object.values(S.hist).reduce((a, h) => a + h.n, 0), right = Object.values(S.hist).reduce((a, h) => a + h.ok, 0);
     const wk = act.slice(-7).reduce((a, x) => a + x.h.xp, 0);
+    const ready = A.readiness(), readyN = ready.filter((x) => x.ok).length, won = ACH.filter((a) => S.flags['ach_' + a[0]]).length;
     const rec = (t, v, ok) => `<div class="recd ${ok ? 'ok' : ''}"><b>${v}</b><span>${esc(t)}</span></div>`;
     return {
       title: 'Progress',
       html: `
-      <div class="card rankcard"><span class="badge big r${rk.i}">${rk.i + 1}</span><div class="grow"><div class="kicker">Rank</div><h3 class="m0">${esc(rk.name)}</h3>
-        <div class="xpbar"><i style="width:${Math.round(rk.pct * 100)}%"></i></div><div class="tiny muted">${S.xp.toLocaleString()} XP${rk.next ? ` · next: ${esc(rk.next)} at ${rk.to.toLocaleString()}` : ''}</div></div></div>
-      <div class="card"><div class="row-sb"><div><div class="kicker">Last 14 days</div><h3 class="m0">${wk.toLocaleString()} XP this week</h3></div><div class="tiny muted">${A.streak()}-day streak</div></div>${bars(act)}
-        <div class="stats"><div><b>${reps.toLocaleString()}</b><span>total reps</span></div><div><b>${reps ? Math.round((100 * right) / reps) + '%' : '–'}</b><span>accuracy</span></div><div><b>${S.days.length}</b><span>days trained</span></div></div></div>
+      <div class="prof">
+        <div class="prof-coin">${medallion('spadeSolid', 'g', false)}</div>
+        <div class="prof-name"><h2>${esc(S.prof.name || 'Player')}</h2><button class="iconbtn sm" id="pname" aria-label="Edit your name">${A.icon('pencil')}</button></div>
+        <div class="prof-sub"><span class="tag blue">${esc(rk.name)}</span><span>${S.xp.toLocaleString()} XP${rk.next ? ` · ${(rk.to - S.xp).toLocaleString()} to ${esc(rk.next)}` : ' · top rank'}</span></div>
+        <div class="rpath" role="img" aria-label="Rank ${rk.i + 1} of ${A.RANKS.length}">${A.RANKS.map((r, i) => `${i ? `<i class="rp-dash ${i <= rk.i ? 'on' : ''}"></i>` : ''}<span class="rp ${i < rk.i ? 'done' : i === rk.i ? 'cur' : ''}">${i + 1}</span>`).join('')}</div>
+      </div>
+      <div class="seg gold pseg" id="pseg"><button data-v="stats" class="${view === 'stats' ? 'on' : ''}">My stats</button><button data-v="ach" class="${view === 'ach' ? 'on' : ''}">Achievements</button></div>
+      <div id="pv-stats" ${view === 'stats' ? '' : 'hidden'}>
+      <h3 class="sec">My stats</h3>
+      <div class="card gpa"><span class="gpa-coin">${medallion('trophy', 'g', false)}</span><div><b>${readyN}<em>/${ready.length}</em></b><span>Casino-ready benchmarks</span></div></div>
+      <div class="sgrid">
+        <div class="sg"><b class="g">${reps.toLocaleString()}</b><span>Reps trained</span></div>
+        <div class="sg"><b>${reps ? Math.round((100 * right) / reps) + '%' : '–'}</b><span>Accuracy</span></div>
+        <div class="sg"><b class="g">${A.streak()}</b><span>Day streak</span></div>
+        <div class="sg"><b>${bestStreak()}</b><span>Best streak</span></div>
+      </div>
+      <div class="card"><div class="row-sb"><div><div class="kicker">Last 14 days</div><h3 class="m0">${wk.toLocaleString()} XP this week</h3></div><div class="tiny muted">${S.days.length} days trained</div></div>${bars(act)}</div>
       <h3 class="sec">Casino-ready</h3>
-      <div class="card checks">${A.readiness().map((i) => A.checkRow(i)).join('')}</div>
+      <div class="card checks">${ready.map((i) => A.checkRow(i)).join('')}</div>
       <h3 class="sec">Mastery</h3>
       <button class="card masteries" data-go="mastery">
         <div>${A.ring(A.masteryPct('hard'), 58, 6, Math.round(A.masteryPct('hard') * 100) + '%')}<span>Hard</span></div>
@@ -49,8 +123,21 @@
       <div class="group">
       <button class="list-item" data-go="log"><span class="ic">${A.icon('notebook')}</span><span class="tx"><b>Session log</b><span>${S.log.length} sessions logged</span></span><span class="chev">${A.icon('chevron')}</span></button>
       <button class="list-item" data-go="bankroll"><span class="ic">${A.icon('calc')}</span><span class="tx"><b>Bankroll & risk of ruin</b><span>Plan your bets before you play</span></span><span class="chev">${A.icon('chevron')}</span></button>
+      </div>
+      </div>
+      <div id="pv-ach" ${view === 'ach' ? '' : 'hidden'}>
+        <div class="row-sb"><h3 class="sec">Achievements</h3><span class="ach-count">${won} of ${ACH.length}</span></div>
+        <div class="ach-grid">${ACH.map((a) => { const on = !!S.flags['ach_' + a[0]]; return `<div class="ach ${on ? 'won' : 'lock'}" data-ach="${a[0]}"><span class="cat">${esc(a[1])}</span>${medallion(a[4], a[5], !on)}<b>${esc(a[2])}</b><small>${esc(a[3])}</small></div>`; }).join('')}</div>
       </div>`,
-      mount: A.bindGo
+      mount(root) {
+        A.bindGo(root);
+        $$('#pseg button', root).forEach((bt) => (bt.onclick = () => {
+          view = bt.dataset.v; A.fx.tap();
+          $$('#pseg button', root).forEach((x) => x.classList.toggle('on', x === bt));
+          $('#pv-stats', root).hidden = view !== 'stats'; $('#pv-ach', root).hidden = view !== 'ach';
+        }));
+        $('#pname', root).onclick = () => A.editName();
+      }
     };
   };
 
