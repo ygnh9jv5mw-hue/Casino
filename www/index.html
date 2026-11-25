@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NO ANTICHEAT">
+<meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<title>NO ANTICHEAT</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-screen="scr-title">
+<canvas id="gl"></canvas>
+<canvas id="overlay"></canvas>
+
+<!-- ======================= HUD ======================= -->
+<div id="hud" class="hidden">
+  <div id="hud-tl">
+    <div id="sus" title="Suspicion">
+      <svg viewBox="0 0 24 24" class="eye"><path d="M12 5C6.5 5 2.4 9.2 1 12c1.4 2.8 5.5 7 11 7s9.6-4.2 11-7c-1.4-2.8-5.5-7-11-7zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg>
+      <div class="bar"><i id="sus-fill"></i></div><b id="sus-val">0</b>
+    </div>
+    <div id="credits-live">+&#8353;0</div>
+    <canvas id="minimap" width="220" height="220"></canvas>
+  </div>
+  <div id="hud-top"><div id="scoreline"></div><div id="timer">4:00</div></div>
+  <div id="killfeed"></div>
+  <div id="hud-bottom">
+    <div id="hp"><div class="bar"><i id="hp-fill"></i></div><b id="hp-val">100</b></div>
+    <div id="ammo"><b id="ammo-val">12</b><span id="ammo-max">/12</span><span id="weapon-name">P9 Pistol</span></div>
+  </div>
+  <div id="killpop"></div>
+  <div id="center-msg"></div>
+  <div id="aim-hint" class="hidden">Click to aim · WASD move · Space jump · R reload · Q swap · Insert cheats · Enter chat</div>
+  <div id="fps" class="hidden"></div>
+  <div id="touch">
+    <div id="joy"><div id="joy-knob"></div></div>
+    <button class="tb" id="b-fire" data-btn="fire">FIRE</button>
+    <button class="tb" id="b-jump" data-btn="jump">JUMP</button>
+    <button class="tb" id="b-reload" data-btn="reload">R</button>
+    <button class="tb" id="b-swap" data-btn="swap">&#8644;</button>
+  </div>
+  <div id="hud-tr">
+    <button class="pill" data-btn="chat" id="b-chat">CHAT</button>
+    <button class="pill ins" data-btn="ins" id="b-ins">INS</button>
+    <button class="pill" data-btn="pause" id="b-pause">II</button>
+  </div>
+</div>
+
+<div id="chat"></div>
+<form id="chat-form" class="hidden" autocomplete="off"><input id="chat-input" maxlength="80" placeholder="say something&hellip;" enterkeyhint="send"><button type="submit">Send</button></form>
+
+<!-- ======================= CHEAT MENU ======================= -->
+<div id="cheatmenu" class="hidden">
+  <div class="cm-title"><span>skillissue v1.0 | undetected | INS to hide</span><button id="cm-close">&times;</button></div>
+  <div id="cm-list"></div>
+  <button id="cm-panic">PANIC (END): all cheats off</button>
+</div>
+
+<!-- ======================= SCREENS ======================= -->
+<section id="scr-title" class="screen">
+  <div class="title-wrap">
+    <h1 class="glitch" data-text="NO ANTICHEAT">NO ANTICHEAT</h1>
+    <p class="tagline">you can't aim. good thing nobody's checking.</p>
+    <button class="btn primary big" id="title-go">TAP TO START</button>
+  </div>
+</section>
+
+<section id="scr-name" class="screen hidden">
+  <div class="panel narrow">
+    <div class="client-logo">FRAGLINE</div>
+    <h2>Create your account</h2>
+    <p class="muted">Pick a username. Everyone in the lobby will see it.</p>
+    <input id="name-input" maxlength="18" autocomplete="off" spellcheck="false">
+    <button class="btn primary" id="name-go">CREATE ACCOUNT</button>
+  </div>
+</section>
+
+<section id="scr-menu" class="screen hidden">
+  <div class="menu">
+    <header class="topbar">
+      <div class="client-logo">FRAGLINE</div>
+      <div class="who"><b id="menu-user"></b><span id="menu-rank" class="rank"></span></div>
+      <div class="credits" id="menu-credits"></div>
+    </header>
+    <div class="menu-grid">
+      <button class="tile play" id="m-play"><span class="t-big">PLAY</span><span class="t-sub" id="m-play-sub"></span></button>
+      <button class="tile shop" id="m-shop"><span class="t-big">SHOP</span><span class="t-sub">skillissue.shop</span><i class="badge hidden" id="shop-badge"></i></button>
+      <button class="tile" id="m-profile"><span class="t-big">PROFILE</span><span class="t-sub">stats &amp; achievements</span></button>
+      <button class="tile" id="m-settings"><span class="t-big">SETTINGS</span><span class="t-sub">controls &amp; sound</span></button>
+    </div>
+    <div class="ticker"><span id="menu-ticker"></span></div>
+  </div>
+</section>
+
+<section id="scr-play" class="screen hidden">
+  <div class="menu">
+    <header class="topbar">
+      <button class="btn ghost" data-back="scr-menu">&larr; Back</button>
+      <div class="who"><b>Choose a lobby</b></div>
+      <div class="credits" id="play-credits"></div>
+    </header>
+    <div id="tier-list" class="tier-list"></div>
+  </div>
+</section>
+
+<section id="scr-lobby" class="screen hidden see-through">
+  <div class="lobby">
+    <div class="lobby-head"><b id="lobby-title"></b><span id="lobby-sub" class="muted"></span></div>
+    <div id="lobby-players"></div>
+    <div class="lobby-count"><span>Match starts in</span><b id="lobby-count">4</b></div>
+  </div>
+</section>
+
+<section id="scr-results" class="screen hidden">
+  <div class="results">
+    <div class="res-left">
+      <h2 id="res-title">VICTORY</h2>
+      <div id="res-sub" class="muted"></div>
+      <div id="res-board"></div>
+      <div id="res-stats" class="muted"></div>
+      <div id="res-chat" class="res-chat"></div>
+    </div>
+    <div class="res-mid">
+      <div class="pay-head">PAYOUT</div>
+      <div id="res-pay"></div>
+      <div class="pay-total"><span>Total</span><b id="res-total"></b></div>
+      <div id="res-unlock" class="hidden"></div>
+      <div class="res-buttons">
+        <button class="btn shopbtn" id="res-shop">SHOP<i class="badge hidden" id="res-badge"></i></button>
+        <button class="btn primary" id="res-again">PLAY AGAIN</button>
+        <button class="btn" id="res-lobbies">LOBBIES</button>
+        <button class="btn ghost" id="res-menu">MENU</button>
+      </div>
+      <div id="res-auto" class="hidden"><span id="res-auto-text"></span> <button class="btn ghost tiny" id="res-auto-cancel">cancel</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="scr-shop" class="screen hidden">
+  <div class="browser">
+    <div class="browser-bar">
+      <button class="btn ghost" data-back-shop="1">&larr;</button>
+      <div class="addr"><span class="nsec">&#9888; Not secure</span> https://skillissue.shop</div>
+      <div class="shop-credits" id="shop-credits"></div>
+    </div>
+    <div class="browser-body">
+      <div class="shop-main">
+        <div class="shop-hero"><b>SKILLISSUE.SHOP</b><span>we sell skill &bull; all products 100% UNDETECTED &bull; no refunds</span></div>
+        <div id="shop-list"></div>
+      </div>
+      <aside class="shop-dms"><div class="dm-head">DMs &middot; @undetected</div><div id="shop-dms"></div></aside>
+    </div>
+  </div>
+</section>
+
+<section id="scr-profile" class="screen hidden">
+  <div class="menu">
+    <header class="topbar"><button class="btn ghost" data-back="scr-menu">&larr; Back</button><div class="who"><b>Profile</b></div><div></div></header>
+    <div id="prof-body" class="prof"></div>
+  </div>
+</section>
+
+<section id="scr-settings" class="screen hidden">
+  <div class="menu">
+    <header class="topbar"><button class="btn ghost" id="set-back">&larr; Back</button><div class="who"><b>Settings</b></div><div></div></header>
+    <div class="settings">
+      <label>Look sensitivity <input type="range" id="set-sens" min="0.3" max="2.5" step="0.05"><span id="set-sens-v"></span></label>
+      <label>Volume <input type="range" id="set-vol" min="0" max="1" step="0.05"><span id="set-vol-v"></span></label>
+      <label class="check"><input type="checkbox" id="set-auto"> Auto-Queue starts the next match (when owned)</label>
+      <label class="check"><input type="checkbox" id="set-fps"> Show FPS</label>
+      <button class="btn danger" id="set-reset">Reset all progress</button>
+      <p class="muted small">NO ANTICHEAT v0.1 &middot; a single-player game. Every "player" is a bot and every cheat is an in-game upgrade.</p>
+    </div>
+  </div>
+</section>
+
+<section id="scr-pause" class="screen hidden">
+  <div class="panel narrow">
+    <h2>Paused</h2>
+    <button class="btn primary" id="pause-resume">RESUME</button>
+    <button class="btn" id="pause-settings">SETTINGS</button>
+    <button class="btn danger" id="pause-leave">LEAVE MATCH (keep kill credits)</button>
+  </div>
+</section>
+
+<div id="toast"></div>
+<div id="rotate" class="hidden"><div>&#8635;</div><p>Turn your phone sideways to play</p></div>
+
+<script src="js/vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/world.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

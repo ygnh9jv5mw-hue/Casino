@@ -1,0 +1,10 @@
+{
+  "appId": "com.noanticheat.game",
+  "appName": "NO ANTICHEAT",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0b0d12",
+    "scrollEnabled": false
+  }
+}
