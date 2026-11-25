@@ -191,100 +191,28 @@
   const chamsMat = () => matCache.chams || (matCache.chams = new THREE.MeshBasicMaterial({ color: 0xff2a6d, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false }));
   const iceMat = () => matCache.ice || (matCache.ice = new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.55, depthWrite: false }));
   const GUN_LEN = { pistol: 0.32, smg: 0.5, rifle: 0.7, dmr: 0.85, sniper: 1.05, shotgun: 0.75, lmg: 0.9 };
-  // ---------------------------------------------------------------- blocky player models
-  // Roblox-style: box head with a drawn face, box torso, swinging arms and legs, the odd hat.
-  const SKINS = [0xf1c9a5, 0xe0ac7e, 0xc68642, 0x8d5524, 0xffdbac, 0xf5d0b0];
-  const PANTS = [0x1f2937, 0x374151, 0x1e3a5f, 0x3f2a1d, 0x14532d, 0x111827, 0x4b5563];
-  const HATS = [0xef4444, 0x111827, 0xf59e0b, 0x10b981, 0x6366f1, 0xf8fafc, 0xec4899];
-  const faceCache = [];
-  function faceTex(kind) {
-    if (faceCache[kind]) return faceCache[kind];
-    const c = document.createElement('canvas');
-    c.width = c.height = 64;
-    const g2 = c.getContext('2d');
-    g2.fillStyle = '#1b1b1f'; g2.strokeStyle = '#1b1b1f'; g2.lineWidth = 4; g2.lineCap = 'round';
-    const eyes = (h) => { g2.fillRect(18, 22, 7, h); g2.fillRect(39, 22, 7, h); };
-    if (kind === 3) { g2.fillRect(12, 20, 40, 10); g2.fillRect(30, 20, 4, 4); }       // shades
-    else if (kind === 2) { eyes(9); g2.beginPath(); g2.moveTo(14, 16); g2.lineTo(27, 21); g2.moveTo(50, 16); g2.lineTo(37, 21); g2.stroke(); } // angry
-    else eyes(kind === 4 ? 12 : 9);
-    g2.beginPath();
-    if (kind === 0 || kind === 3) g2.arc(32, 36, 11, 0.15 * Math.PI, 0.85 * Math.PI);                 // smile
-    else if (kind === 1) { g2.moveTo(22, 46); g2.quadraticCurveTo(36, 50, 44, 41); }                 // smirk
-    else if (kind === 2) { g2.moveTo(22, 48); g2.quadraticCurveTo(32, 42, 42, 48); }                 // frown
-    else if (kind === 4) g2.arc(32, 46, 4, 0, Math.PI * 2);                                         // surprised
-    else { g2.moveTo(23, 46); g2.lineTo(41, 46); }                                                   // bored
-    g2.stroke();
-    const tex = new THREE.CanvasTexture(c);
-    tex.magFilter = THREE.NearestFilter;
-    faceCache[kind] = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
-    return faceCache[kind];
-  }
-  function makeBotMesh(color, cls) {
-    if (!geo) geo = { box: new THREE.BoxGeometry(1, 1, 1), face: new THREE.PlaneGeometry(0.4, 0.4) };
-    const box = (m, w, h, d, x, y, z) => { const o = new THREE.Mesh(geo.box, m); o.scale.set(w, h, d); o.position.set(x, y, z); return o; };
-    const pivot = (x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); return p; };
-    const g = new THREE.Group();
-    g.rotation.order = 'YXZ';
-    const skin = mat(U.pick(SKINS)), shirt = mat(color), pants = mat(U.pick(PANTS)), dark = mat(0x24262b);
-    const legL = pivot(-0.125, 0.8, 0), legR = pivot(0.125, 0.8, 0);
-    legL.add(box(pants, 0.24, 0.8, 0.26, 0, -0.4, 0)); legR.add(box(pants, 0.24, 0.8, 0.26, 0, -0.4, 0));
-    const torso = box(shirt, 0.52, 0.64, 0.28, 0, 1.12, 0);
-    const armL = pivot(-0.38, 1.42, 0), armR = pivot(0.38, 1.42, 0);
-    armL.rotation.order = armR.rotation.order = 'ZXY';
-    armL.add(box(shirt, 0.22, 0.26, 0.25, 0, -0.12, 0), box(skin, 0.21, 0.4, 0.23, 0, -0.44, 0));
-    armR.add(box(shirt, 0.22, 0.26, 0.25, 0, -0.12, 0), box(skin, 0.21, 0.4, 0.23, 0, -0.44, 0));
-    const len = GUN_LEN[cls] || 0.55;
-    const gun = box(dark, 0.09, len, 0.11, 0, -0.62 - len / 2 + 0.12, -0.08); // runs down the arm, so it points forward when the arm is raised
-    armR.add(gun);
-    gun.name = 'gun';
-    const head = new THREE.Group();
-    head.position.y = 1.66;
-    head.add(box(skin, 0.44, 0.44, 0.44, 0, 0, 0));
-    const face = new THREE.Mesh(geo.face, faceTex(U.randInt(0, 5)));
-    face.position.z = -0.222; face.rotation.y = Math.PI;
-    head.add(face);
-    const detail = [face];
-    if (Math.random() < 0.45) {
-      const hm = mat(U.pick(HATS));
-      const parts = Math.random() < 0.5 ? [box(hm, 0.47, 0.13, 0.47, 0, 0.28, 0), box(hm, 0.36, 0.04, 0.2, 0, 0.23, -0.3)] : [box(hm, 0.47, 0.2, 0.47, 0, 0.27, 0)]; // cap or beanie
-      head.add(...parts);
-      detail.push(...parts);
-    }
-    const chams = new THREE.Group();
-    const cm = chamsMat();
-    for (const o of [box(cm, 0.54, 1.44, 0.3, 0, 0.72, 0), box(cm, 0.46, 0.46, 0.46, 0, 1.66, 0), box(cm, 0.24, 0.66, 0.26, -0.38, 1.12, 0), box(cm, 0.24, 0.66, 0.26, 0.38, 1.12, 0)]) { o.renderOrder = 10; chams.add(o); }
-    chams.visible = false;
-    const ice = new THREE.Group();
-    ice.add(box(iceMat(), 1.05, 1.5, 0.6, 0, 0.76, 0), box(iceMat(), 0.58, 0.58, 0.58, 0, 1.66, 0));
-    ice.visible = false;
-    g.add(legL, legR, torso, armL, armR, head, chams, ice);
-    Object.assign(g.userData, { chams, ice, legL, legR, armL, armR, head, gun, detail, near: true, aimK: 0 });
+  // ---------------------------------------------------------------- characters (see avatar.js)
+  function makeBotMesh(color, cls, name) {
+    const av = NA.Avatar.build(NA.Avatar.botOutfit(color, name), { cls, skin: Math.random() < 0.3 ? U.pick(NA.Cosmetics.GUN_SKINS.slice(1)).id : null });
+    if (NA.Graphics && NA.Graphics.shadows()) NA.Avatar.shadows(av, true);
+    const g = av.root;
+    Object.assign(g.userData, { av, chams: av.chams, ice: av.ice, gun: av.gun, head: av.bones.head });
     return g;
   }
-  // Walk cycle and aiming pose, driven by how fast the bot actually moved this frame.
+  // Walk/run cycle, aiming pose, jumps, dances. Driven by how the bot actually moved.
   function animateBot(b, dt) {
-    const ud = b.mesh.userData, sp = Math.hypot(b.vel.x, b.vel.z);
-    // far away: skip drawing the face and hat (saves draw calls in 32-player lobbies)
-    const near = b.pos.distanceToSquared(NA.R.camera.position) < 1600;
-    if (near !== ud.near) { ud.near = near; for (const o of ud.detail) o.visible = near; }
-    b.walkPh = (b.walkPh || 0) + dt * sp * 2.8;
-    const sw = Math.sin(b.walkPh) * Math.min(1, sp / 3) * 0.75;
-    ud.legL.rotation.x = sw; ud.legR.rotation.x = -sw;
-    ud.aimK = U.lerp(ud.aimK, b.canSee && b.target ? 1 : 0, Math.min(1, dt * 8));
-    const k = ud.aimK;
-    ud.armR.rotation.x = U.lerp(0.55 - sw * 0.3, Math.PI / 2, k);
-    ud.armL.rotation.x = U.lerp(-sw * 0.8, Math.PI / 2 - 0.12, k);
-    ud.armL.rotation.z = -0.55 * k;
-    ud.head.rotation.x = b.target && b.canSee ? -0.08 : 0;
-    const big = cfx().bigheads ? 2.3 : 1;
-    if (ud.head.scale.x !== big) { ud.head.scale.setScalar(big); ud.head.position.y = big > 1 ? 1.95 : 1.66; }
-    if (G.match && G.match.tier.chaos && G.aimTarget === b) {
-      // your aimbot locked on: they dance
-      b.danceT = (b.danceT || 0) + dt * 9;
-      ud.armL.rotation.x = ud.armR.rotation.x = Math.PI * 0.9 + Math.sin(b.danceT) * 0.4;
-      ud.armL.rotation.z = Math.sin(b.danceT) * 0.5;
-      b.mesh.rotation.y += Math.sin(b.danceT * 0.5) * 0.6;
+    const av = b.mesh.userData.av, tg = b.target;
+    let pitch = 0;
+    if (tg && b.canSee && tg.alive) {
+      const dx = tg.pos.x - b.pos.x, dz = tg.pos.z - b.pos.z;
+      pitch = Math.atan2(tg.pos.y - b.pos.y, Math.hypot(dx, dz));
     }
+    // far away: skip the outline pass (half the vertex work for distant bots)
+    if (G.player && av.outline) av.outline.visible = b.pos.distanceToSquared(G.player.pos) < 2000;
+    NA.Avatar.animate(av, {
+      speed: Math.hypot(b.vel.x, b.vel.z), aim: !!(tg && b.canSee), pitch, air: Math.abs(b.vy) > 0.5,
+      bigHead: !!cfx().bigheads, dance: !!(G.match && G.match.tier.chaos && G.aimTarget === b),
+    }, dt);
   }
 
   function genName(used) {
@@ -336,7 +264,7 @@
     const wid = tier.lootMode || (name === 'BOT_Kevin' && tier.id <= 2) ? 'p9' : U.pick(tier.bot.weapons);
     const w = D.WEAPONS[wid];
     const color = team === 'A' ? 0x3b82f6 : team === 'B' ? 0xe5484d : FFA_COLORS[ffaIdx++ % FFA_COLORS.length];
-    const mesh = makeBotMesh(color, w.cls);
+    const mesh = makeBotMesh(color, w.cls, name);
     NA.R.scene.add(mesh);
     const ri = U.clamp(rankIndex(tier.rank) + U.randInt(-1, 1), 0, D.RANKS.length - 1);
     const b = {
@@ -356,12 +284,13 @@
   }
   function removeBot(b) {
     NA.R.scene.remove(b.mesh);
+    NA.Avatar.dispose(b.mesh.userData.av);
     const i = G.bots.indexOf(b);
     if (i >= 0) G.bots.splice(i, 1);
     for (const o of G.bots) if (o.target === b) o.target = null;
   }
   function clearBots() {
-    for (const b of G.bots) NA.R.scene.remove(b.mesh);
+    for (const b of G.bots) { NA.R.scene.remove(b.mesh); NA.Avatar.dispose(b.mesh.userData.av); }
     G.bots = [];
   }
   function spawnList(team) {
@@ -404,7 +333,7 @@
     if (G.match.tier.lootMode) setBotWeapon(b, 'p9', 0);
     b.ammo = D.WEAPONS[b.weapon].mag; b.reloadT = 0; b.frozenT = 0; b.retreatT = 0; b.queue = 0;
     b.prevPos.copy(b.pos); b.vel.set(0, 0, 0);
-    b.mesh.visible = true; b.mesh.rotation.x = 0; b.mesh.userData.ice.visible = false;
+    b.mesh.visible = true; NA.Avatar.reset(b.mesh.userData.av);
     b.mesh.position.copy(b.pos); b.mesh.rotation.y = b.yaw;
   }
 
@@ -720,7 +649,7 @@
     killer.kills++;
     victim.deaths++;
     if (mt.tier.mode === 'tdm' && (killer.team === 'A' || killer.team === 'B')) mt.score[killer.team]++;
-    mt.killfeed.push({ k: killer.name, v: victim.name, head, wb: !!(info && info.walls), mine: killer === p, me: victim === p, t: now, kt: killer.team, vt: victim.team });
+    mt.killfeed.push({ k: killer.name, v: victim.name, head, knife: !!(info && info.knife), wb: !!(info && info.walls), mine: killer === p, me: victim === p, t: now, kt: killer.team, vt: victim.team });
     if (mt.killfeed.length > 6) mt.killfeed.shift();
     if (victim.cheat) victim.cheat.deathRun++;
     if (killer.cheat) killer.cheat.deathRun = 0;
@@ -787,6 +716,7 @@
     if (!b.alive) return;
     const hadShield = b.shield > 0;
     applyDamage(b, dmg);
+    b.mesh.userData.av.hitAt = performance.now();
     b.lastAttacker = attacker;
     b.lastAttackT = performance.now();
     if (attacker === G.player) {
@@ -802,7 +732,8 @@
     }
     if (b.hp <= 0) {
       b.alive = false; b.hp = 0; b.shield = 0; b.respawnT = 3; b.deathT = 0; b.frozenT = 0; b.mesh.userData.ice.visible = false;
-      FX.burst(b.pos, b.color, G.match.tier.chaos);
+      if (attacker === G.player) FX.kill(b, NA.Cosmetics.equipped('killfx'));
+      else FX.burst(b.pos, b.color, G.match.tier.chaos);
       dropGun(b);
       registerKill(attacker, b, head, info);
     }
@@ -1208,8 +1139,7 @@
   function setBotWeapon(b, id, rarity) {
     const w = D.WEAPONS[id];
     b.weapon = id; b.rarity = rarity || 0; b.ammo = w.mag; b.reloadT = 0;
-    const gun = b.mesh.userData.gun, len = GUN_LEN[w.cls] || 0.55;
-    if (gun) { gun.scale.y = len; gun.position.y = -0.62 - len / 2 + 0.12; }
+    NA.Avatar.setGun(b.mesh.userData.av, w.cls);
   }
   // One number for how good a gun is, so a bot never swaps back and forth between two guns.
   const gunValue = (id, rarity) => (D.WEAPONS[id].slot === 1 ? 0 : 3) + D.WEAPONS[id].tier * 0.35 + (rarity || 0) * 0.8;
@@ -1511,14 +1441,15 @@
     const mt = G.match;
     if (audible && mt.snd < 18) { mt.snd++; A.shot(b.weapon, G.player.pos.distanceTo(b.pos)); }
     b.ammo--;
+    b.mesh.userData.av.kickAt = performance.now();
     if (b.ammo <= 0) b.reloadT = w.reload * U.rand(1, 1.3);
     noise(b);
   }
   function updateBot(b, dt, now) {
     if (!b.alive) {
       b.deathT += dt;
-      b.mesh.rotation.x = -Math.min(1, b.deathT / 0.35) * Math.PI / 2;
-      if (b.deathT > 0.9) b.mesh.visible = false;
+      NA.Avatar.animate(b.mesh.userData.av, { dead: true, deadT: b.deathT }, dt);
+      if (b.deathT > 1.65) b.mesh.visible = false;
       b.respawnT -= dt;
       if (b.respawnT <= 0) respawnBot(b);
       return;
@@ -1834,12 +1765,12 @@
     tr.m.visible = true;
     tr.t = 0;
   };
-  function spawnPart(pos, color, vel, life) {
+  function spawnPart(pos, color, vel, life, grav) {
     const pt = FX.parts[FX.pi++ % FX.parts.length];
     pt.m.position.copy(pos);
     pt.m.material.color.setHex(color);
     pt.v.copy(vel);
-    pt.t = 0; pt.life = life;
+    pt.t = 0; pt.life = life; pt.g = grav === undefined ? 15 : grav;
     pt.m.visible = true;
   }
   const CONFETTI = [0xf43f5e, 0xfacc15, 0x4ade80, 0x22d3ee, 0xa855f7, 0xf97316, 0xffffff];
@@ -1848,6 +1779,24 @@
       spawnPart(tv3.set(pos.x + U.rand(-0.3, 0.3), pos.y + U.rand(0.4, 1.7), pos.z + U.rand(-0.3, 0.3)),
         confetti ? U.pick(CONFETTI) : i % 3 === 0 ? 0xf1c9a5 : color, new THREE.Vector3(U.rand(-3, 3), U.rand(2, confetti ? 9 : 6), U.rand(-3, 3)), U.rand(0.6, confetti ? 1.6 : 1));
     }
+  };
+  // kill effects you can buy in the Item Shop
+  FX.kill = function (b, kind) {
+    const p = b.pos, V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const at = (dy) => tv3.set(p.x + U.rand(-0.35, 0.35), p.y + dy, p.z + U.rand(-0.35, 0.35));
+    if (kind === 'confetti') FX.burst(p, b.color, true);
+    else if (kind === 'pixels') { for (let i = 0; i < 26; i++) spawnPart(at(U.rand(0.1, 1.8)), U.pick([0x4ade80, 0x22c55e, 0x86efac, 0x15803d]), V(U.rand(-0.6, 0.6), U.rand(1.5, 4), U.rand(-0.6, 0.6)), U.rand(0.7, 1.3), -1.5); b.deathT = 0.95; }
+    else if (kind === 'flames') { for (let i = 0; i < 28; i++) spawnPart(at(U.rand(0, 1.4)), U.pick([0xf97316, 0xfacc15, 0xef4444, 0xfb923c, 0x1f2937]), V(U.rand(-1, 1), U.rand(2, 5), U.rand(-1, 1)), U.rand(0.4, 0.9), -3); }
+    else if (kind === 'hearts') { for (let i = 0; i < 18; i++) spawnPart(at(U.rand(0.6, 1.8)), U.pick([0xf472b6, 0xec4899, 0xfda4af, 0xef4444]), V(U.rand(-0.8, 0.8), U.rand(1, 2.5), U.rand(-0.8, 0.8)), U.rand(1, 1.6), -0.6); }
+    else if (kind === 'lightning') {
+      let a = V(p.x + U.rand(-2, 2), p.y + 26, p.z + U.rand(-2, 2));
+      for (let i = 1; i <= 6; i++) {
+        const k = i / 6, n = V(U.lerp(a.x, p.x, 0.45) + (i < 6 ? U.rand(-1.2, 1.2) : 0), p.y + 26 * (1 - k) + 0.9 * k, U.lerp(a.z, p.z, 0.45) + (i < 6 ? U.rand(-1.2, 1.2) : 0));
+        FX.tracer(a, n, 0xdbeafe); a = n;
+      }
+      for (let i = 0; i < 20; i++) spawnPart(at(U.rand(0.1, 0.6)), U.pick([0xffffff, 0xbfdbfe, 0x60a5fa]), V(U.rand(-4, 4), U.rand(1, 6), U.rand(-4, 4)), U.rand(0.3, 0.7));
+      NA.UI.flash && NA.UI.flash();
+    } else FX.burst(p, b.color, G.match.tier.chaos);
   };
   FX.puff = function (pos) {
     for (let i = 0; i < 3; i++) spawnPart(pos, 0xbfc3ca, new THREE.Vector3(U.rand(-1.5, 1.5), U.rand(0.5, 2.5), U.rand(-1.5, 1.5)), 0.35);
@@ -1862,7 +1811,7 @@
     for (const pt of FX.parts) {
       if (!pt.m.visible) continue;
       pt.t += dt;
-      pt.v.y -= 15 * dt;
+      pt.v.y -= pt.g * dt;
       pt.m.position.addScaledVector(pt.v, dt);
       if (pt.m.position.y < 0.05) { pt.m.position.y = 0.05; pt.v.y *= -0.3; pt.v.x *= 0.6; pt.v.z *= 0.6; }
       pt.m.rotation.x += dt * 6; pt.m.rotation.y += dt * 4;
@@ -1872,45 +1821,59 @@
   G.FX = FX;
 
   // ---------------------------------------------------------------- viewmodel
-  const VM = { group: null, kick: 0, flashT: 0, bobT: 0, models: {}, muzzleZ: {} };
+  // Toon-shaded guns that wear your gun skin, arms that wear your outfit, and a knife.
+  const VM = { group: null, kick: 0, flashT: 0, bobT: 0, models: {}, muzzleZ: {}, mids: [], knifeT: 0 };
+  // UVs in world units so skins tile evenly over every block of the gun
+  function boxUV(geo, w, h, d, s) {
+    const uv = geo.attributes.uv, dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+    for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) { const k = f * 4 + i; uv.setXY(k, uv.getX(k) * dims[f][0] * s + f * 0.37, uv.getY(k) * dims[f][1] * s + f * 0.21); }
+    return geo;
+  }
   function buildViewmodel() {
-    const scene = NA.R.vmScene;
-    const dark = new THREE.MeshLambertMaterial({ color: 0x2a2d33 }), mid = new THREE.MeshLambertMaterial({ color: 0x454a53 });
-    VM.midMat = mid;
-    const acc = new THREE.MeshLambertMaterial({ color: 0xe8822e }), wood = new THREE.MeshLambertMaterial({ color: 0x7a5232 });
-    const glass = new THREE.MeshLambertMaterial({ color: 0x1e3a5f });
-    const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); return o; };
+    const scene = NA.R.vmScene, toon = c => new THREE.MeshToonMaterial({ color: c, gradientMap: NA.Avatar.grad() });
+    const dark = toon(0x2a2d33), acc = toon(0xe8822e), wood = toon(0x7a5232), glass = toon(0x1e3a5f);
+    VM.factory = toon(0x454a53);
+    const mid = VM.factory;
+    const box = (w, h, d, m, x, y, z) => {
+      const o = new THREE.Mesh(boxUV(new THREE.BoxGeometry(w, h, d), w, h, d, 3.2), m);
+      o.position.set(x, y, z);
+      if (m === mid) VM.mids.push(o);
+      return o;
+    };
     const grp = (...parts) => { const g = new THREE.Group(); g.add(...parts); return g; };
     VM.models.pistol = grp(box(0.07, 0.09, 0.26, mid, 0, 0, -0.08), box(0.05, 0.05, 0.12, dark, 0, 0.01, -0.26),
       box(0.06, 0.15, 0.07, dark, 0, -0.1, 0.0), box(0.072, 0.02, 0.06, acc, 0, 0.055, -0.15));
     VM.muzzleZ.pistol = -0.34;
     VM.models.smg = grp(box(0.075, 0.1, 0.4, mid, 0, 0, -0.14), box(0.04, 0.04, 0.14, dark, 0, 0.01, -0.4),
-      box(0.05, 0.2, 0.06, dark, 0, -0.14, -0.16), box(0.06, 0.14, 0.07, dark, 0, -0.1, 0.0), box(0.03, 0.03, 0.18, dark, 0, 0.02, 0.14), box(0.03, 0.03, 0.08, acc, 0, 0.065, -0.1));
+      box(0.05, 0.2, 0.06, dark, 0, -0.14, -0.16), box(0.06, 0.14, 0.07, dark, 0, -0.1, 0.0), box(0.03, 0.03, 0.18, mid, 0, 0.02, 0.14), box(0.03, 0.03, 0.08, acc, 0, 0.065, -0.1));
     VM.muzzleZ.smg = -0.5;
     VM.models.rifle = grp(box(0.08, 0.11, 0.55, mid, 0, 0, -0.2), box(0.045, 0.045, 0.3, dark, 0, 0.02, -0.6),
-      box(0.06, 0.15, 0.08, dark, 0, -0.11, -0.02), box(0.06, 0.17, 0.07, dark, 0, -0.12, -0.25),
-      box(0.07, 0.09, 0.2, dark, 0, -0.01, 0.17), box(0.03, 0.04, 0.12, acc, 0, 0.08, -0.15));
+      box(0.06, 0.15, 0.08, dark, 0, -0.11, -0.02), box(0.06, 0.17, 0.07, mid, 0, -0.12, -0.25),
+      box(0.07, 0.09, 0.2, mid, 0, -0.01, 0.17), box(0.03, 0.04, 0.12, acc, 0, 0.08, -0.15), box(0.085, 0.03, 0.2, dark, 0, -0.065, -0.4));
     VM.muzzleZ.rifle = -0.78;
     VM.models.dmr = grp(box(0.08, 0.11, 0.62, mid, 0, 0, -0.22), box(0.04, 0.04, 0.36, dark, 0, 0.02, -0.7),
       box(0.06, 0.15, 0.08, dark, 0, -0.11, -0.02), box(0.06, 0.12, 0.07, dark, 0, -0.1, -0.28),
-      box(0.07, 0.1, 0.22, wood, 0, -0.01, 0.18), box(0.06, 0.06, 0.22, glass, 0, 0.1, -0.18));
+      box(0.07, 0.1, 0.22, mid, 0, -0.01, 0.18), box(0.06, 0.06, 0.22, glass, 0, 0.1, -0.18));
     VM.muzzleZ.dmr = -0.9;
-    VM.models.sniper = grp(box(0.08, 0.1, 0.7, wood, 0, 0, -0.22), box(0.038, 0.038, 0.5, dark, 0, 0.02, -0.82),
+    VM.models.sniper = grp(box(0.08, 0.1, 0.7, mid, 0, 0, -0.22), box(0.038, 0.038, 0.5, dark, 0, 0.02, -0.82),
       box(0.06, 0.14, 0.08, dark, 0, -0.1, -0.02), box(0.07, 0.07, 0.3, glass, 0, 0.11, -0.2), box(0.08, 0.08, 0.04, dark, 0, 0.11, -0.36),
-      box(0.07, 0.11, 0.2, wood, 0, -0.02, 0.2), box(0.02, 0.02, 0.06, acc, 0.05, 0.04, -0.05));
+      box(0.07, 0.11, 0.2, mid, 0, -0.02, 0.2), box(0.02, 0.02, 0.06, acc, 0.05, 0.04, -0.05));
     VM.muzzleZ.sniper = -1.08;
     VM.models.shotgun = grp(box(0.085, 0.1, 0.5, mid, 0, 0, -0.18), box(0.05, 0.05, 0.42, dark, 0, 0.03, -0.55),
-      box(0.06, 0.05, 0.3, wood, 0, -0.04, -0.5), box(0.06, 0.15, 0.08, dark, 0, -0.11, 0.0), box(0.07, 0.1, 0.22, wood, 0, -0.01, 0.18));
+      box(0.06, 0.05, 0.3, wood, 0, -0.04, -0.5), box(0.06, 0.15, 0.08, dark, 0, -0.11, 0.0), box(0.07, 0.1, 0.22, mid, 0, -0.01, 0.18));
     VM.muzzleZ.shotgun = -0.78;
     VM.models.lmg = grp(box(0.1, 0.13, 0.62, mid, 0, 0, -0.2), box(0.05, 0.05, 0.36, dark, 0, 0.02, -0.68),
-      box(0.12, 0.13, 0.16, acc, 0, -0.1, -0.2), box(0.06, 0.15, 0.08, dark, 0, -0.12, 0.02), box(0.08, 0.1, 0.2, dark, 0, -0.01, 0.2),
+      box(0.12, 0.13, 0.16, acc, 0, -0.1, -0.2), box(0.06, 0.15, 0.08, dark, 0, -0.12, 0.02), box(0.08, 0.1, 0.2, mid, 0, -0.01, 0.2),
       box(0.03, 0.12, 0.03, dark, 0.03, -0.1, -0.6), box(0.03, 0.12, 0.03, dark, -0.03, -0.1, -0.6));
     VM.muzzleZ.lmg = -0.88;
     VM.group = new THREE.Group();
     for (const k in VM.models) VM.group.add(VM.models[k]);
-    // a blocky forearm and hand to match the player models
-    const skinM = new THREE.MeshLambertMaterial({ color: 0xe0ac7e }), sleeve = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-    VM.group.add(box(0.11, 0.12, 0.14, skinM, 0.0, -0.12, 0.02), box(0.12, 0.13, 0.34, sleeve, 0.02, -0.15, 0.24));
+    // arms in your outfit's colours: right hand on the grip, left hand under the barrel
+    VM.handM = toon(0xe0ac7e); VM.sleeveM = toon(0x2563eb); VM.cuffM = toon(0x1d4ed8);
+    VM.group.add(box(0.11, 0.12, 0.14, VM.handM, 0.0, -0.12, 0.02), box(0.125, 0.135, 0.34, VM.sleeveM, 0.02, -0.15, 0.24));
+    VM.leftArm = grp(box(0.1, 0.11, 0.13, VM.handM, 0, 0, 0), box(0.12, 0.13, 0.4, VM.sleeveM, -0.04, -0.03, 0.24));
+    VM.leftArm.position.set(-0.02, -0.09, -0.42); VM.leftArm.rotation.set(0.3, -0.55, 0.1);
+    VM.group.add(VM.leftArm);
     VM.group.scale.setScalar(0.9);
     VM.base = new THREE.Vector3(0.25, -0.23, -0.46);
     const fc = document.createElement('canvas');
@@ -1923,18 +1886,58 @@
     VM.flash.visible = false;
     VM.group.add(VM.flash);
     scene.add(VM.group);
+    // the knife lives outside the gun group so it can slash across the screen
+    VM.knife = new THREE.Group();
+    VM.knifeMesh = new THREE.Mesh(NA.Cosmetics.knifeGeometry('combat'), NA.Avatar.toon());
+    VM.knifeMesh.scale.setScalar(1.6);
+    VM.knifeHand = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.11, 0.13), VM.handM);
+    VM.knifeHand.position.set(0, -0.005, 0.06);
+    VM.knife.add(VM.knifeMesh, VM.knifeHand, (() => { const s = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.13, 0.36), VM.sleeveM); s.position.set(0.01, -0.01, 0.28); return s; })());
+    VM.knife.visible = false;
+    scene.add(VM.knife);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.0));
-    const dl = new THREE.DirectionalLight(0xffffff, 0.6); dl.position.set(1, 2, 1); scene.add(dl);
+    const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1, 2, 1); scene.add(dl);
+    VM.dressed = '';
   }
+  // re-dress the arms and re-skin the gun whenever the locker changes something
+  function dressVM() {
+    const CS = NA.Cosmetics, key = CS.equipped('outfit') + '|' + CS.equipped('gunskin') + '|' + CS.equipped('knife');
+    if (VM.dressed === key) return;
+    VM.dressed = key;
+    const o = CS.outfit(), long = ['hoodie', 'jacket', 'suit', 'gi', 'hazmat', 'astro'].indexOf(o.top) >= 0;
+    VM.handM.color.setHex(o.gloves || o.skin);
+    VM.sleeveM.color.setHex(long ? o.shirt : o.skin);
+    const skin = CS.equipped('gunskin');
+    VM.skinMat = skin === 'factory' ? VM.factory : CS.gunMaterial(skin);
+    for (const m of VM.mids) m.material = VM.skinMat;
+    VM.knifeMesh.geometry = CS.knifeGeometry(CS.equipped('knife'));
+    const kd = CS.get('knife', CS.equipped('knife'));
+    VM.knifeMesh.material.emissive.setHex(kd.glow ? 0x0e4f5c : 0x000000);
+  }
+  G.dressVM = () => { if (VM.group) { VM.dressed = ''; dressVM(); } };
+  G._vm = VM;
   function updateVM(dt) {
     if (!VM.group) return;
     const p = G.player;
     const w = G.curW(), cls = w.cls;
+    dressVM();
+    NA.Cosmetics.tick(performance.now());
     for (const k in VM.models) VM.models[k].visible = k === cls;
+    VM.leftArm.visible = cls !== 'pistol';
     const ci = G.curInst(), mc = ci ? NA.Prog.mastery(ci.id).color : null;
-    if (VM.midMat && VM.midColor !== mc) { VM.midColor = mc; VM.midMat.color.set(mc || 0x454a53); }
+    if (VM.midColor !== mc) { VM.midColor = mc; VM.factory.color.set(mc || 0x454a53); }
     const scoped = G.ads && (w.scope || 0) >= 2.5;
-    VM.group.visible = G.state === 'playing' && !!p && p.alive && !scoped;
+    const show = G.state === 'playing' && !!p && p.alive;
+    VM.group.visible = show && !scoped;
+    // knife: a quick slash from the right
+    VM.knifeT = Math.max(0, VM.knifeT - dt);
+    const kt = VM.knifeT > 0 ? 1 - VM.knifeT / 0.38 : 0;
+    VM.knife.visible = show && VM.knifeT > 0;
+    if (VM.knife.visible) {
+      const sw = Math.sin(Math.min(1, kt * 1.6) * Math.PI);
+      VM.knife.position.set(0.32 - sw * 0.34, -0.3 + sw * 0.12, -0.42 - sw * 0.2);
+      VM.knife.rotation.set(-0.2 + sw * 0.25, 0.5 - sw * 1.1, -0.6 + sw * 0.9);
+    }
     if (!VM.group.visible) return;
     VM.kick = Math.max(0, VM.kick - dt * 7);
     const moving = Math.hypot(G.input.mx, G.input.mz) > 0.1 && p.onGround;
@@ -1942,6 +1945,7 @@
     const bob = moving ? 0.012 : 0.004;
     let dip = 0;
     if (p.reloadT > 0) dip = Math.sin((1 - p.reloadT / p.reloadTotal) * Math.PI) * 0.18;
+    if (VM.knifeT > 0) dip = Math.max(dip, Math.sin(kt * Math.PI) * 0.35);
     const adsX = G.ads ? -0.25 : 0, adsY = G.ads ? 0.1 : 0;
     VM.group.position.set(VM.base.x + adsX + Math.cos(VM.bobT) * bob, VM.base.y + adsY + Math.abs(Math.sin(VM.bobT)) * bob - dip, VM.base.z + VM.kick * 0.07);
     VM.group.rotation.x = VM.kick * 0.22 + dip * 2;
@@ -1954,6 +1958,37 @@
       VM.flash.scale.set(s, s, s);
     } else VM.flash.visible = false;
   }
+
+  // ---------------------------------------------------------------- knife
+  // Melee: 55 damage, or an instant kill from behind. Short range, needs a clear line.
+  G.knife = function () {
+    const p = G.player;
+    if (!p || !p.alive || G.state !== 'playing' || G.paused || VM.knifeT > 0 || (p.knifeCD || 0) > performance.now()) return;
+    VM.knifeT = 0.38; p.knifeCD = performance.now() + 550;
+    p.burstQ = 0; G.ads = false;
+    A.knife && A.knife();
+    const o = eye(tv1), dir = aimDir(tv2);
+    let best = null, bd = 2.4;
+    for (const b of G.bots) {
+      if (!b.alive || !G.isEnemy(p, b)) continue;
+      const dx = b.pos.x - p.pos.x, dz = b.pos.z - p.pos.z, d = Math.hypot(dx, dz);
+      if (d > bd || Math.abs(b.pos.y - p.pos.y) > 1.4) continue;
+      const dot = (dx * dir.x + dz * dir.z) / (d * Math.hypot(dir.x, dir.z) + 1e-6);
+      if (d > 0.7 && dot < 0.55) continue;
+      if (W.countWalls(o.x, o.y - 0.5, o.z, dx / d, 0, dz / d, d) > 0) continue;
+      best = b; bd = d;
+    }
+    if (!best) return;
+    setTimeout(() => {
+      if (!best.alive || !p.alive) return;
+      const fx = -Math.sin(best.yaw), fz = -Math.cos(best.yaw), tx = p.pos.x - best.pos.x, tz = p.pos.z - best.pos.z;
+      const behind = (fx * tx + fz * tz) / (Math.hypot(tx, tz) + 1e-6) < -0.35;
+      damageBot(best, behind ? 999 : 55, p, false, { knife: true, backstab: behind });
+      if (behind) NA.UI.toast(T_('BACKSTAB!'));
+      NA.Prog.track && NA.Prog.track('knifeKill', 0);
+    }, 110);
+  };
+  function T_(s) { return NA.t ? NA.t(s) : s; }
 
   // ---------------------------------------------------------------- dev hooks (used by automated tests)
   G.dev = {

@@ -3,43 +3,75 @@
   'use strict';
   const U = NA.U;
 
+  // Boot runs in small steps behind the intro so the logo animation and loading bar can paint.
+  const STEPS = [
+    ['booting FRAGLINE client', setupRenderer],
+    ['loading maps', () => NA.World.build(NA.R.scene, 'aim_map')],
+    ['teaching bots to miss', () => { NA.Game.initFX(); NA.Game.computeMods(); NA.Chat.init(); NA.UI.init(); NA.Comms.init(); }],
+    ['building the lobby', () => { NA.Showroom.init(); resize(); }],
+    ['compiling shaders', () => { const R = NA.R; R.renderer.compile(NA.Showroom.scene, NA.Showroom.camera); R.renderer.compile(R.scene, R.camera); }],
+    ['bribing the anticheat', () => {}],
+    ['ready', () => {}],
+  ];
   function boot() {
     NA.Save.load();
     NA.Audio.setVolume(NA.Save.data.settings.volume);
+    const intro = document.getElementById('intro'), bar = document.getElementById('intro-bar'), step = document.getElementById('intro-step');
+    // split the intro wordmark into letters so they can drop in one by one
+    let n = 0;
+    intro.querySelectorAll('.word span').forEach(sp => { sp.innerHTML = sp.textContent.split('').map(ch => `<i class="ch" style="animation-delay:${1.15 + (n++) * 0.035}s">${ch}</i>`).join(''); });
+    intro.querySelector('.intro-center').classList.add('shake');
+    const t0 = performance.now(), minT = /[?&]fast=1/.test(location.search) ? 0 : 2900;
+    let i = 0;
+    const next = () => {
+      if (i < STEPS.length) {
+        const [label, fn] = STEPS[i];
+        step.textContent = label;
+        try { fn(); } catch (e) { console.error('boot step failed: ' + label, e); }
+        i++;
+        bar.style.width = Math.round(i / STEPS.length * 100) + '%';
+        if (i === 4) requestAnimationFrame(loop);
+        setTimeout(next, 170);
+        return;
+      }
+      const wait = Math.max(0, minT - (performance.now() - t0));
+      setTimeout(() => {
+        intro.classList.add('out');
+        NA.UI.onIntroDone && NA.UI.onIntroDone();
+        setTimeout(() => intro.remove(), 500);
+      }, wait);
+    };
+    // let the first frame of the intro paint before doing heavy work
+    requestAnimationFrame(() => setTimeout(next, 40));
+  }
+  function setupRenderer() {
     const canvas = document.getElementById('gl');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: !U.isTouch, powerPreference: 'high-performance' });
     renderer.autoClear = false;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.05, 300);
     scene.add(camera);
-    scene.add(new THREE.HemisphereLight(0xe4edff, 0x4a4036, 0.95));
+    const hemi = new THREE.HemisphereLight(0xe4edff, 0x4a4036, 0.95);
+    scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffffff, 0.55);
     sun.position.set(0.6, 1, 0.35);
-    scene.add(sun);
+    scene.add(sun, sun.target);
     const vmScene = new THREE.Scene();
     const vmCamera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.01, 10);
-    NA.R = { renderer, scene, camera, vmScene, vmCamera };
-
-    NA.World.build(scene, 'aim_map');
-    NA.Game.initFX();
-    NA.Game.computeMods();
-    NA.Chat.init();
-    NA.UI.init();
-    NA.Comms.init();
-    resize();
+    NA.R = { renderer, scene, camera, vmScene, vmCamera, hemi, sun };
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', () => setTimeout(resize, 250));
-    requestAnimationFrame(loop);
   }
 
   function resize() {
     const R = NA.R, w = innerWidth, h = innerHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, U.isTouch ? 1.75 : 2);
+    const low = NA.Graphics.quality() === 'low', dpr = Math.min(window.devicePixelRatio || 1, U.isTouch ? (low ? 1.25 : 1.75) : (low ? 1.25 : 2));
     R.renderer.setPixelRatio(dpr);
     R.renderer.setSize(w, h, false);
     R.camera.aspect = w / h; R.camera.updateProjectionMatrix();
     R.vmCamera.aspect = w / h; R.vmCamera.updateProjectionMatrix();
-    NA.UI.resize(w, h);
+    if (NA.Showroom) NA.Showroom.resize(w, h);
+    if (NA.UI.ov) NA.UI.resize(w, h);
   }
 
   let last = performance.now(), fpsT = 0, frames = 0, hudT = 0, mmT = 0, fadeT = 0;
@@ -52,10 +84,15 @@
     const steps = G.speed > 1 ? Math.round(G.speed) : 1;
     for (let i = 0; i < steps; i++) G.update(dt, now + i * dt * 1000);
     NA.Chat.update();
-    if (G.state === 'idle') G.menuCamera(now / 1000);
+    if (NA.Decor) NA.Decor.update(dt, now / 1000, G.player && G.state === 'playing' ? G.player.pos : R.camera.position, R.camera);
+    const SR = NA.Showroom;
     R.renderer.clear();
-    R.renderer.render(R.scene, R.camera);
-    if (G.state === 'playing') { R.renderer.clearDepth(); R.renderer.render(R.vmScene, R.vmCamera); }
+    if (SR.scene && SR.wants()) { SR.update(dt); SR.render(R.renderer); }
+    else {
+      if (G.state === 'idle') G.menuCamera(now / 1000);
+      R.renderer.render(R.scene, R.camera);
+      if (G.state === 'playing') { R.renderer.clearDepth(); R.renderer.render(R.vmScene, R.vmCamera); }
+    }
     NA.UI.drawOverlay(now);
     hudT += dt; if (hudT > 0.1) { hudT = 0; NA.UI.hudTick(); }
     mmT += dt; if (mmT > 0.12) { mmT = 0; NA.UI.drawMinimap(); }

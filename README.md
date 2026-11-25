@@ -15,9 +15,20 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v0.4)
+## What's in this build (v0.5)
 
-- 3D blocky shooter (three.js): Roblox-style box players with faces, hats and walk animations; touch, mouse/keyboard and **game controllers**
+**New in v0.5: the visual update**
+- **Intro**: animated logo (shield, crosshair, slash) with a loading bar, then a title screen with a sound sting when you tap
+- **3D lobby**: your character stands on a lit stage behind the main menu (drag to spin it, tap it for the Locker); menu buttons slide and glow in
+- **New characters**: smoother blocky models with real clothes (hoodies, jackets, vests, helmets, caps, headphones…), toon shading, outlines, and proper running, jumping, aiming, hit-flinch and death animations
+- **Item Shop**: 18 outfits, 12 gun skins, 6 knives and 6 kill effects, bought with credits, in 5 rarities. Four featured items a day at 20% off
+- **Locker**: try things on and equip them. Your outfit shows on your arms in first person and your gun skin on your gun
+- **Knife**: press **V** or the knife button. 55 damage, or an instant kill from behind
+- **Better maps**: sky with a sun and clouds, sun shadows, new textures, baked shading, props, and a landmark on every map (hologram on Aim Map, forklift and trusses in the Warehouse, golden statue and clock tower in the Courtyard, cranes, sea and a cargo ship at the Shipyard, a ceiling and city windows in the Office, detailed trains in the Metro, a lighthouse and palm trees on the Island)
+- **Graphics setting** (Settings → Graphics): High has shadows, Low is faster on older phones
+
+**Everything else**
+- 3D blocky shooter (three.js); touch, mouse/keyboard and **game controllers**
 - Your aim is broken on purpose: crosshair sway, twitches, spread, recoil, panic and fumbled reloads
 - **Four difficulties** (Easy / Normal / Hard / Nightmare): harder bots, bigger payouts and more rank points
 - **9 lobby tiers** from Aim Map 1v1 to a 24-player Megalobby on big maps (Courtyard, Shipyard, Office, Metro, Island)
@@ -61,6 +72,7 @@ Tap the **FRAGLINE** logo 5 times, hold your **credits** (top right of the main 
 | R | X | R | Reload |
 | ⇄ | Y (LB/RB pick a slot) | Q, 1, 2 | Switch weapon |
 | PICK UP | B | E | Pick up a gun |
+| Knife button | | V | Knife (instant kill from behind) |
 | INS | View / Select | Insert or ` | Cheat menu |
 | Cheat menu → PANIC | D-pad up | End | All cheats off and back on |
 | CHAT | | Enter | Type in chat |
@@ -79,7 +91,12 @@ www/                 the game (plain HTML/CSS/JS, no build step)
   js/i18n.js         the cheat menu in 11 languages
   js/game.js         player, handicaps, cheats, bots, matches, effects
   js/ui.js           screens, HUD, wallhack overlay, shop, input
-  js/world.js        maps, collision, raycasts, bot pathfinding
+  js/world.js        maps, textures, collision, raycasts, bot pathfinding
+  js/decor.js        sky, lighting, shadows, map props and landmarks
+  js/avatar.js       blocky characters: one skinned mesh, toon shading, animations
+  js/cosmetics.js    outfits, gun skins, knives, kill effects, daily shop
+  js/showroom.js     the 3D lobby stage and shop thumbnails
+  js/store.js        Item Shop and Locker screens
 ios/                 Capacitor iOS wrapper (Swift Package Manager)
 .github/workflows/   the IPA build
 ```

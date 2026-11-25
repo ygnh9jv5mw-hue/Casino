@@ -95,7 +95,7 @@
     tourney: { played: 0, won: 0 },
     playMode: 'casual',
     prestige: 0,
-    cosmetics: { style: 'cross', color: 'white', owned: [] },
+    cosmetics: { style: 'cross', color: 'white', owned: [], outfit: 'recruit', gunskin: 'factory', knife: 'combat', killfx: 'default' },
     season: { id: 0, peak: 0, history: [] },
     daily: { day: '', items: [], streak: 0, lastLogin: '' },
     mastery: {},
@@ -107,7 +107,7 @@
     comms: { last: 0, msgs: {}, posts: [], rep: 0, notoriety: 0, notorietyAt: 0, unread: 0 },
     ranked: { rr: 0, peakRR: 0, offenses: 0, banUntil: 0, perma: false, ban: null, appeal: null, acVersion: [3, 0, 0], bypassDetected: false, patchReadyAt: 0,
       sinceUpdate: 0, nextUpdate: 4, alts: 0, bans: 0, appealsWon: 0, matches: 0 },
-    settings: { sens: 1, volume: 0.8, autoQueue: true, showFps: false, lang: 'en', difficulty: 'normal' },
+    settings: { sens: 1, volume: 0.8, autoQueue: true, showFps: false, lang: 'en', difficulty: 'normal', gfx: 'high' },
   });
   Save.load = () => {
     const def = Save.defaults();
@@ -204,8 +204,32 @@
   A.reload = () => { A.noiseBurst('highpass', 3000, 0.04, 0.2); A.noiseBurst('highpass', 2500, 0.05, 0.2, 0.25); };
   A.fumble = () => { A.noiseBurst('lowpass', 600, 0.12, 0.3); A.tone(300, 0.2, 'sine', 0.12, 0.05, 120); };
   A.win = () => [392, 523, 659, 784].forEach((f, i) => A.tone(f, 0.18, 'triangle', 0.12, i * 0.11));
+  A.knife = () => { A.noiseBurst('highpass', 2600, 0.12, 0.28); A.tone(700, 0.1, 'sine', 0.06, 0, 300); };
+  A.whoosh = (d) => A.noiseBurst('bandpass', 900 + Math.random() * 400, 0.18, 0.06, d || 0);
+  A.equip = () => { A.noiseBurst('highpass', 4000, 0.03, 0.18); A.noiseBurst('highpass', 3000, 0.04, 0.16, 0.08); A.tone(520, 0.05, 'square', 0.04, 0.08); };
+  // the logo sting: sub boom, a rising sweep, two glitch ticks and a bright chord
+  A.intro = () => {
+    if (!A.ctx) return;
+    A.tone(55, 1.1, 'sine', 0.55, 0, 38);
+    A.noiseBurst('lowpass', 500, 0.5, 0.35);
+    A.tone(180, 0.7, 'sawtooth', 0.05, 0.05, 900);
+    A.noiseBurst('highpass', 5000, 0.03, 0.2, 0.55); A.noiseBurst('highpass', 5000, 0.03, 0.2, 0.63);
+    [523, 659, 784, 1047].forEach((f, i) => A.tone(f, 0.9, 'triangle', 0.07, 0.72 + i * 0.015));
+    A.tone(1568, 0.6, 'sine', 0.05, 0.75);
+  };
   A.lose = () => [392, 330, 262].forEach((f, i) => A.tone(f, 0.22, 'triangle', 0.12, i * 0.14));
   NA.Audio = A;
+
+  // Graphics quality: High has sun shadows and full resolution, Low is for older phones.
+  NA.Graphics = {
+    quality: () => (NA.Save.data && NA.Save.data.settings.gfx) || 'high',
+    shadows: () => NA.Graphics.quality() === 'high',
+    set(q) {
+      NA.Save.data.settings.gfx = q; NA.Save.save();
+      if (NA.Decor && NA.R) NA.Decor.setShadows(q === 'high');
+      window.dispatchEvent(new Event('resize'));
+    },
+  };
 
   // Haptics on iOS through the Capacitor bridge when the app runs natively.
   NA.haptic = (style) => {

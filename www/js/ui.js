@@ -4,7 +4,7 @@
   const U = NA.U, D = NA.DATA, A = NA.Audio, C = NA.Chat;
   const $ = id => document.getElementById(id);
   const esc = U.esc;
-  const SCREENS = ['scr-title', 'scr-name', 'scr-menu', 'scr-play', 'scr-lobby', 'scr-results', 'scr-shop', 'scr-profile', 'scr-settings', 'scr-pause', 'scr-ranks', 'scr-comms'];
+  const SCREENS = ['scr-title', 'scr-name', 'scr-menu', 'scr-items', 'scr-play', 'scr-lobby', 'scr-results', 'scr-shop', 'scr-profile', 'scr-settings', 'scr-pause', 'scr-ranks', 'scr-comms'];
   const UI = { current: 'scr-title', hurtA: 0, hurtAng: null, hitT: -9, hitHead: false, keys: {}, cheatOpen: false, chatOpen: false, autoTimer: null };
   let G = null;
   const tv1 = new THREE.Vector3(), tv2 = new THREE.Vector3(), pv = new THREE.Vector3();
@@ -51,7 +51,21 @@
     $('m-play-sub').textContent = `Tier ${top.id}: ${top.name}`;
     $('menu-ticker').textContent = `Reports against you: ${U.num(s.stats.reports)}  ·  Action taken: 0  ·  Anticheat: Coming Soon™ (posted ${U.num(NA.Save.anticheatDays())} days ago)`;
     UI.refreshDMBadge();
+    const CSm = NA.Cosmetics, today = new Date().toDateString();
+    $('menu-user2').textContent = s.username;
+    $('menu-outfit').textContent = CSm.get('outfit', CSm.equipped('outfit')).name;
+    $('items-badge').classList.toggle('hidden', s.cosmetics.shopSeen === today);
+    const left = CSm.featured().resetsIn;
+    $('m-items-sub').textContent = `new items in ${Math.floor(left / 3600000)}h ${Math.floor(left / 60000) % 60}m`;
+    const owned = (s.cosmetics.owned || []).filter(x => /^(outfit|gunskin|knife|killfx):/.test(x)).length;
+    $('m-locker-sub').textContent = `${owned + 4} items`;
+    const fromElsewhere = UI.current !== 'scr-menu';
     UI.show('scr-menu');
+    if (fromElsewhere) {
+      const lob = document.querySelector('.lobby');
+      lob.classList.remove('enter'); void lob.offsetWidth; lob.classList.add('enter');
+      for (let i = 0; i < 4; i++) A.whoosh(0.08 + i * 0.07);
+    }
   };
   function botsLabel(t) {
     if (t.mode === 'duel') return '1v1';
@@ -444,6 +458,7 @@
     $('set-sens').value = st.sens; $('set-sens-v').textContent = (+st.sens).toFixed(2);
     $('set-vol').value = st.volume; $('set-vol-v').textContent = Math.round(st.volume * 100) + '%';
     $('set-auto').checked = !!st.autoQueue; $('set-fps').checked = !!st.showFps;
+    $('set-gfx').value = NA.Graphics.quality();
     $('set-lang').innerHTML = NA.I18N.LANGS.map(l => `<option value="${l[0]}" ${l[0] === st.lang ? 'selected' : ''}>${l[1]}</option>`).join('');
     $('set-pad').textContent = UI.padName ? 'Controller: ' + UI.padName : 'Controller: none connected (pair one in iOS Settings → Bluetooth)';
     UI.renderCrosshairPick();
@@ -647,7 +662,7 @@
     $('b-swap').classList.toggle('dim', !p.slots[p.slot === 0 ? 1 : 0]);
     const now = performance.now();
     const feed = mt.killfeed.filter(k => now - k.t < 6000).slice(-4)
-      .map(k => `<div class="kf ${k.mine ? 'mine' : ''}"><span class="${tc(k.kt)}">${esc(k.k)}</span> ${k.wb ? '<span class="hs">▦</span>' : ''}${k.head ? '<span class="hs">◎</span>' : '›'} <span class="${tc(k.vt)}">${esc(k.v)}</span></div>`).join('');
+      .map(k => `<div class="kf ${k.mine ? 'mine' : ''}"><span class="${tc(k.kt)}">${esc(k.k)}</span> ${k.wb ? '<span class="hs">▦</span>' : ''}${k.knife ? '<span class="kn">🔪</span>' : k.head ? '<span class="hs">◎</span>' : '›'} <span class="${tc(k.vt)}">${esc(k.v)}</span></div>`).join('');
     if (feed !== lastFeed) { $('killfeed').innerHTML = feed; lastFeed = feed; }
   };
 
@@ -895,6 +910,7 @@
     else if (role === 'swap') G.swapWeapon();
     else if (role === 'ads') G.toggleAds();
     else if (role === 'pick') G.pickup();
+    else if (role === 'knife') G.knife();
   }
   function initTouch() {
     const el = $('touch'), joy = $('joy'), knob = $('joy-knob'), T = {};
@@ -993,6 +1009,7 @@
       else if (k === '1') G.selectSlot(0);
       else if (k === '2') G.selectSlot(1);
       else if (k === 'e' || k === 'f') G.pickup();
+      else if (k === 'v') G.knife();
       else if (k === 'z') G.toggleAds();
       else if (e.key === 'Insert' || e.key === '`') { UI.toggleCheatMenu(); e.preventDefault(); }
       else if (e.key === 'End') { G.setPanic(!G.panic); if (UI.cheatOpen) UI.renderCheatMenu(); }
@@ -1061,10 +1078,49 @@
     if (U.isTouch) document.body.classList.add('touch');
     const click = (id, fn) => $(id).addEventListener('click', () => { A.unlock(); A.click(); fn(); });
 
+    let going = false;
     click('title-go', () => {
-      if (!NA.Save.data.username) { $('name-input').value = 'newplayer_' + U.randInt(1000, 9999); UI.show('scr-name'); }
-      else UI.showMenu();
+      if (going) return;
+      going = true;
+      A.intro();
+      NA.haptic('MEDIUM');
+      $('scr-title').classList.add('go');
+      document.querySelector('.title-v5').classList.add('go');
+      setTimeout(() => {
+        going = false;
+        $('scr-title').classList.remove('go');
+        document.querySelector('.title-v5').classList.remove('go');
+        if (!NA.Save.data.username) { $('name-input').value = 'newplayer_' + U.randInt(1000, 9999); UI.show('scr-name'); }
+        else UI.showMenu();
+      }, 620);
     });
+    // tap anywhere on the title screen
+    $('scr-title').addEventListener('click', e => { if (!e.target.closest('#title-go')) $('title-go').click(); });
+    click('m-items', () => NA.Store.open('shop'));
+    click('m-locker', () => NA.Store.open('locker'));
+    // the character in the lobby: drag to spin it, tap to open the Locker
+    const spinZone = (el, onTap) => {
+      let id = null, sx = 0, lx = 0, lt = 0, v = 0, moved = 0;
+      el.addEventListener('pointerdown', e => { id = e.pointerId; sx = lx = e.clientX; lt = performance.now(); moved = 0; v = 0; try { el.setPointerCapture(id); } catch (er) { /* old webkit */ } });
+      el.addEventListener('pointermove', e => {
+        if (e.pointerId !== id) return;
+        const dx = e.clientX - lx, now = performance.now();
+        moved += Math.abs(dx);
+        NA.Showroom.spinBy(dx * 0.012);
+        v = dx * 0.012 / Math.max(0.008, (now - lt) / 1000);
+        lx = e.clientX; lt = now;
+      });
+      const up = e => {
+        if (e.pointerId !== id) return;
+        id = null;
+        if (moved < 8 && onTap && Math.abs(e.clientX - sx) < 8) onTap();
+        else if (performance.now() - lt < 80) NA.Showroom.fling(U.clamp(v, -12, 12));
+      };
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    };
+    spinZone($('lobby-char'), () => { A.unlock(); A.click(); NA.Store.open('locker'); });
+    spinZone($('store-char'), null);
     click('name-go', () => {
       let n = $('name-input').value.trim().replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 18);
       if (n.length < 3) n = 'newplayer_' + U.randInt(1000, 9999);
@@ -1301,6 +1357,7 @@
     });
     $('cm-list').addEventListener('change', e => { if (e.target.dataset.lvl) UI.renderCheatMenu(); });
     $('set-lang').addEventListener('change', e => { NA.Save.data.settings.lang = e.target.value; NA.Save.save(); });
+    $('set-gfx').addEventListener('change', e => NA.Graphics.set(e.target.value));
     window.addEventListener('gamepadconnected', () => { pollPad(); if (UI.current === 'scr-settings') UI.showSettings(UI.settingsFrom); });
     $('chat-form').addEventListener('submit', e => { e.preventDefault(); C.playerSays($('chat-input').value); UI.closeChat(); });
     tap($('b-chat'), () => UI.openChat());

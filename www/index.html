@@ -15,6 +15,21 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body data-screen="scr-title">
+<div id="intro">
+  <div class="intro-scan"></div>
+  <div class="intro-center">
+    <div class="logo">
+      <svg class="mark" viewBox="0 0 120 140" aria-hidden="true">
+        <path class="sh" d="M60 6 L108 22 V64 C108 98 86 122 60 134 C34 122 12 98 12 64 V22 Z"/>
+        <g class="xh"><circle cx="60" cy="68" r="22"/><path d="M60 38v14M60 84v14M30 68h14M76 68h14"/><circle class="dot" cx="60" cy="68" r="3.2"/></g>
+        <path class="sl" d="M24 114 L96 24"/>
+      </svg>
+      <div class="word" data-text="NO ANTICHEAT"><span class="w1">NO</span> <span class="w2">ANTICHEAT</span></div>
+    </div>
+  </div>
+  <div class="intro-load"><div class="bar"><i id="intro-bar"></i></div><div class="step" id="intro-step">booting</div></div>
+  <div class="intro-flash"></div>
+</div>
 <canvas id="gl"></canvas>
 <canvas id="overlay"></canvas>
 
@@ -50,6 +65,7 @@
     <button class="tb" id="b-reload" data-btn="reload">R</button>
     <button class="tb" id="b-swap" data-btn="swap">&#8644;</button>
     <button class="tb" id="b-ads" data-btn="ads">ADS</button>
+    <button class="tb" id="b-knife" data-btn="knife" aria-label="Knife"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 21l7-7m0 0l2 2 9-11-11 9z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></button>
     <button class="tb hidden" id="b-pick" data-btn="pick">PICK UP</button>
   </div>
   <div id="hud-tr">
@@ -72,12 +88,19 @@
 
 <!-- ======================= SCREENS ======================= -->
 <section id="scr-title" class="screen">
-  <div class="title-wrap">
-    <h1 class="glitch" data-text="NO ANTICHEAT">NO ANTICHEAT</h1>
+  <div class="title-v5">
+    <div class="logo">
+      <svg class="mark" viewBox="0 0 120 140" aria-hidden="true">
+        <path class="sh" d="M60 6 L108 22 V64 C108 98 86 122 60 134 C34 122 12 98 12 64 V22 Z"/>
+        <g class="xh"><circle cx="60" cy="68" r="22"/><path d="M60 38v14M60 84v14M30 68h14M76 68h14"/><circle class="dot" cx="60" cy="68" r="3.2"/></g>
+        <path class="sl" d="M24 114 L96 24"/>
+      </svg>
+      <div class="word" data-text="NO ANTICHEAT"><span class="w1">NO</span> <span class="w2">ANTICHEAT</span></div>
+    </div>
     <p class="tagline">you can't aim. good thing nobody's checking.</p>
-    <button class="btn primary big" id="title-go">TAP TO START</button>
-    <p class="muted small title-ver">v0.4</p>
+    <button class="tap-start" id="title-go"><span>TAP TO START</span></button>
   </div>
+  <div class="title-foot"><span>FRAGLINE client</span><span class="title-ver">v0.5</span></div>
 </section>
 
 <section id="scr-name" class="screen hidden">
@@ -91,21 +114,45 @@
 </section>
 
 <section id="scr-menu" class="screen hidden">
-  <div class="menu">
-    <header class="topbar">
+  <div class="lobby">
+    <header class="lobby-top">
       <div class="client-logo" id="menu-logo">FRAGLINE</div>
-      <div class="who"><b id="menu-user"></b><span id="menu-rank" class="rank"></span></div>
-      <div class="credits" id="menu-credits"></div>
+      <div class="lobby-stats">
+        <div class="credits" id="menu-credits"></div>
+        <button class="icon-btn" id="m-settings" aria-label="Settings"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 000-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 00-1.7-1L15 3h-4l-.4 2.9a7.4 7.4 0 00-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 000 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 001.7 1L11 21h4l.4-2.9a7.4 7.4 0 001.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1116.5 12 3.5 3.5 0 0113 15.5z"/></svg></button>
+      </div>
     </header>
-    <div class="menu-grid">
-      <button class="tile play" id="m-play"><span class="t-big">PLAY</span><span class="t-sub" id="m-play-sub"></span></button>
-      <button class="tile shop" id="m-shop"><span class="t-big">SHOP</span><span class="t-sub">skillissue.shop</span><i class="badge hidden" id="shop-badge"></i></button>
-      <button class="tile ranks" id="m-ranks"><span class="t-big">RANKS</span><span class="t-sub" id="m-ranks-sub">ladder · dailies</span><i class="badge hidden" id="ranks-badge"></i></button>
-      <button class="tile comms" id="m-comms"><span class="t-big">COMMS</span><span class="t-sub">clips · servers</span><i class="badge hidden" id="comms-badge"></i></button>
-      <button class="tile" id="m-profile"><span class="t-big">PROFILE</span><span class="t-sub">stats &amp; achievements</span></button>
-      <button class="tile" id="m-settings"><span class="t-big">SETTINGS</span><span class="t-sub">controls &amp; sound</span></button>
+    <div class="lobby-left">
+      <div class="who"><b id="menu-user"></b><span id="menu-rank" class="rank"></span></div>
+      <button class="mbtn play" id="m-play" style="--i:0"><span class="t-big">PLAY</span><span class="t-sub" id="m-play-sub"></span><i class="play-arrow">&#9654;</i></button>
+      <div class="mgrid">
+        <button class="mbtn items" id="m-items" style="--i:1"><span class="t-big">ITEM SHOP</span><span class="t-sub" id="m-items-sub">new items daily</span><i class="badge hidden" id="items-badge">NEW</i></button>
+        <button class="mbtn locker" id="m-locker" style="--i:2"><span class="t-big">LOCKER</span><span class="t-sub" id="m-locker-sub">outfits &middot; skins</span></button>
+        <button class="mbtn shop" id="m-shop" style="--i:3"><span class="t-big">CHEATS</span><span class="t-sub">skillissue.shop</span><i class="badge hidden" id="shop-badge"></i></button>
+        <button class="mbtn ranks" id="m-ranks" style="--i:4"><span class="t-big">RANKS</span><span class="t-sub" id="m-ranks-sub">ladder &middot; dailies</span><i class="badge hidden" id="ranks-badge"></i></button>
+        <button class="mbtn comms" id="m-comms" style="--i:5"><span class="t-big">COMMS</span><span class="t-sub">clips &middot; servers</span><i class="badge hidden" id="comms-badge"></i></button>
+        <button class="mbtn prof" id="m-profile" style="--i:6"><span class="t-big">PROFILE</span><span class="t-sub">stats</span></button>
+      </div>
     </div>
+    <div class="lobby-char" id="lobby-char"><div class="nameplate"><b id="menu-user2"></b><small id="menu-outfit"></small></div><div class="char-hint">drag to spin &middot; tap for locker</div></div>
     <div class="ticker"><span id="menu-ticker"></span></div>
+  </div>
+</section>
+
+<section id="scr-items" class="screen hidden">
+  <div class="store">
+    <div class="store-char" id="store-char">
+      <div class="store-detail" id="store-detail"></div>
+    </div>
+    <div class="store-panel">
+      <header class="store-top">
+        <button class="btn ghost" id="store-back">&larr; Back</button>
+        <div class="store-title"><b id="store-title">ITEM SHOP</b><small id="store-timer"></small></div>
+        <div class="credits" id="store-credits"></div>
+      </header>
+      <div class="store-tabs" id="store-tabs"></div>
+      <div class="store-grid" id="store-grid"></div>
+    </div>
   </div>
 </section>
 
@@ -192,6 +239,7 @@
       <label>Volume <input type="range" id="set-vol" min="0" max="1" step="0.05"><span id="set-vol-v"></span></label>
       <label class="check"><input type="checkbox" id="set-auto"> Auto-Queue starts the next match (when owned)</label>
       <label class="check"><input type="checkbox" id="set-fps"> Show FPS</label>
+      <label>Graphics <select id="set-gfx"><option value="high">High (shadows)</option><option value="low">Low (faster)</option></select></label>
       <label>Cheat menu language <select id="set-lang"></select></label>
       <div class="set-x"><span>Crosshair</span><div id="set-xstyle" class="chips"></div></div>
       <div class="set-x"><span>Crosshair color</span><div id="set-xcolor" class="chips"></div></div>
@@ -305,6 +353,10 @@
 <script src="js/i18n.js"></script>
 <script src="js/core.js"></script>
 <script src="js/world.js"></script>
+<script src="js/decor.js"></script>
+<script src="js/avatar.js"></script>
+<script src="js/cosmetics.js"></script>
+<script src="js/showroom.js"></script>
 <script src="js/chat.js"></script>
 <script src="js/ranked.js"></script>
 <script src="js/progression.js"></script>
@@ -313,6 +365,7 @@
 <script src="js/comms.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/store.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
