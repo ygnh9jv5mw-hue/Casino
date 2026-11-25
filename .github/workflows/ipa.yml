@@ -13,7 +13,13 @@ permissions:
 
 jobs:
   ipa:
-    runs-on: macos-15
+    # Apple-silicon Mac runners are sometimes short on capacity, so ask for both kinds.
+    # Whichever finishes first commits the IPA; the other sees it and skips.
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -52,14 +58,18 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: NoAnticheat-unsigned-ipa
+          name: NoAnticheat-unsigned-ipa-${{ matrix.runner }}
           path: dist/NoAnticheat-unsigned.ipa
 
       - name: Commit IPA to the branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git fetch -q origin "${GITHUB_REF_NAME}"
+          if git log -1 --format=%s "origin/${GITHUB_REF_NAME}" | grep -q "${GITHUB_SHA::7}"; then
+            echo "The IPA for this commit is already published."; exit 0
+          fi
           git add -f dist/NoAnticheat-unsigned.ipa
-          git commit -m "Build unsigned IPA (run ${{ github.run_number }}) [skip ci]" || exit 0
+          git commit -m "Build unsigned IPA (run ${{ github.run_number }}, ${GITHUB_SHA::7}, ${{ matrix.runner }}) [skip ci]" || exit 0
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
