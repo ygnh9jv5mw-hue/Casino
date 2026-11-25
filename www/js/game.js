@@ -69,11 +69,15 @@
       voteRig: on('voterig') > 0,
       wallbang: wb ? { pen: [1, 2, 99][wb - 1], keep: [0.55, 0.75, 0.9][wb - 1] } : null,
       freeze: fz ? [1.2, 2.2][fz - 1] : 0,
-      payoutMult: 1 + 0.15 * NA.Save.level('affiliate'),
+      payoutMult: (1 + 0.15 * NA.Save.level('affiliate')) * (NA.Prog ? NA.Prog.payBoost() : 1),
       practiceDone: !!(s.practiceStartedAt && Date.now() - s.practiceStartedAt >= 3600e6),
     };
     if (m.practiceDone) m.swayMult *= 0.95;
     m.anyActive = TOGGLES.some(id => on(id) > 0);
+    m.adv = NA.Cfg.adv();
+    const cf = G.match && G.match.chaosFx;
+    if (cf && cf.aimbot && !m.aimbot) m.aimbot = { lvl: 3, fov: 45, speed: 360, silent: false, bone: 'head', smooth: 1, predict: true, fovCircle: true, chaos: true };
+    if (cf && cf.walls) { m.esp = Math.max(m.esp, 4); m.espOpt = Object.assign({}, m.espOpt, { box: true, health: true, name: true, skeleton: true }); }
     G.mods = m;
     const chams = m.esp >= 5 && m.espOpt.chams !== false;
     for (const b of G.bots) b.mesh.userData.chams.visible = chams && G.player && G.isEnemy(G.player, b);
@@ -153,14 +157,18 @@
     return U.lerp(1, f[2], (d - f[0]) / (f[1] - f[0]));
   }
 
+  // ---------------------------------------------------------------- chaos FFA modifiers
+  const cfx = () => (G.match && G.match.chaosFx) || {};
+  const gravMul = () => (cfx().moon ? 0.28 : 1);
+
   // ---------------------------------------------------------------- entities
   function newPlayer(tier) {
     const s = NA.Save.data;
-    const primary = s.loadout.primary && s.guns[s.loadout.primary] ? inst(s.loadout.primary) : null;
-    const secondary = inst(s.loadout.secondary && s.guns[s.loadout.secondary] ? s.loadout.secondary : 'p9');
+    const primary = !tier.lootMode && s.loadout.primary && s.guns[s.loadout.primary] ? inst(s.loadout.primary) : null;
+    const secondary = inst(!tier.lootMode && s.loadout.secondary && s.guns[s.loadout.secondary] ? s.loadout.secondary : 'p9');
     return {
       name: s.username, team: 'A', isPlayer: true, pos: new THREE.Vector3(), vy: 0, onGround: true,
-      yaw: 0, pitch: 0, hp: 100, maxHp: 100, shield: tier.shield || 0, maxShield: tier.shield ? 100 : 0, alive: true, respawnT: 0, lastHurtT: -99, lastKillT: -99,
+      yaw: 0, pitch: 0, hp: 100, maxHp: 100, shield: tier.shield || 0, maxShield: tier.shield || tier.lootMode ? 100 : 0, alive: true, respawnT: 0, lastHurtT: -99, lastKillT: -99,
       kills: 0, deaths: 0, headshots: 0, shotsFired: 0, shotsHit: 0, streak: 0, vel: new THREE.Vector3(),
       slots: [primary, secondary], slot: primary ? 0 : 1, loadout: [primary && primary.id, secondary.id],
       reloadT: 0, reloadTotal: 1, fireCD: 0, burstQ: 0, burstT: 0, bloom: 0, recP: 0, recY: 0, offYaw: 0, offPitch: 0,
@@ -183,35 +191,102 @@
   const chamsMat = () => matCache.chams || (matCache.chams = new THREE.MeshBasicMaterial({ color: 0xff2a6d, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false }));
   const iceMat = () => matCache.ice || (matCache.ice = new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.55, depthWrite: false }));
   const GUN_LEN = { pistol: 0.32, smg: 0.5, rifle: 0.7, dmr: 0.85, sniper: 1.05, shotgun: 0.75, lmg: 0.9 };
+  // ---------------------------------------------------------------- blocky player models
+  // Roblox-style: box head with a drawn face, box torso, swinging arms and legs, the odd hat.
+  const SKINS = [0xf1c9a5, 0xe0ac7e, 0xc68642, 0x8d5524, 0xffdbac, 0xf5d0b0];
+  const PANTS = [0x1f2937, 0x374151, 0x1e3a5f, 0x3f2a1d, 0x14532d, 0x111827, 0x4b5563];
+  const HATS = [0xef4444, 0x111827, 0xf59e0b, 0x10b981, 0x6366f1, 0xf8fafc, 0xec4899];
+  const faceCache = [];
+  function faceTex(kind) {
+    if (faceCache[kind]) return faceCache[kind];
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g2 = c.getContext('2d');
+    g2.fillStyle = '#1b1b1f'; g2.strokeStyle = '#1b1b1f'; g2.lineWidth = 4; g2.lineCap = 'round';
+    const eyes = (h) => { g2.fillRect(18, 22, 7, h); g2.fillRect(39, 22, 7, h); };
+    if (kind === 3) { g2.fillRect(12, 20, 40, 10); g2.fillRect(30, 20, 4, 4); }       // shades
+    else if (kind === 2) { eyes(9); g2.beginPath(); g2.moveTo(14, 16); g2.lineTo(27, 21); g2.moveTo(50, 16); g2.lineTo(37, 21); g2.stroke(); } // angry
+    else eyes(kind === 4 ? 12 : 9);
+    g2.beginPath();
+    if (kind === 0 || kind === 3) g2.arc(32, 36, 11, 0.15 * Math.PI, 0.85 * Math.PI);                 // smile
+    else if (kind === 1) { g2.moveTo(22, 46); g2.quadraticCurveTo(36, 50, 44, 41); }                 // smirk
+    else if (kind === 2) { g2.moveTo(22, 48); g2.quadraticCurveTo(32, 42, 42, 48); }                 // frown
+    else if (kind === 4) g2.arc(32, 46, 4, 0, Math.PI * 2);                                         // surprised
+    else { g2.moveTo(23, 46); g2.lineTo(41, 46); }                                                   // bored
+    g2.stroke();
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    faceCache[kind] = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+    return faceCache[kind];
+  }
   function makeBotMesh(color, cls) {
-    if (!geo) {
-      geo = {
-        body: new THREE.CapsuleGeometry(0.34, 0.8, 4, 10), head: new THREE.SphereGeometry(0.22, 14, 10),
-        visor: new THREE.BoxGeometry(0.32, 0.09, 0.1), gun: new THREE.BoxGeometry(0.08, 0.09, 1),
-        iceBody: new THREE.CapsuleGeometry(0.42, 0.9, 4, 8), iceHead: new THREE.SphereGeometry(0.3, 10, 8),
-      };
-    }
+    if (!geo) geo = { box: new THREE.BoxGeometry(1, 1, 1), face: new THREE.PlaneGeometry(0.4, 0.4) };
+    const box = (m, w, h, d, x, y, z) => { const o = new THREE.Mesh(geo.box, m); o.scale.set(w, h, d); o.position.set(x, y, z); return o; };
+    const pivot = (x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); return p; };
     const g = new THREE.Group();
     g.rotation.order = 'YXZ';
-    const body = new THREE.Mesh(geo.body, mat(color)); body.position.y = 0.76;
-    const head = new THREE.Mesh(geo.head, mat(0xf1c9a5)); head.position.y = 1.62;
-    const visor = new THREE.Mesh(geo.visor, mat(0x15171c)); visor.position.set(0, 1.66, -0.17);
+    const skin = mat(U.pick(SKINS)), shirt = mat(color), pants = mat(U.pick(PANTS)), dark = mat(0x24262b);
+    const legL = pivot(-0.125, 0.8, 0), legR = pivot(0.125, 0.8, 0);
+    legL.add(box(pants, 0.24, 0.8, 0.26, 0, -0.4, 0)); legR.add(box(pants, 0.24, 0.8, 0.26, 0, -0.4, 0));
+    const torso = box(shirt, 0.52, 0.64, 0.28, 0, 1.12, 0);
+    const armL = pivot(-0.38, 1.42, 0), armR = pivot(0.38, 1.42, 0);
+    armL.rotation.order = armR.rotation.order = 'ZXY';
+    armL.add(box(shirt, 0.22, 0.26, 0.25, 0, -0.12, 0), box(skin, 0.21, 0.4, 0.23, 0, -0.44, 0));
+    armR.add(box(shirt, 0.22, 0.26, 0.25, 0, -0.12, 0), box(skin, 0.21, 0.4, 0.23, 0, -0.44, 0));
     const len = GUN_LEN[cls] || 0.55;
-    const gun = new THREE.Mesh(geo.gun, mat(0x24262b)); gun.scale.z = len; gun.position.set(0.24, 1.15, -0.1 - len / 2);
+    const gun = box(dark, 0.09, len, 0.11, 0, -0.62 - len / 2 + 0.12, -0.08); // runs down the arm, so it points forward when the arm is raised
+    armR.add(gun);
+    gun.name = 'gun';
+    const head = new THREE.Group();
+    head.position.y = 1.66;
+    head.add(box(skin, 0.44, 0.44, 0.44, 0, 0, 0));
+    const face = new THREE.Mesh(geo.face, faceTex(U.randInt(0, 5)));
+    face.position.z = -0.222; face.rotation.y = Math.PI;
+    head.add(face);
+    const detail = [face];
+    if (Math.random() < 0.45) {
+      const hm = mat(U.pick(HATS));
+      const parts = Math.random() < 0.5 ? [box(hm, 0.47, 0.13, 0.47, 0, 0.28, 0), box(hm, 0.36, 0.04, 0.2, 0, 0.23, -0.3)] : [box(hm, 0.47, 0.2, 0.47, 0, 0.27, 0)]; // cap or beanie
+      head.add(...parts);
+      detail.push(...parts);
+    }
     const chams = new THREE.Group();
-    const cb = new THREE.Mesh(geo.body, chamsMat()); cb.position.y = 0.76; cb.renderOrder = 10;
-    const ch = new THREE.Mesh(geo.head, chamsMat()); ch.position.y = 1.62; ch.renderOrder = 10;
-    chams.add(cb, ch);
+    const cm = chamsMat();
+    for (const o of [box(cm, 0.54, 1.44, 0.3, 0, 0.72, 0), box(cm, 0.46, 0.46, 0.46, 0, 1.66, 0), box(cm, 0.24, 0.66, 0.26, -0.38, 1.12, 0), box(cm, 0.24, 0.66, 0.26, 0.38, 1.12, 0)]) { o.renderOrder = 10; chams.add(o); }
     chams.visible = false;
     const ice = new THREE.Group();
-    const ib = new THREE.Mesh(geo.iceBody, iceMat()); ib.position.y = 0.78;
-    const ih = new THREE.Mesh(geo.iceHead, iceMat()); ih.position.y = 1.62;
-    ice.add(ib, ih); ice.visible = false;
-    g.add(body, head, visor, gun, chams, ice);
-    g.userData.chams = chams;
-    g.userData.ice = ice;
+    ice.add(box(iceMat(), 1.05, 1.5, 0.6, 0, 0.76, 0), box(iceMat(), 0.58, 0.58, 0.58, 0, 1.66, 0));
+    ice.visible = false;
+    g.add(legL, legR, torso, armL, armR, head, chams, ice);
+    Object.assign(g.userData, { chams, ice, legL, legR, armL, armR, head, gun, detail, near: true, aimK: 0 });
     return g;
   }
+  // Walk cycle and aiming pose, driven by how fast the bot actually moved this frame.
+  function animateBot(b, dt) {
+    const ud = b.mesh.userData, sp = Math.hypot(b.vel.x, b.vel.z);
+    // far away: skip drawing the face and hat (saves draw calls in 32-player lobbies)
+    const near = b.pos.distanceToSquared(NA.R.camera.position) < 1600;
+    if (near !== ud.near) { ud.near = near; for (const o of ud.detail) o.visible = near; }
+    b.walkPh = (b.walkPh || 0) + dt * sp * 2.8;
+    const sw = Math.sin(b.walkPh) * Math.min(1, sp / 3) * 0.75;
+    ud.legL.rotation.x = sw; ud.legR.rotation.x = -sw;
+    ud.aimK = U.lerp(ud.aimK, b.canSee && b.target ? 1 : 0, Math.min(1, dt * 8));
+    const k = ud.aimK;
+    ud.armR.rotation.x = U.lerp(0.55 - sw * 0.3, Math.PI / 2, k);
+    ud.armL.rotation.x = U.lerp(-sw * 0.8, Math.PI / 2 - 0.12, k);
+    ud.armL.rotation.z = -0.55 * k;
+    ud.head.rotation.x = b.target && b.canSee ? -0.08 : 0;
+    const big = cfx().bigheads ? 2.3 : 1;
+    if (ud.head.scale.x !== big) { ud.head.scale.setScalar(big); ud.head.position.y = big > 1 ? 1.95 : 1.66; }
+    if (G.match && G.match.tier.chaos && G.aimTarget === b) {
+      // your aimbot locked on: they dance
+      b.danceT = (b.danceT || 0) + dt * 9;
+      ud.armL.rotation.x = ud.armR.rotation.x = Math.PI * 0.9 + Math.sin(b.danceT) * 0.4;
+      ud.armL.rotation.z = Math.sin(b.danceT) * 0.5;
+      b.mesh.rotation.y += Math.sin(b.danceT * 0.5) * 0.6;
+    }
+  }
+
   function genName(used) {
     const leet = s => s.replace(/[aeios]/g, c => (Math.random() < 0.35 ? { a: '4', e: '3', i: '1', o: '0', s: '5' }[c] : c));
     const cap = s => s[0].toUpperCase() + s.slice(1);
@@ -247,16 +322,18 @@
     }
     return 'player' + U.randInt(1000, 99999);
   }
+  G.genName = genName;
   function rankIndex(rank) { const i = D.RANKS.indexOf(String(rank).split(' ')[0]); return i < 0 ? D.RANKS.length - 1 : i; }
+  G.diff = () => D.DIFFICULTY.find(x => x.id === NA.Save.data.settings.difficulty) || D.DIFFICULTY[1];
   function botSkill(name, tier) {
-    let s = tier.bot.skill + U.rand(-0.06, 0.06) + (G.ranked ? D.RANKED.skillBonus : 0);
+    let s = tier.bot.skill + U.rand(-0.06, 0.06) + (G.ranked ? D.RANKED.skillBonus : 0) + G.match0.diff.skill + (G.match0.skillAdd || 0);
     const adj = D.BOT_SKILL[name];
     if (adj) s += adj[tier.id] !== undefined ? adj[tier.id] : (adj['*'] || 0);
     return U.clamp(s, 0.05, 0.99);
   }
   let ffaIdx = 0;
   function addBot(name, team, tier) {
-    const wid = name === 'BOT_Kevin' && tier.id <= 2 ? 'p9' : U.pick(tier.bot.weapons);
+    const wid = tier.lootMode || (name === 'BOT_Kevin' && tier.id <= 2) ? 'p9' : U.pick(tier.bot.weapons);
     const w = D.WEAPONS[wid];
     const color = team === 'A' ? 0x3b82f6 : team === 'B' ? 0xe5484d : FFA_COLORS[ffaIdx++ % FFA_COLORS.length];
     const mesh = makeBotMesh(color, w.cls);
@@ -265,8 +342,8 @@
     const b = {
       name, team, color, isPlayer: false, story: !!D.CHARACTERS[name],
       pos: new THREE.Vector3(), vy: 0, onGround: true, yaw: 0, hp: tier.bot.hp, maxHp: tier.bot.hp,
-      shield: tier.shield || 0, maxShield: tier.shield ? 100 : 0, alive: true,
-      stats: tier.bot, skill: botSkill(name, tier), weapon: wid, ammo: w.mag, reloadT: 0, burstLeft: 0, queue: 0, queueT: 0,
+      shield: (tier.shield || 0) + G.match0.diff.shield, maxShield: tier.shield || tier.lootMode || G.match0.diff.shield ? 100 : 0, alive: true,
+      stats: tier.bot, react: tier.bot.react * G.match0.diff.react, rateMul: tier.bot.rateMul * G.match0.diff.rate, skill: botSkill(name, tier), weapon: wid, ammo: w.mag, reloadT: 0, burstLeft: 0, queue: 0, queueT: 0,
       platform: name === 'BOT_Kevin' ? 'TRAINING' : name === 'mom_plays_too' ? 'TABLET' : U.pick(D.PLATFORMS),
       rank: D.RANKS[ri] + ' ' + ['I', 'II', 'III', 'IV', 'V'][U.randInt(0, 4)],
       mesh, target: null, canSee: false, perceptT: Math.random() * 0.2, reactT: 0, fireCD: 0, err: 10, errYaw: 0, errPitch: 0,
@@ -306,7 +383,7 @@
   }
   function placeAt(ent, s) {
     ent.pos.set(s[0] + U.rand(-0.4, 0.4), 0, s[1] + U.rand(-0.4, 0.4));
-    W.collide(ent.pos, PR, PH, 'x'); W.collide(ent.pos, PR, PH, 'z');
+    W.collide(ent.pos, PR, PH);
     ent.pos.y = Math.max(0, W.groundAt(ent.pos.x, ent.pos.z, 0.3, 10));
     ent.vy = 0;
     ent.yaw = Math.atan2(ent.pos.x, ent.pos.z);
@@ -323,7 +400,8 @@
   }
   function respawnBot(b) {
     placeAt(b, pickSpawn(b));
-    b.hp = b.maxHp; b.shield = G.match.tier.shield || 0; b.alive = true; b.target = null; b.canSee = false; b.path = null; b.deathT = 0;
+    b.hp = b.maxHp; b.shield = (G.match.tier.shield || 0) + G.match.diff.shield; b.alive = true; b.target = null; b.canSee = false; b.path = null; b.deathT = 0;
+    if (G.match.tier.lootMode) setBotWeapon(b, 'p9', 0);
     b.ammo = D.WEAPONS[b.weapon].mag; b.reloadT = 0; b.frozenT = 0; b.retreatT = 0; b.queue = 0;
     b.prevPos.copy(b.pos); b.vel.set(0, 0, 0);
     b.mesh.visible = true; b.mesh.rotation.x = 0; b.mesh.userData.ice.visible = false;
@@ -365,6 +443,8 @@
     ffaIdx = 0;
     G.panic = false;
     G.ads = false;
+    const promo = G.ranked && !!NA.Save.data.ranked.promo;
+    G.match0 = { diff: G.diff(), skillAdd: (opts.skillAdd || 0) + NA.Prog.skillBoost() + (G.ranked ? NA.Prog.myRank().idx * 0.012 : 0) + (promo ? 0.06 : 0) };
     G.player = newPlayer(tier);
     G.player.team = tier.mode === 'ffa' ? 'P' : 'A';
     const used = new Set([NA.Save.data.username]);
@@ -380,8 +460,14 @@
       reportT: 0, reports: 0, ambientT: U.rand(6, 10), multiExtra: 0, liveCredits: 0, firstSeen: {}, rapidShots: 0,
       killfeed: [], visT: 0, momNice: 0, startTime: 0, ended: false, vote: null, voteCD: 40, pendingLeave: [], backfill: [],
       ragequits: 0, used, sndT: 0, snd: 0,
-      det: 0, detPeak: 0, detMult: 1, flagged: false, warned: false,
+      det: 0, detPeak: 0, detMult: 1, flagged: false, warned: false, diff: G.match0.diff,
+      promo, cheater: null, reportQueue: [], reportRewards: 0, usedAimbot: false, chaosFx: null,
     };
+    rollCheater();
+    // people who saw your clips in Comms already think you're cheating
+    const noto = NA.Comms ? NA.Comms.notoriety() : 0;
+    if (noto && !tier.chaos) { G.match.sus = Math.min(60, G.match.sus + noto * 0.3); if (G.ranked && !G.legit) G.match.det = Math.min(60, G.match.det + noto * 0.1); }
+    if (tier.chaos && NA.Events) NA.Events.startChaos(G.match);
     if (G.ranked) {
       G.match.detMult = NA.Ranked.matchMult(G.loader);
       if (!G.legit && G.loader <= 1) G.match.det = G.loader === 0 ? 45 : 25;
@@ -399,6 +485,7 @@
     const shown = G.bots.slice(0, 6);
     shown.forEach((b, i) => C.post('SYSTEM', `${b.name} joined the lobby`, 'system', { delay: i * 200 }));
     if (G.bots.length > shown.length) C.system(`…and ${G.bots.length - shown.length} more joined`);
+    if (promo) C.system(`PROMOTION MATCH: win to reach ${NA.Prog.RANKS[NA.Prog.myRank().idx + 1]}. The lobby is tougher.`, { priority: true });
     if (G.ranked) {
       C.system(`RANKED · protected by ${D.RANKED.ac} v${NA.Ranked.version()} (kernel mode)`);
       if (G.legit) C.system('Playing legit: cheats are unloaded for this match.');
@@ -428,7 +515,7 @@
     if (!G.match || G.state === 'results') return;
     const t = G.match.tier, p = G.player, s = NA.Save.data;
     if (G.state === 'playing') {
-      const pay = Math.round(p.kills * t.kill * G.mods.payoutMult);
+      const pay = Math.round(p.kills * t.kill * G.mods.payoutMult * G.match.diff.pay * (G.ranked ? D.RANKED.payMult : 1)) + (G.match.reportRewards || 0);
       s.credits += pay; s.lifetimeCredits += pay;
       s.stats.matches++; s.stats.kills += p.kills; s.stats.deaths += p.deaths;
       s.stats.shotsFired += p.shotsFired; s.stats.shotsHit += p.shotsHit; s.stats.headshots += p.headshots;
@@ -437,13 +524,14 @@
     G.tourney = null;
     // leaving a ranked match counts as a loss, and Warden still reviews what it saw
     if (G.ranked && G.state === 'playing') {
-      const out = NA.Ranked.afterMatch(false, G.match.detPeak, false);
+      const out = NA.Ranked.afterMatch(false, G.match.detPeak, false, { diff: G.match.diff, promo: G.match.promo, mvp: false });
       if (out.wave) NA.UI.toast('Ban wave: ' + out.wave.label);
     }
     G.toIdle();
     NA.UI.showMenu();
   };
   G.toIdle = function () {
+    if (NA.Events) NA.Events.stop();
     G.state = 'idle';
     G.paused = false;
     G.input.fire = false;
@@ -467,12 +555,16 @@
     const mult = G.mods.payoutMult;
     if (mult > 1) lines.push([`Affiliate ×${mult.toFixed(2)}`, Math.round(sub * (mult - 1))]);
     let total = Math.round(sub * mult);
+    if (G.match.reportRewards) { lines.push(['Report bounties', G.match.reportRewards]); total += G.match.reportRewards; }
+    const df = G.match.diff;
+    if (df.pay !== 1) { lines.push([`${df.name} difficulty ×${df.pay}`, Math.round(total * df.pay) - total]); total = Math.round(total * df.pay); }
     if (G.ranked) { lines.push([`Ranked ×${D.RANKED.payMult}`, Math.round(total * (D.RANKED.payMult - 1))]); total = Math.round(total * D.RANKED.payMult); }
     return { lines, total };
   }
 
   function endMatch(won, kicked) {
     if (G.state !== 'playing') return;
+    if (G.match.tier.chaos && NA.Events) NA.Events.stop();
     G.state = 'results';
     G.input.fire = false;
     G.ads = false;
@@ -487,8 +579,21 @@
     st.shotsFired += p.shotsFired; st.shotsHit += p.shotsHit;
     st.accHistory.push(acc); if (st.accHistory.length > 60) st.accHistory.shift();
     let unlocked = null, comingSoon = false, tourney = null, ranked = null;
+    const board = G.entities().slice().sort((a, b) => b.kills - a.kills);
+    const mvp = board[0] === p;
+    if (won && !kicked) {
+      const P = NA.Prog;
+      P.track('win');
+      if (G.ranked) P.track('rankedWin');
+      if (mt.diff.id === 'hard' || mt.diff.id === 'nightmare') P.track('hardWin');
+      if (!mt.usedAimbot) P.track('noAimbotWin');
+      if (mt.susPeak < 50) P.track('lowSusWin');
+      if (p.deaths === 0) P.track('flawless');
+    }
+    if (t.lootMode) NA.Prog.track('lootRush');
+    if (NA.Comms) NA.Comms.afterMatch(mt);
     if (G.ranked) {
-      ranked = NA.Ranked.afterMatch(won, mt.detPeak, kicked === 'ban');
+      ranked = NA.Ranked.afterMatch(won, mt.detPeak, kicked === 'ban', { diff: mt.diff, promo: mt.promo, mvp });
       ranked.peak = Math.round(mt.detPeak);
       ranked.legit = G.legit;
       if (kicked === 'ban') ranked.ban = NA.Save.data.ranked.ban;
@@ -500,7 +605,7 @@
         if (G.tourney.round >= 3) { s.tourney.won++; G.achieve('champion', 'FRAGLINE Open Champion'); tourney = { champion: true }; G.tourney = null; }
         else tourney = { next: G.tourney.round, label: D.TOURNAMENT.rounds[G.tourney.round].label };
       } else { tourney = { out: true }; G.tourney = null; }
-    } else if (won && kicked !== 'ban') {
+    } else if (won && kicked !== 'ban' && t.id <= D.MAX_PLAYABLE_TIER) {
       s.winsByTier[t.id] = (s.winsByTier[t.id] || 0) + 1;
       if (s.winsByTier[t.id] >= t.winsToUnlock && s.highestTier <= t.id) {
         if (t.id < D.MAX_PLAYABLE_TIER) {
@@ -539,7 +644,7 @@
     const m = G.mods, rows = G.entities().map(e => {
       let k = e.kills, d = e.deaths, spoof = false;
       if (e.isPlayer && m.kdSpoof) { k = Math.max(1, Math.round(e.kills * 0.45)); d = e.deaths + Math.round(e.kills * 0.4); spoof = true; }
-      return { name: e.name, team: e.team, k, d, me: !!e.isPlayer, spoof };
+      return { name: e.name, team: e.team, k, d, me: !!e.isPlayer, spoof, ally: !e.isPlayer && G.isAlly(e) };
     });
     rows.sort((a, b) => b.k - a.k);
     return rows;
@@ -565,7 +670,7 @@
   // ---------------------------------------------------------------- suspicion
   G.addSus = function (amt) {
     const mt = G.match;
-    if (!mt || G.state !== 'playing') return;
+    if (!mt || G.state !== 'playing' || mt.tier.chaos) return;
     if (amt > 0 && G.mods.kdSpoof) amt *= 0.8;
     if (amt > 0 && G.mods.streamProof) amt *= 0.7;
     mt.sus = U.clamp(mt.sus + amt, 0, 100);
@@ -617,11 +722,19 @@
     if (mt.tier.mode === 'tdm' && (killer.team === 'A' || killer.team === 'B')) mt.score[killer.team]++;
     mt.killfeed.push({ k: killer.name, v: victim.name, head, wb: !!(info && info.walls), mine: killer === p, me: victim === p, t: now, kt: killer.team, vt: victim.team });
     if (mt.killfeed.length > 6) mt.killfeed.shift();
+    if (victim.cheat) victim.cheat.deathRun++;
+    if (killer.cheat) killer.cheat.deathRun = 0;
+    if (victim === p) G.lastKiller = killer;
     if (killer === p) {
       const t = mt.tier;
       p.streak++;
       if (head) p.headshots++;
       victim.killedByMe++;
+      NA.Prog.track('kill');
+      if (head) NA.Prog.track('headshot');
+      if (info && info.walls) NA.Prog.track('wallbankKill'.replace('bank', 'bang'));
+      const ci = G.curInst();
+      if (ci) NA.Prog.addMasteryKill(ci.id);
       mt.liveCredits += t.kill * (head ? 1.5 : 1);
       let susGain = 1 + (head ? 1 : 0);
       if (now - p.lastKillT < 2000) {
@@ -630,7 +743,8 @@
       }
       p.lastKillT = now;
       const turned = G.turnLog.reduce((a, e) => a + (now - e.t < 150 ? e.deg : 0), 0);
-      if (turned > 60) { susGain += 4; firstSeen('aimbot'); G.addDet(7); }
+      const hz = G.mods.adv;
+      if (turned > 60 + hz.humanizer * 6 + (hz.curve === 'human' ? 25 : hz.curve === 'smooth' ? 12 : 0)) { susGain += 4; firstSeen('aimbot'); G.addDet(7); }
       if (info && info.silentDev > 8) { susGain += 3; firstSeen('silent'); G.addDet(4); }
       if (info && info.walls) { susGain += 3; firstSeen('wallbang'); G.addDet(8); }
       if (head && p.streak >= 3) G.addDet(1.5);
@@ -662,6 +776,7 @@
   }
 
   function applyDamage(ent, dmg) {
+    if (cfx().oneshot) dmg *= 4;
     if (ent.shield > 0) {
       const s = Math.min(ent.shield, dmg);
       ent.shield -= s; dmg -= s;
@@ -687,11 +802,12 @@
     }
     if (b.hp <= 0) {
       b.alive = false; b.hp = 0; b.shield = 0; b.respawnT = 3; b.deathT = 0; b.frozenT = 0; b.mesh.userData.ice.visible = false;
-      FX.burst(b.pos, b.color);
+      FX.burst(b.pos, b.color, G.match.tier.chaos);
+      dropGun(b);
       registerKill(attacker, b, head, info);
     }
   }
-  function damagePlayer(dmg, attacker) {
+  function damagePlayer(dmg, attacker, info) {
     const p = G.player;
     if (!p.alive || G.god) return;
     applyDamage(p, dmg);
@@ -702,15 +818,17 @@
       p.hp = 0; p.alive = false; p.respawnT = 2.5;
       p.reloadT = 0;
       G.ads = false;
-      registerKill(attacker, p, false);
+      dropGun(p);
+      registerKill(attacker, p, false, info);
     }
   }
-  function damageEnt(e, dmg, attacker, head, info) { if (e.isPlayer) damagePlayer(dmg, attacker); else damageBot(e, dmg, attacker, head, info); }
+  function damageEnt(e, dmg, attacker, head, info) { if (e.isPlayer) damagePlayer(dmg, attacker, info); else damageBot(e, dmg, attacker, head, info); }
 
   // ---------------------------------------------------------------- hits
   const hitBox = { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 };
   function hitEntity(e, o, dir, maxT) {
-    const th = U.raySphere(o.x, o.y, o.z, dir.x, dir.y, dir.z, e.pos.x, e.pos.y + 1.62, e.pos.z, 0.25);
+    const big = cfx().bigheads && !e.isPlayer;
+    const th = U.raySphere(o.x, o.y, o.z, dir.x, dir.y, dir.z, e.pos.x, e.pos.y + (big ? 1.95 : 1.62), e.pos.z, big ? 0.55 : 0.25);
     hitBox.minX = e.pos.x - 0.36; hitBox.maxX = e.pos.x + 0.36; hitBox.minY = e.pos.y + 0.02; hitBox.maxY = e.pos.y + 1.45;
     hitBox.minZ = e.pos.z - 0.36; hitBox.maxZ = e.pos.z + 0.36;
     const tb = U.rayBox(o.x, o.y, o.z, dir.x, dir.y, dir.z, hitBox, maxT);
@@ -764,19 +882,18 @@
     inp.lookDX = inp.lookDY = 0;
     aimHelpers(dt, now);
 
-    const speed = WALK * m.speedMult * (G.ads ? 0.6 : 1);
+    const speed = WALK * m.speedMult * (G.ads ? 0.6 : 1) * (cfx().speed ? 1.6 : 1);
     const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
     let mvx = fx * inp.mz + rx * inp.mx, mvz = fz * inp.mz + rz * inp.mx;
     const len = Math.hypot(mvx, mvz);
     if (len > 1) { mvx /= len; mvz /= len; }
     const ox = p.pos.x, oz = p.pos.z;
-    p.pos.x += mvx * speed * dt; W.collide(p.pos, PR, PH, 'x');
-    p.pos.z += mvz * speed * dt; W.collide(p.pos, PR, PH, 'z');
+    W.move(p.pos, mvx * speed * dt, mvz * speed * dt, PR, PH);
     if (dt > 0) p.vel.set((p.pos.x - ox) / dt, 0, (p.pos.z - oz) / dt);
-    if (inp.jump && p.onGround) { p.vy = JUMP_V; p.onGround = false; }
+    if (inp.jump && p.onGround) { p.vy = JUMP_V * (cfx().moon ? 1.25 : 1); p.onGround = false; }
     inp.jump = false;
     const yPrev = p.pos.y;
-    p.vy -= GRAV * dt;
+    p.vy -= GRAV * gravMul() * dt;
     p.pos.y += p.vy * dt;
     const g = W.groundAt(p.pos.x, p.pos.z, PR * 0.7, yPrev);
     if (p.pos.y <= g) { p.pos.y = g; p.vy = 0; p.onGround = true; } else p.onGround = false;
@@ -835,10 +952,11 @@
     return W.countWalls(e.x, e.y, e.z, dx / d, dy / d, dz / d, d) <= wb.pen;
   }
   // Best enemy inside a cone around the current aim point.
-  function findTarget(limitDeg, bonePick, predict, now) {
+  function findTarget(limitDeg, bonePick, predict, now, adv) {
     const p = G.player, e = eye(tv1);
     const aYaw = p.yaw + p.offYaw, aPitch = p.pitch + p.offPitch;
-    let best = null;
+    const prio = adv ? adv.priority : 'crosshair', vis = adv ? adv.visCheck !== false : true;
+    let best = null, bestScore = Infinity;
     for (const b of G.bots) {
       if (!b.alive || !G.isEnemy(p, b)) continue;
       const bone = bonePick(b);
@@ -848,30 +966,55 @@
       if (dist > 130) continue;
       const ty = Math.atan2(-dx, -dz), tp = Math.asin(dy / dist);
       const ang = Math.hypot(U.wrap(ty - aYaw), tp - aPitch) / DEG;
-      if (ang > limitDeg || (best && ang >= best.ang)) continue;
-      if (!canHitThrough(e, pt.x, pt.y, pt.z)) continue;
+      if (ang > limitDeg) continue;
+      const score = prio === 'closest' ? dist : prio === 'lowhp' ? b.hp + b.shield + ang * 0.01 : ang;
+      if (score >= bestScore) continue;
+      if (vis && !canHitThrough(e, pt.x, pt.y, pt.z)) continue;
+      bestScore = score;
       best = { b, ang, yaw: ty, pitch: tp, bone, x: pt.x, y: pt.y, z: pt.z, dist };
     }
     return best;
   }
   function aimHelpers(dt, now) {
     const p = G.player, m = G.mods, ab = m.aimbot;
+    if (ab && G.match) G.match.usedAimbot = true;
     G.aimLock = false; G.aimTarget = null; G.silentTarget = null;
     while (G.turnLog.length && now - G.turnLog[0].t > 300) G.turnLog.shift();
+    const adv = m.adv;
+    // aim key: only aim while firing / while scoped
+    const keyOk = !ab || adv.aimKey === 'always' || (adv.aimKey === 'firing' && G.input.fire) || (adv.aimKey === 'ads' && G.ads);
+    // reaction delay: wait before locking onto a new target
+    const reacted = tgt => {
+      if (!tgt) { G.abTgt = null; return false; }
+      if (G.abTgt !== tgt.b) { G.abTgt = tgt.b; G.abSince = now; G.abMiss = Math.random() * 100 >= adv.hitChance; G.abMissDir = U.rand(-1, 1); }
+      return now - G.abSince >= adv.reaction;
+    };
     if (ab && ab.silent) {
-      const tgt = findTarget(ab.fov / 2, b => boneFor(b, ab, now), ab.predict, now);
-      if (tgt) { G.silentTarget = tgt; G.aimTarget = tgt.b; }
+      const tgt = keyOk ? findTarget(ab.fov / 2, b => boneFor(b, ab, now), ab.predict, now, adv) : null;
+      if (reacted(tgt)) { G.silentTarget = tgt; G.aimTarget = tgt.b; }
       if (!m.assistR) return;
     }
-    if (!(ab && !ab.silent) && !m.assistR) return;
-    const memory = ab && !ab.silent;
+    if (!(ab && !ab.silent && keyOk) && !m.assistR) return;
+    const memory = ab && !ab.silent && keyOk;
     const limit = memory ? ab.fov / 2 : m.assistR;
-    const best = findTarget(limit, b => (memory ? boneFor(b, ab, now) : 'chest'), memory && ab.predict, now);
-    if (!best) return;
-    const wantYaw = best.yaw - p.offYaw, wantPitch = U.clamp(best.pitch - p.offPitch, -85 * DEG, 85 * DEG);
+    const best = findTarget(limit, b => (memory ? boneFor(b, ab, now) : 'chest'), memory && ab.predict, now, memory ? adv : null);
+    if (!best || (memory && !reacted(best))) return;
+    let wantYaw = best.yaw - p.offYaw, wantPitch = U.clamp(best.pitch - p.offPitch, -85 * DEG, 85 * DEG);
+    if (memory) {
+      // hit chance below 100%: sometimes settle just off the target. humanizer: small wobble.
+      if (G.abMiss) wantYaw += G.abMissDir * (1.2 + 2.5 / Math.max(3, best.dist / 4)) * DEG;
+      if (adv.humanizer) { const tt = now / 1000; wantYaw += Math.sin(tt * 5.3) * adv.humanizer * 0.08 * DEG; wantPitch += Math.sin(tt * 4.1 + 1) * adv.humanizer * 0.06 * DEG; }
+    }
     let speed = memory ? ab.speed : m.assistPull;
     if (memory && ab.smooth > 1) speed = speed === Infinity ? 1500 / ab.smooth : speed / ab.smooth;
     const before = p.yaw;
+    const remain = Math.hypot(U.wrap(wantYaw - p.yaw), wantPitch - p.pitch) / DEG;
+    if (memory && adv.curve !== 'linear') {
+      // ease out near the target (smooth), plus a slight arc on the way in (human)
+      if (speed === Infinity) speed = 1400;
+      speed *= U.clamp(remain / 12, adv.curve === 'human' ? 0.18 : 0.3, 1);
+      if (adv.curve === 'human' && remain > 2) wantPitch += Math.min(3, remain * 0.12) * DEG;
+    }
     if (speed === Infinity) { p.yaw = wantYaw; p.pitch = wantPitch; }
     else {
       const step = speed * DEG * dt;
@@ -915,14 +1058,16 @@
     G.usedTrigger = false;
     if (m.trigger !== null && !want) {
       const hit = trace(eye(tv1), aimDir(tv2), p, 0, 1);
-      if (hit.ent && (!m.triggerHead || hit.head)) { G.trigT += dt; if (G.trigT >= m.trigger) { want = true; G.usedTrigger = true; } }
-      else G.trigT = 0;
+      if (hit.ent && (!m.triggerHead || hit.head)) {
+        G.trigT += dt;
+        if (G.trigT >= m.trigger + m.adv.trigDelay / 1000) { want = true; G.usedTrigger = true; if (m.adv.trigMode === 'single') G.trigT = -0.12; }
+      } else G.trigT = 0;
     }
     if (want && p.fireCD <= 0) {
       if (wi.ammo <= 0 && !m.infAmmo) { G.reload(); return; }
       fire(now, false);
       if (w.burst > 1) { p.burstQ = w.burst - 1; p.burstT = 0.075; }
-      p.fireCD = 1 / (w.rate * m.fireRateMult);
+      p.fireCD = 1 / (w.rate * m.fireRateMult * (cfx().rapid ? 2 : 1));
     }
   }
   function fire(now, burstFollow) {
@@ -933,13 +1078,14 @@
     const o = eye(new THREE.Vector3());
     const camDir = aimDir(new THREE.Vector3());
     let base = camDir.clone(), silentDev = 0;
-    const st = G.silentTarget;
+    let st = G.silentTarget;
+    if (st && Math.random() * 100 >= m.adv.hitChance) st = null;
     if (st && st.b.alive) {
       base.set(st.x - o.x, st.y - o.y, st.z - o.z).normalize();
       silentDev = Math.acos(U.clamp(base.dot(camDir), -1, 1)) / DEG;
       if (silentDev > 6) { G.addSus(0.6); G.addDet(0.8); }
     }
-    const cone = (st && w.pellets === 1) ? 0 : G.spreadCone() * DEG;
+    const cone = (st && st.b.alive && w.pellets === 1) ? 0 : G.spreadCone() * DEG;
     p.bloom = Math.min(5, p.bloom + 1);
     p.recP = Math.min(p.recP + w.recoil * m.recoilMult * DEG, 12 * DEG);
     p.recY = U.clamp(p.recY + U.rand(-0.6, 0.6) * w.recoil * m.recoilMult * DEG, -6 * DEG, 6 * DEG);
@@ -1038,21 +1184,71 @@
     for (let i = 0; i < wts.length; i++) { r -= wts[i]; if (r <= 0) return i; }
     return 0;
   }
-  function makeLoot(tier) {
+  function makeLoot(tier, spec) {
     const k = Math.random();
-    const kind = k < 0.55 ? 'weapon' : k < 0.8 ? 'shield' : 'med';
-    const pool = D.WEAPON_ORDER.filter(id => id !== 'p9' && D.WEAPONS[id].tier <= tier.id + 1);
-    const item = { kind, rarity: rollRarity(tier.id), id: kind === 'weapon' ? U.pick(pool) : null, pos: new THREE.Vector3(), alive: true, respawnT: 0, ph: Math.random() * 6 };
-    const pt = W.randomPoint();
+    const kind = spec ? spec.kind : k < 0.55 ? 'weapon' : k < 0.8 ? 'shield' : 'med';
+    const tid = Math.min(tier.lootTier || tier.id, 9);
+    const pool = D.WEAPON_ORDER.filter(id => id !== 'p9' && D.WEAPONS[id].tier <= tid + 1);
+    const item = { kind, rarity: spec ? spec.rarity : rollRarity(tid), id: spec ? spec.id : kind === 'weapon' ? U.pick(pool) : null, pos: new THREE.Vector3(), alive: true, respawnT: 0, ph: Math.random() * 6, drop: !!spec };
+    const pt = spec ? spec.pos : W.randomPoint();
     item.pos.set(pt.x, Math.max(0, W.groundAt(pt.x, pt.z, 0.2, 10)), pt.z);
     item.mesh = lootMesh(item);
     item.mesh.position.copy(item.pos);
     NA.R.scene.add(item.mesh);
     return item;
   }
+  // Loot Rush: whoever dies drops the gun they were holding
+  function dropGun(ent) {
+    const t = G.match.tier;
+    if (!t.lootMode) return;
+    const id = ent.isPlayer ? (G.curInst() || {}).id : ent.weapon, rarity = ent.isPlayer ? (G.curInst() || {}).rarity || 0 : ent.rarity || 0;
+    if (!id || id === 'p9') return;
+    G.loot.push(makeLoot(t, { kind: 'weapon', id, rarity, pos: { x: ent.pos.x + U.rand(-0.4, 0.4), z: ent.pos.z + U.rand(-0.4, 0.4) } }));
+  }
+  function setBotWeapon(b, id, rarity) {
+    const w = D.WEAPONS[id];
+    b.weapon = id; b.rarity = rarity || 0; b.ammo = w.mag; b.reloadT = 0;
+    const gun = b.mesh.userData.gun, len = GUN_LEN[w.cls] || 0.55;
+    if (gun) { gun.scale.y = len; gun.position.y = -0.62 - len / 2 + 0.12; }
+  }
+  // One number for how good a gun is, so a bot never swaps back and forth between two guns.
+  const gunValue = (id, rarity) => (D.WEAPONS[id].slot === 1 ? 0 : 3) + D.WEAPONS[id].tier * 0.35 + (rarity || 0) * 0.8;
+  // Bots in Loot Rush want a better gun (or shields) and walk over to it.
+  function lootWant(b) {
+    let best = null, bestScore = 0;
+    const curV = gunValue(b.weapon, b.rarity);
+    for (const it of G.loot) {
+      if (!it.alive) continue;
+      const d = Math.hypot(it.pos.x - b.pos.x, it.pos.z - b.pos.z);
+      if (d > 45) continue;
+      let v = 0;
+      if (it.kind === 'weapon') v = gunValue(it.id, it.rarity) - curV - 0.25;
+      else if (it.kind === 'shield' && b.shield < 60) v = 1.5;
+      if (v <= 0) continue;
+      const score = v / (1 + d * 0.08);
+      if (score > bestScore) { bestScore = score; best = it; }
+    }
+    return best;
+  }
+  function botLoot(b) {
+    for (const it of G.loot) {
+      if (!it.alive || Math.hypot(it.pos.x - b.pos.x, it.pos.z - b.pos.z) > 1.3) continue;
+      if (it.kind === 'weapon') {
+        const cur = D.WEAPONS[b.weapon];
+        if (gunValue(it.id, it.rarity) <= gunValue(b.weapon, b.rarity) + 0.25) continue;
+        if (cur.slot === 0 && b.weapon !== 'p9') G.loot.push(makeLoot(G.match.tier, { kind: 'weapon', id: b.weapon, rarity: b.rarity || 0, pos: { x: b.pos.x, z: b.pos.z } }));
+        setBotWeapon(b, it.id, it.rarity);
+      } else if (it.kind === 'shield' && b.shield < 100) b.shield = Math.min(100, b.shield + [25, 25, 50, 50, 75][it.rarity]);
+      else if (it.kind === 'med' && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + 50);
+      else continue;
+      it.alive = false; it.mesh.visible = false; it.respawnT = 25;
+      return;
+    }
+  }
+
   function spawnLoot(tier) {
     if (!tier.loot) return;
-    const n = U.clamp(Math.round((G.bots.length + 1) * 1.3), 10, 36);
+    const n = U.clamp(Math.round((G.bots.length + 1) * (tier.lootMode ? 3 : 1.3)), 10, tier.lootMode ? 60 : 36);
     for (let i = 0; i < n; i++) G.loot.push(makeLoot(tier));
   }
   function clearLoot() {
@@ -1085,6 +1281,7 @@
       G.selectSlot(w.slot);
       p.slot = w.slot;
       NA.UI.toast(`Picked up ${D.RARITY[it.rarity].name} ${w.name}`);
+      if (it.rarity === 4) NA.Prog.track('legendary');
       A.buy();
       if (m.lootEsp && it.rarity >= 3) { G.addSus(2); firstSeen('lootesp'); }
     }
@@ -1096,7 +1293,13 @@
   };
   function updateLoot(dt, now) {
     const t = now / 1000;
+    if (G.loot.some(it => it.drop && !it.alive)) {
+      for (const it of G.loot) if (it.drop && !it.alive) NA.R.scene.remove(it.mesh);
+      G.loot = G.loot.filter(it => !(it.drop && !it.alive));
+    }
     for (const it of G.loot) {
+      if (!it.alive && it.drop) continue;
+      if (it.drop && (it.life = (it.life || 0) + dt) > 30) { it.alive = false; it.mesh.visible = false; continue; }
       if (!it.alive) {
         it.respawnT -= dt;
         if (it.respawnT <= 0) {
@@ -1121,9 +1324,126 @@
       if (Math.random() < 0.35 + b.skill * 0.5) { b.lastSeen = { x: shooter.pos.x, z: shooter.pos.z }; b.path = null; }
     }
   }
+  // ---------------------------------------------------------------- cheater bots
+  // Levels 1-10: closet aim help, then walls, triggerbot reactions, aimbot, speed, rapid fire,
+  // wallbangs and finally spinbot. Some start legit and flip to rage mid-match.
+  const CHEAT_AIM = [1, 0.8, 0.68, 0.56, 0.45, 0.25, 0.2, 0.15, 0.1, 0.06, 0.03];
+  const cl = b => Math.max(b.cheat && !b.cheat.gone ? b.cheat.cur : 0, cfx().aimbot ? 5 : cfx().walls ? 3 : 0);
+  G.cheatLevel = cl;
+  function cheaterChance(tier) {
+    if (tier.chaos) return 0;
+    let c = tier.tourney !== undefined ? 0.25 : tier.lootMode ? 0.15 : [0, 0.07, 0.08, 0.1, 0.12, 0.14, 0.17, 0.2, 0.23, 0.25][Math.min(9, tier.id)];
+    c += G.match.diff.cheater;
+    if (G.ranked) c += 0.04 + NA.Prog.myRank().idx * 0.01;
+    if (G.match.promo) c += 0.15;
+    return U.clamp(c, 0, 0.45);
+  }
+  function rollCheater() {
+    const t = G.match.tier;
+    const pool = G.bots.filter(b => G.isEnemy(G.player, b) && !b.story);
+    if (!pool.length || Math.random() >= cheaterChance(t)) return;
+    const b = U.pick(pool), tid = Math.min(9, t.id > 9 ? 8 : t.id);
+    const max = U.clamp(Math.round(1 + Math.pow(Math.random(), 1.4) * (3 + tid * 0.75)), 1, 10);
+    const switcher = max >= 4 && Math.random() < 0.4;
+    b.cheat = { max, cur: switcher ? Math.min(2, max) : max, switcher, rageAt: t.timeLimit * U.rand(0.25, 0.65), deathRun: 0, gone: false };
+    G.match.cheater = b;
+  }
+  function updateCheaters(dt) {
+    const mt = G.match, b = mt.cheater;
+    if (b && !b.cheat.gone && G.bots.indexOf(b) >= 0) {
+      const c = b.cheat;
+      if (c.switcher && c.cur < c.max && (mt.tier.timeLimit - mt.time > c.rageAt || c.deathRun >= 3)) {
+        c.cur = c.max;
+        const o = G.bots.find(x => x !== b && !x.story) || G.randomBot();
+        if (o) C.post(o.name, U.pick(D.CHAT.cheater.switched).replace('{name}', b.name), G.isAlly(o) ? 'team' : 'bot', { delay: 1200 });
+      }
+      c.chatT = (c.chatT || 0) - dt;
+      if (c.cur >= 5 && b.kills >= 3 && c.chatT <= 0) {
+        c.chatT = U.rand(25, 45);
+        const o = G.bots.find(x => x !== b && Math.random() < 0.5) || G.bots.find(x => x !== b);
+        if (o) C.post(o.name, U.pick(D.CHAT.cheater.accuse).replace('{name}', b.name), G.isAlly(o) ? 'team' : 'bot');
+      }
+      // Warden picks up blatant cheaters in Ranked on its own (no reward for you)
+      c.acT = (c.acT || 0) + dt;
+      if (G.ranked && c.cur >= 8 && c.acT > 10) { c.acT = 0; if (Math.random() < (c.cur - 6) * 0.05) cheaterBanned(b, false); }
+    }
+    for (const r of mt.reportQueue) {
+      r.t -= dt;
+      if (r.t > 0 || r.done) continue;
+      r.done = true;
+      if (G.bots.indexOf(r.bot) < 0 || !r.bot.cheat || r.bot.cheat.gone) continue;
+      if (Math.random() < r.chance) cheaterBanned(r.bot, true);
+    }
+    mt.reportQueue = mt.reportQueue.filter(r => !r.done);
+  }
+  function reportChance(b) {
+    const lvl = cl(b);
+    if (!lvl) return 0;
+    return U.clamp([0, 0.08, 0.15, 0.25, 0.35, 0.5, 0.6, 0.7, 0.8, 0.9, 0.97][lvl] * (G.ranked ? 1.15 : 0.85), 0, 0.98);
+  }
+  function cheaterBanned(b, byReport) {
+    const mt = G.match, s = NA.Save.data;
+    b.cheat.gone = true;
+    C.system(byReport ? (G.ranked ? `${b.name} was banned by ${D.RANKED.ac}. Thanks for your report!` : `A moderator actually reviewed a report for once. ${b.name} has been banned.`)
+      : `${b.name} was banned by ${D.RANKED.ac}.`, { priority: true });
+    const o = G.bots.find(x => x !== b);
+    if (o) C.post(o.name, U.pick(D.CHAT.cheater.banned).replace('{name}', b.name), G.isAlly(o) ? 'team' : 'bot', { delay: 900 });
+    if (byReport) {
+      const reward = Math.round(mt.tier.kill * (3 + b.cheat.max) * mt.diff.pay);
+      mt.reportRewards += reward;
+      s.reports.banned++;
+      NA.UI.toast(`Your report got ${b.name} banned (+${U.fmt(reward)})`);
+      NA.Prog.track('cheaterBanned');
+      G.achieve('snitch', 'Hall Monitor');
+    }
+    mt.pendingLeave.push(b);
+    NA.Save.save();
+  }
+  G.report = function (b) {
+    const mt = G.match;
+    if (!mt || !b || b.reported) { if (b && b.reported) NA.UI.toast('Already reported'); return false; }
+    b.reported = true;
+    NA.Save.data.reports.filed++;
+    NA.UI.toast(`Reported ${b.name}`);
+    if (G.state === 'playing' && G.bots.indexOf(b) >= 0) mt.reportQueue.push({ bot: b, chance: reportChance(b), t: U.rand(4, 12) });
+    else if (b.cheat && !b.cheat.gone) {
+      // reported from the results screen: the verdict arrives later
+      NA.Save.data.reports.pending.push({ name: b.name, chance: reportChance(b), at: Date.now() + U.randInt(30, 90) * 1000, reward: Math.round(mt.tier.kill * (3 + b.cheat.max) * mt.diff.pay) });
+    }
+    NA.Save.save();
+    return true;
+  };
+  G.resolveReports = function () {
+    const s = NA.Save.data, now = Date.now(), out = [];
+    s.reports.pending = (s.reports.pending || []).filter(r => {
+      if (now < r.at) return true;
+      if (Math.random() < r.chance) {
+        s.credits += r.reward; s.reports.banned++;
+        out.push(r);
+        NA.Chat.dm(`update on your report: ${r.name} got banned. +${U.fmt(r.reward)} bounty`);
+        NA.Prog.track('cheaterBanned');
+      }
+      return false;
+    });
+    if (out.length) NA.Save.save();
+    return out;
+  };
+  // Save a clip of a player to post in Comms later.
+  G.clip = function (b) {
+    const s = NA.Save.data, mt = G.match;
+    if (!b || !mt) return false;
+    if ((b.clipped = (b.clipped || 0) + 1) > 1) { NA.UI.toast('Already clipped this player'); return false; }
+    s.clips.unshift({ id: Date.now() + '' + U.randInt(10, 99), name: b.name, level: b.cheat ? b.cheat.max : 0, seen: cl(b), kills: b.kills, deaths: b.deaths, where: mt.tier.name, at: Date.now(), posted: false });
+    s.clips = s.clips.slice(0, 12);
+    NA.Save.save();
+    NA.UI.toast(`Clip saved: ${b.name}. Post it in Comms → #clips`);
+    return true;
+  };
+
   function perceive(b, now) {
     const ex = b.pos.x, ey = b.pos.y + 1.55, ez = b.pos.z;
-    const fov = (50 + 28 * b.skill) * DEG, range = Math.min(110, W.current.def.fog[1] * 0.8);
+    const c = cl(b);
+    const fov = c >= 3 ? Math.PI : (50 + 28 * b.skill) * DEG, range = Math.min(110, W.current.def.fog[1] * 0.8);
     const cand = [];
     for (const e of G.entities()) {
       if (!e.alive || !G.isEnemy(b, e)) continue;
@@ -1133,14 +1453,17 @@
       const ang = Math.abs(U.wrap(Math.atan2(-dx, -dz) - b.yaw));
       const recent = b.lastAttacker === e && now - b.lastAttackT < 3000;
       if (ang > fov && !recent && d > 2.5) continue;
-      cand.push([d - (recent ? 20 : 0) - (e === b.target ? 8 : 0), e]);
+      cand.push([d - (recent ? 20 : 0) - (e === b.target ? 8 : 0), e, d]);
     }
     cand.sort((p, q) => p[0] - q[0]);
     let best = null;
     for (let i = 0; i < cand.length && i < 5; i++) {
       const e = cand[i][1];
-      if (W.los(ex, ey, ez, e.pos.x, e.pos.y + 1.2, e.pos.z) || W.los(ex, ey, ez, e.pos.x, e.pos.y + 1.62, e.pos.z)) { best = e; break; }
+      if (W.los(ex, ey, ez, e.pos.x, e.pos.y + 1.2, e.pos.z) || W.los(ex, ey, ez, e.pos.x, e.pos.y + 1.62, e.pos.z) || (c >= 9 && cand[i][2] < 28)) { best = e; break; }
     }
+    // wallhack cheaters always know where you are and pre-aim you through cover
+    b.wallTarget = !best && c >= 3 && cand.length && cand[0][2] < 45 ? cand[0][1] : null;
+    if (b.wallTarget) b.lastSeen = { x: b.wallTarget.pos.x, z: b.wallTarget.pos.z };
     if (best !== b.target) {
       b.target = best;
       if (best) {
@@ -1148,10 +1471,10 @@
         const off = Math.abs(U.wrap(Math.atan2(-dx, -dz) - b.yaw)) / DEG;
         const preaim = Math.min(1, off / 60);
         // first shots start off-target and settle; better bots start closer and settle faster
-        const floor = U.lerp(3.6, 0.4, b.skill);
-        b.err = floor + U.lerp(14, 3, b.skill) * (0.35 + 0.65 * preaim);
+        const floor = U.lerp(3.6, 0.4, b.skill) * CHEAT_AIM[c];
+        b.err = floor + U.lerp(14, 3, b.skill) * (0.35 + 0.65 * preaim) * CHEAT_AIM[c];
         b.errYaw = U.rand(-1, 1); b.errPitch = U.rand(-0.6, 0.6);
-        b.reactT = b.stats.react * U.rand(0.7, 1.3) * (0.6 + 0.4 * preaim);
+        b.reactT = b.react * U.rand(0.7, 1.3) * (0.6 + 0.4 * preaim) * Math.max(0.12, 1 - c * 0.09);
       }
     }
     b.canSee = !!best;
@@ -1163,11 +1486,12 @@
     const dx = tgt.pos.x - b.pos.x, dz = tgt.pos.z - b.pos.z, d = Math.hypot(dx, dz) || 1;
     const lat = Math.abs((tgt.vel.x * -dz + tgt.vel.z * dx) / d);
     const angVel = lat / d / DEG;
-    let err = b.err + angVel * U.lerp(0.35, 0.05, sk);
+    const c = cl(b);
+    let err = (b.err + angVel * U.lerp(0.35, 0.05, sk)) * CHEAT_AIM[c];
     if (moving) err *= U.lerp(1.6, 1.15, sk);
     if (tgt.isPlayer && !tgt.onGround) err *= 1.25;
     const from = tv1.set(b.pos.x, b.pos.y + 1.55, b.pos.z);
-    const head = Math.random() < 0.12 + 0.45 * sk;
+    const head = Math.random() < 0.12 + 0.45 * sk + (c >= 5 ? 0.35 : c * 0.04);
     const aimY = tgt.pos.y + (head ? 1.6 : 1.1);
     const lead = sk * 0.06;
     const base = tv2.set(tgt.pos.x + tgt.vel.x * lead - from.x, aimY - from.y, tgt.pos.z + tgt.vel.z * lead - from.z).normalize();
@@ -1179,10 +1503,10 @@
     for (let k = 0; k < w.pellets; k++) {
       const dir = U.dirFromAngles(yaw0, pitch0, new THREE.Vector3());
       spread(dir, (err * 0.5 + (w.pellets > 1 ? w.spread : spreadDeg)) * DEG);
-      const hit = trace(from, dir, b, 0, 1);
-      if (k < 2) FX.tracer(tv3.set(0.24, 1.15, -0.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), b.yaw).add(b.pos).clone(), hit.point, 0xffc46b);
+      const hit = trace(from, dir, b, c >= 9 ? 2 : 0, 0.75);
+      if (k < 2) FX.tracer(tv3.set(0.24, 1.15, -0.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), b.yaw).add(b.pos).clone(), hit.point, c >= 5 ? 0xff5c8a : 0xffc46b);
       G.botStats.shots++;
-      if (hit.ent) { G.botStats.hits++; damageEnt(hit.ent, w.dmg * (hit.head ? w.head : 1) * falloff(w, hit.t), b, hit.head); }
+      if (hit.ent) { G.botStats.hits++; damageEnt(hit.ent, w.dmg * D.RARITY[b.rarity || 0].mult * (hit.head ? w.head : 1) * falloff(w, hit.t) * (hit.mult || 1), b, hit.head, { walls: hit.walls }); }
     }
     const mt = G.match;
     if (audible && mt.snd < 18) { mt.snd++; A.shot(b.weapon, G.player.pos.distanceTo(b.pos)); }
@@ -1223,8 +1547,8 @@
       const dist = Math.hypot(dx, dz) || 1;
       b.yaw = U.approachAngle(b.yaw, Math.atan2(-dx, -dz), (4 + 8 * sk) * dt);
       // settle the aim while tracking
-      const floor = U.lerp(3.6, 0.4, sk);
-      b.err = floor + (b.err - floor) * Math.exp(-U.lerp(1.1, 6, sk) * dt);
+      const floor = U.lerp(3.6, 0.4, sk) * CHEAT_AIM[cl(b)];
+      b.err = floor + (b.err - floor) * Math.exp(-U.lerp(1.1, 6, sk) * (1 + cl(b) * 0.3) * dt);
       b.strafeT -= dt;
       if (b.strafeT <= 0) { b.strafeT = U.rand(0.35, 1.3) * (1.4 - sk); b.strafeDir = Math.random() < 0.5 ? -1 : 1; }
       let strafe = 0.8;
@@ -1249,7 +1573,7 @@
         } else if (b.fireCD <= 0) {
           botFire(b, tgt, dist, strafe > 0);
           if (w.burst > 1) { b.queue = w.burst - 1; b.queueT = 0.075; }
-          let cd = 1 / (w.rate * b.stats.rateMul) * U.rand(0.9, 1.15);
+          let cd = 1 / (w.rate * b.rateMul) * U.rand(0.9, 1.15) / (cl(b) >= 8 ? 1.3 : 1) / (G.match.chaosFx && G.match.chaosFx.rapid ? 2 : 1);
           if (w.rate >= 7) {
             if (b.burstLeft <= 0) b.burstLeft = U.randInt(3, 4 + Math.round(sk * 7));
             if (--b.burstLeft <= 0) cd += U.rand(0.25, 0.6) * (1.3 - sk);
@@ -1263,9 +1587,12 @@
     if (!(tgt && tgt.alive && b.canSee) || b.retreatT > 0) {
       if (b.reloadT <= 0 && b.ammo < w.mag * 0.4 && !b.canSee) b.reloadT = w.reload;
       b.repathT -= dt;
+      const want = G.match.tier.lootMode && !b.wallTarget ? lootWant(b) : null;
+      if (want && (!b.lootGoal || b.lootGoal !== want)) { b.lootGoal = want; b.path = null; }
       if (!b.path || b.pathI >= b.path.length || b.repathT <= 0) {
         let goal;
-        if (b.lastSeen && Math.random() < 0.8) goal = b.lastSeen;
+        if (want) goal = want.pos;
+        else if (b.lastSeen && Math.random() < 0.8) goal = b.lastSeen;
         else if (Math.random() < 0.55) {
           const foes = G.entities().filter(e => e.alive && G.isEnemy(b, e));
           const f = foes.length ? U.pick(foes) : null;
@@ -1283,14 +1610,19 @@
           b.yaw = U.approachAngle(b.yaw, Math.atan2(-dx, -dz), 5 * dt);
         }
       }
+      const wt = b.wallTarget;
+      if (wt && wt.alive) b.yaw = U.approachAngle(b.yaw, Math.atan2(-(wt.pos.x - b.pos.x), -(wt.pos.z - b.pos.z)), 9 * dt);
     }
+    if (G.match.tier.lootMode) botLoot(b);
+    const lv = cl(b);
+    b.spin = lv >= 10 && !(b.canSee && b.target) ? ((b.spin || 0) + dt * 22) % (Math.PI * 2) : 0;
     const l = Math.hypot(mvx, mvz);
     if (l > 1) { mvx /= l; mvz /= l; }
-    const spd = BOT_SPEED * (b.retreatT > 0 ? 1.15 : 1);
-    b.pos.x += mvx * spd * dt; W.collide(b.pos, BR, PH, 'x');
-    b.pos.z += mvz * spd * dt; W.collide(b.pos, BR, PH, 'z');
+    const spd = BOT_SPEED * (b.retreatT > 0 ? 1.15 : 1) * (lv >= 10 ? 1.45 : lv >= 7 ? 1.25 : 1) * (G.match.chaosFx && G.match.chaosFx.speed ? 1.6 : 1);
+    W.move(b.pos, mvx * spd * dt, mvz * spd * dt, BR, PH);
     const yPrev = b.pos.y;
-    b.vy -= GRAV * dt; b.pos.y += b.vy * dt;
+    b.vy -= GRAV * gravMul() * dt; b.pos.y += b.vy * dt;
+    if (cfx().moon && b.vy === 0 && Math.random() < dt * 0.6) b.vy = JUMP_V * 1.25;
     const g = W.groundAt(b.pos.x, b.pos.z, BR * 0.7, yPrev);
     if (b.pos.y <= g) { b.pos.y = g; b.vy = 0; }
     if (b.pos.y < -10) respawnBot(b);
@@ -1300,7 +1632,8 @@
       b.lastPos.copy(b.pos); b.stuckT = 0;
     }
     b.mesh.position.copy(b.pos);
-    b.mesh.rotation.y = b.yaw;
+    b.mesh.rotation.y = b.yaw + (b.spin || 0);
+    animateBot(b, dt);
   }
 
   // ---------------------------------------------------------------- vote kicks, rage quits
@@ -1331,7 +1664,7 @@
     }
     mt.backfill = mt.backfill.filter(x => !x.done);
     // vote kicks (big lobbies only)
-    if (t.id < 4 || t.tourney !== undefined) return;
+    if (t.id < 4 || t.tourney !== undefined || t.chaos) return;
     if (!mt.vote) {
       mt.voteCD -= dt;
       if (mt.voteCD <= 0 && mt.sus >= 80) {
@@ -1416,6 +1749,13 @@
     updateSocial(dt);
     updateLoot(dt, now);
     if (G.ranked && G.state === 'playing') updateDetection(dt);
+    if (G.state === 'playing') updateCheaters(dt);
+    if (G.mods.adv.safeMode && G.state === 'playing' && !mt.tier.chaos) {
+      const hot = mt.sus >= 70 || (G.ranked && mt.det >= 65), cool = mt.sus < 40 && (!G.ranked || mt.det < 30);
+      if (!G.panic && hot) { G.safePanic = true; G.setPanic(true); NA.UI.centerMsg('SAFE MODE: cheats paused until things cool down', 2200); }
+      else if (G.panic && G.safePanic && cool) { G.safePanic = false; G.setPanic(false); }
+    }
+    if (G.state === 'playing' && mt.chaosFx && NA.Events) NA.Events.tickChaos(mt, dt);
   }
 
   // ---------------------------------------------------------------- frame
@@ -1502,10 +1842,11 @@
     pt.t = 0; pt.life = life;
     pt.m.visible = true;
   }
-  FX.burst = function (pos, color) {
-    for (let i = 0; i < 12; i++) {
+  const CONFETTI = [0xf43f5e, 0xfacc15, 0x4ade80, 0x22d3ee, 0xa855f7, 0xf97316, 0xffffff];
+  FX.burst = function (pos, color, confetti) {
+    for (let i = 0; i < (confetti ? 30 : 12); i++) {
       spawnPart(tv3.set(pos.x + U.rand(-0.3, 0.3), pos.y + U.rand(0.4, 1.7), pos.z + U.rand(-0.3, 0.3)),
-        i % 3 === 0 ? 0xf1c9a5 : color, new THREE.Vector3(U.rand(-3, 3), U.rand(2, 6), U.rand(-3, 3)), U.rand(0.6, 1));
+        confetti ? U.pick(CONFETTI) : i % 3 === 0 ? 0xf1c9a5 : color, new THREE.Vector3(U.rand(-3, 3), U.rand(2, confetti ? 9 : 6), U.rand(-3, 3)), U.rand(0.6, confetti ? 1.6 : 1));
     }
   };
   FX.puff = function (pos) {
@@ -1535,6 +1876,7 @@
   function buildViewmodel() {
     const scene = NA.R.vmScene;
     const dark = new THREE.MeshLambertMaterial({ color: 0x2a2d33 }), mid = new THREE.MeshLambertMaterial({ color: 0x454a53 });
+    VM.midMat = mid;
     const acc = new THREE.MeshLambertMaterial({ color: 0xe8822e }), wood = new THREE.MeshLambertMaterial({ color: 0x7a5232 });
     const glass = new THREE.MeshLambertMaterial({ color: 0x1e3a5f });
     const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); return o; };
@@ -1566,6 +1908,9 @@
     VM.muzzleZ.lmg = -0.88;
     VM.group = new THREE.Group();
     for (const k in VM.models) VM.group.add(VM.models[k]);
+    // a blocky forearm and hand to match the player models
+    const skinM = new THREE.MeshLambertMaterial({ color: 0xe0ac7e }), sleeve = new THREE.MeshLambertMaterial({ color: 0x2563eb });
+    VM.group.add(box(0.11, 0.12, 0.14, skinM, 0.0, -0.12, 0.02), box(0.12, 0.13, 0.34, sleeve, 0.02, -0.15, 0.24));
     VM.group.scale.setScalar(0.9);
     VM.base = new THREE.Vector3(0.25, -0.23, -0.46);
     const fc = document.createElement('canvas');
@@ -1586,6 +1931,8 @@
     const p = G.player;
     const w = G.curW(), cls = w.cls;
     for (const k in VM.models) VM.models[k].visible = k === cls;
+    const ci = G.curInst(), mc = ci ? NA.Prog.mastery(ci.id).color : null;
+    if (VM.midMat && VM.midColor !== mc) { VM.midColor = mc; VM.midMat.color.set(mc || 0x454a53); }
     const scoped = G.ads && (w.scope || 0) >= 2.5;
     VM.group.visible = G.state === 'playing' && !!p && p.alive && !scoped;
     if (!VM.group.visible) return;
@@ -1633,6 +1980,7 @@
         if (n <= 0) return 'Type an amount first';
         s.credits = Math.min(1e15, s.credits + n); s.lifetimeCredits += n; msg = '+' + U.fmt(n); break;
       }
+      case 'events': s.flags.eventsAlwaysLive = !s.flags.eventsAlwaysLive; msg = 'Events always live: ' + (s.flags.eventsAlwaysLive ? 'on' : 'off'); break;
       case 'unban': { const r = s.ranked; r.banUntil = 0; r.perma = false; r.offenses = 0; r.appeal = null; r.bypassDetected = false; msg = 'Ranked ban cleared'; break; }
       case 'det0': if (!G.match) return 'Start a match first'; G.match.det = 0; G.match.detPeak = 0; msg = 'Warden detection cleared'; break;
       case 'setzero': s.credits = 0; msg = 'Credits set to ₡0'; break;

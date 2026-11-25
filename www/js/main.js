@@ -25,6 +25,7 @@
     NA.Game.computeMods();
     NA.Chat.init();
     NA.UI.init();
+    NA.Comms.init();
     resize();
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', () => setTimeout(resize, 250));

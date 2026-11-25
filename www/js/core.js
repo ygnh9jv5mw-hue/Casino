@@ -94,9 +94,20 @@
     loadout: { primary: null, secondary: 'p9' },
     tourney: { played: 0, won: 0 },
     playMode: 'casual',
+    prestige: 0,
+    cosmetics: { style: 'cross', color: 'white', owned: [] },
+    season: { id: 0, peak: 0, history: [] },
+    daily: { day: '', items: [], streak: 0, lastLogin: '' },
+    mastery: {},
+    reports: { filed: 0, banned: 0, pending: [] },
+    clips: [],
+    profiles: {},
+    configsOwned: [],
+    adv: {},
+    comms: { last: 0, msgs: {}, posts: [], rep: 0, notoriety: 0, notorietyAt: 0, unread: 0 },
     ranked: { rr: 0, peakRR: 0, offenses: 0, banUntil: 0, perma: false, ban: null, appeal: null, acVersion: [3, 0, 0], bypassDetected: false, patchReadyAt: 0,
       sinceUpdate: 0, nextUpdate: 4, alts: 0, bans: 0, appealsWon: 0, matches: 0 },
-    settings: { sens: 1, volume: 0.8, autoQueue: true, showFps: false, lang: 'en' },
+    settings: { sens: 1, volume: 0.8, autoQueue: true, showFps: false, lang: 'en', difficulty: 'normal' },
   });
   Save.load = () => {
     const def = Save.defaults();
@@ -104,7 +115,7 @@
     try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { d = null; }
     if (!d || typeof d !== 'object') d = def;
     for (const k of Object.keys(def)) if (d[k] === undefined) d[k] = def[k];
-    for (const k of ['stats', 'settings', 'ranked']) {
+    for (const k of ['stats', 'settings', 'ranked', 'cosmetics', 'season', 'daily', 'reports', 'comms']) {
       for (const kk of Object.keys(def[k])) if (d[k][kk] === undefined) d[k][kk] = def[k][kk];
     }
     if (d.highestTier >= 2 && !d.guns.ar7) { d.guns.ar7 = true; if (!d.loadout.primary) d.loadout.primary = 'ar7'; }

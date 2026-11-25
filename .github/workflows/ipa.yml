@@ -45,7 +45,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/App.xcarchive \
-            MARKETING_VERSION="0.3.0" \
+            MARKETING_VERSION="0.4.0" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             > build/xcodebuild.log 2>&1 || { tail -120 build/xcodebuild.log; exit 1; }
@@ -68,13 +68,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           published() { git fetch -q origin "${GITHUB_REF_NAME}"; git log -1 --format=%s "origin/${GITHUB_REF_NAME}" | grep -q "${GITHUB_SHA::7}"; }
-          # Prefer the Apple Silicon build: the Intel runner waits up to 25 min for it before publishing its own.
+          # Prefer the Apple Silicon build: the Intel runner waits up to 10 min for it before publishing its own.
           if [ "${{ matrix.runner }}" != "macos-15" ]; then
-            for i in $(seq 1 25); do published && break; sleep 60; done
+            for i in $(seq 1 10); do published && break; sleep 60; done
           fi
           if published; then echo "The IPA for this commit is already published."; exit 0; fi
-          cp dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.3-unsigned.ipa"
-          git add -f dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.3-unsigned.ipa"
+          cp dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.4-unsigned.ipa"
+          git add -f dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.4-unsigned.ipa"
           git commit -m "Build unsigned IPA (run ${{ github.run_number }}, ${GITHUB_SHA::7}, ${{ matrix.runner }}) [skip ci]" || exit 0
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"

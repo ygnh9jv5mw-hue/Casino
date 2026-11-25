@@ -4,7 +4,7 @@
   const U = NA.U, D = NA.DATA, A = NA.Audio, C = NA.Chat;
   const $ = id => document.getElementById(id);
   const esc = U.esc;
-  const SCREENS = ['scr-title', 'scr-name', 'scr-menu', 'scr-play', 'scr-lobby', 'scr-results', 'scr-shop', 'scr-profile', 'scr-settings', 'scr-pause'];
+  const SCREENS = ['scr-title', 'scr-name', 'scr-menu', 'scr-play', 'scr-lobby', 'scr-results', 'scr-shop', 'scr-profile', 'scr-settings', 'scr-pause', 'scr-ranks', 'scr-comms'];
   const UI = { current: 'scr-title', hurtA: 0, hurtAng: null, hitT: -9, hitHead: false, keys: {}, cheatOpen: false, chatOpen: false, autoTimer: null };
   let G = null;
   const tv1 = new THREE.Vector3(), tv2 = new THREE.Vector3(), pv = new THREE.Vector3();
@@ -26,12 +26,24 @@
     if (id !== 'scr-results') UI.stopAuto();
   };
   function rankLabel() {
-    const t = D.TIERS.find(x => x.id === NA.Save.data.highestTier);
-    return t ? t.rank : 'Wood V';
+    const s = NA.Save.data;
+    if (NA.Ranked.unlocked() && s.ranked.matches) return NA.Prog.myRank().name + (s.prestige ? ` · P${s.prestige}` : '');
+    const t = D.TIERS.find(x => x.id === s.highestTier);
+    return (t ? t.rank + ' lobby' : 'Iron lobby') + (s.prestige ? ` · P${s.prestige}` : '');
   }
   UI.showMenu = function () {
     const s = NA.Save.data;
     if (G.state === 'results') G.toIdle();
+    const P = NA.Prog;
+    const season = P.checkSeason();
+    if (season) UI.toast(`Season ${P.seasonId()} started: +${U.fmt(season.reward)} for your peak rank`);
+    const login = P.checkLogin();
+    if (login) UI.toast(`Daily login (day ${login.streak}): +${U.fmt(login.reward)}`);
+    G.resolveReports();
+    const daily = P.daily();
+    $('m-ranks-sub').textContent = `${NA.Prog.myRank().name} · dailies ${daily.filter(c => c.done).length}/${daily.length}`;
+    $('ranks-badge').classList.toggle('hidden', daily.every(c => c.done));
+    if (NA.Comms) NA.Comms.badge();
     $('menu-user').textContent = s.username;
     $('menu-rank').textContent = rankLabel();
     $('menu-credits').textContent = U.fmt(s.credits);
@@ -49,15 +61,21 @@
   }
   UI.showPlay = function () {
     const s = NA.Save.data, html = [], R = NA.Ranked;
-    const ranked = s.playMode === 'ranked' && R.unlocked();
-    if (!R.unlocked()) s.playMode = 'casual';
+    if (s.playMode === 'ranked' && !R.unlocked()) s.playMode = 'casual';
+    const ranked = s.playMode === 'ranked', events = s.playMode === 'events';
     $('play-credits').textContent = U.fmt(s.credits);
-    $('mode-casual').classList.toggle('on', !ranked);
+    $('mode-casual').classList.toggle('on', !ranked && !events);
     $('mode-ranked').classList.toggle('on', ranked);
+    $('mode-events').classList.toggle('on', events);
+    const cw = NA.Events.chaosWindow();
+    $('mode-events').querySelector('small').innerHTML = cw.live && NA.Events.chaosUnlocked() ? '<b class="live">● Chaos FFA live</b> · Loot Rush' : 'Loot Rush · Tournament · Chaos';
     $('mode-ranked').classList.toggle('locked', !R.unlocked());
     $('mode-ranked').querySelector('small').textContent = R.unlocked() ? `${D.RANKED.ac} · ×${D.RANKED.payMult} pay` : `Unlocks at Tier ${D.RANKED.unlockTier}`;
     $('ranked-panel').classList.toggle('hidden', !ranked);
+    const df = G.diff();
+    $('diff-row').innerHTML = '<span class="diff-l">Difficulty</span>' + D.DIFFICULTY.map(x => `<button class="diff ${x.id === df.id ? 'on' : ''}" data-diff="${x.id}" style="--dc:${x.color}">${x.name}<small>×${x.pay} pay</small></button>`).join('') + `<span class="diff-tag">${esc(df.tag)}</span>`;
     if (ranked) UI.renderRankedPanel();
+    if (events) { $('tier-list').innerHTML = NA.Events.cards(tourneyCard); UI.show('scr-play'); return; }
     for (const t of D.TIERS) {
       const open = s.highestTier >= t.id, wins = s.winsByTier[t.id] || 0;
       let prog;
@@ -67,8 +85,7 @@
       html.push(`<button class="tier ${open ? 'open' : 'locked'} m-${t.map}" data-tier="${t.id}">
         <div class="swatch"></div><div class="tnum">TIER ${t.id} · ${t.rank}</div><div class="tname">${t.name}</div>
         <div class="tmeta">${t.modeLabel} · ${botsLabel(t)} · first to ${t.scoreToWin}${t.loot ? ' · loot + shields' : ''}</div>
-        <div class="tpay">Win ${U.fmt(t.base * (ranked ? D.RANKED.payMult : 1))} + ${U.fmt(t.kill * (ranked ? D.RANKED.payMult : 1))}/kill</div><div class="tprog">${prog}</div></button>`);
-      if (t.id === D.TOURNAMENT.unlockTier - 1 && !ranked) html.push(tourneyCard());
+        <div class="tpay">Win ${U.fmt(t.base * (ranked ? D.RANKED.payMult : 1) * df.pay)} + ${U.fmt(t.kill * (ranked ? D.RANKED.payMult : 1) * df.pay)}/kill</div><div class="tprog">${prog}</div></button>`);
     }
     for (const t of D.LOCKED_TIERS) {
       html.push(`<div class="tier soon locked"><div class="swatch"></div><div class="tnum">TIER ${t.id} · ${t.rank}</div>
@@ -207,7 +224,14 @@
   UI.pause = function () {
     if (G.state !== 'playing' || G.paused) return;
     G.paused = true;
+    UI.renderPausePlayers();
     UI.show('scr-pause');
+  };
+  UI.renderPausePlayers = function () {
+    const rows = G.bots.filter(b => G.isEnemy(G.player, b)).sort((a, b) => b.kills - a.kills);
+    $('pause-players').innerHTML = rows.map(b => `<div class="pp"><b>${esc(b.name)}</b><span>${b.kills}/${b.deaths}</span>
+      <button class="btn tiny" data-prep="${esc(b.name)}" ${b.reported ? 'disabled' : ''}>${b.reported ? 'REPORTED' : 'REPORT'}</button>
+      <button class="btn tiny" data-pclip="${esc(b.name)}" ${b.clipped ? 'disabled' : ''}>${b.clipped ? 'CLIPPED' : 'CLIP'}</button></div>`).join('') || '<div class="muted small">No enemies.</div>';
   };
   UI.resume = function () { G.paused = false; UI.showHUD(); };
 
@@ -219,7 +243,7 @@
     $('res-sub').textContent = `${G.ranked ? 'RANKED · ' : ''}${t.name} · ${t.modeLabel}`;
     const order = t.mode === 'tdm' ? r.rows.filter(x => x.team === 'A').concat(r.rows.filter(x => x.team === 'B')) : r.rows;
     $('res-board').innerHTML = '<div class="row head"><span>Player</span><span>K</span><span>D</span></div>' +
-      order.map(x => `<div class="row ${x.me ? 'me' : ''} ${t.mode === 'tdm' ? 't' + x.team : ''}"><span>${esc(x.name)}${x.spoof ? '<span class="spoof">spoofed</span>' : ''}</span><span>${x.k}</span><span>${x.d}</span></div>`).join('');
+      order.map(x => `<div class="row ${x.me ? 'me' : ''} ${t.mode === 'tdm' ? 't' + x.team : ''}"><span>${esc(x.name)}${x.spoof ? '<span class="spoof">spoofed</span>' : ''}${x.me || x.ally ? '' : `<button class="rep" data-rep="${esc(x.name)}">report</button>`}</span><span>${x.k}</span><span>${x.d}</span></div>`).join('');
     $('res-stats').textContent = `Accuracy ${r.acc}% · Headshots ${p.headshots} · Peak suspicion ${r.peakSus}` + (r.ranked ? ` · Peak Warden detection ${r.ranked.peak}%` : '');
     $('res-pay').innerHTML = r.pay.lines.map(l => `<div class="pl"><span>${esc(l[0])}</span><span>+${U.fmt(l[1])}</span></div>`).join('');
     countUp($('res-total'), r.pay.total);
@@ -231,7 +255,12 @@
       un.innerHTML = `<b class="ban">${rk.wave ? 'BAN WAVE · ' : ''}${esc(b.label)}</b><br>${esc(b.reason)}${b.fine ? ` · fined ${U.fmt(b.fine)}` : ''}${b.rrLost ? ` · rank reset (−${b.rrLost} RR)` : ''}${rk.confiscated ? ` · winnings confiscated (${U.fmt(rk.confiscated)})` : ''}<br><span class="muted">Ticket #${b.ticket}. You can appeal from the Ranked lobby list.</span>`;
       un.classList.add('soon'); un.classList.remove('hidden');
     } else if (rk) {
-      un.innerHTML = `<b>${rk.rr >= 0 ? '+' : ''}${rk.rr} RR</b> · ${NA.Ranked.rankName(RS.rr)} (${RS.rr} RR)${rk.legit ? ' · played legit' : ''}` +
+      const k = rk.rank || {};
+      const rkLine = k.promoted ? `<b class="up">PROMOTED to ${esc(k.after.name)}!</b>${k.reward ? ` +${U.fmt(k.reward.credits)} and a new crosshair` : ''}`
+        : k.promoFailed ? `<b class="ban">Promo lost.</b> Back to ${esc(k.after.name)}: climb ${300 - (RS.rr % 300)} RP to try again`
+        : k.promoStarted ? `<b class="up">PROMO MATCH UNLOCKED:</b> win your next Ranked match to reach ${NA.Prog.RANKS[k.after.idx + 1]}`
+        : `<b>${rk.rr >= 0 ? '+' : ''}${rk.rr} RP</b> · ${esc(NA.Ranked.rankName(RS.rr))}`;
+      un.innerHTML = rkLine + `${rk.legit ? ' · played legit' : ''}` +
         (rk.update ? `<br>${esc(D.RANKED.ac)} updated to v${rk.update}: bypass ${rk.detected ? '<b class="ban">DETECTED</b>' : 'still undetected'}` : '');
       un.classList.remove('hidden');
     } else if (r.tourney && r.tourney.next) {
@@ -256,7 +285,7 @@
     UI.refreshDMBadge();
     UI.show('scr-results');
     const s = NA.Save.data;
-    if (NA.Save.level('autoqueue') && s.settings.autoQueue && !r.unlocked && t.tourney === undefined && !G.ranked) UI.startAuto(t.id);
+    if (NA.Save.level('autoqueue') && s.settings.autoQueue && !r.unlocked && t.tourney === undefined && !G.ranked && t.id <= D.MAX_PLAYABLE_TIER) UI.startAuto(t.id);
   };
   const UNLOCK_NOTES = {
     2: 'AR-7 Rifle + Armory guns', 3: 'new cheats in the shop', 4: 'loot, shields, Loot ESP, Stream Proof, the Tournament',
@@ -307,6 +336,7 @@
   };
   UI.shopBack = function () {
     if (UI.shopFrom === 'scr-results' && G.state === 'results') UI.show('scr-results');
+    else if (UI.shopFrom === 'scr-comms') NA.Comms.open();
     else UI.showMenu();
   };
   UI.renderShop = function () {
@@ -335,6 +365,7 @@
       }
       html.push('</div>');
     }
+    html.push(NA.Cfg.shopHtml());
     html.push('<div class="cat-h">Armory</div><div class="items">');
     for (const id of D.WEAPON_ORDER) {
       const w = D.WEAPONS[id], owned = !!s.guns[id], locked = s.highestTier < w.tier;
@@ -350,7 +381,7 @@
         <div class="iname">${locked ? '??? · unlocks at Tier ' + w.tier : esc(w.name)}<span class="slot">${w.slot ? 'SECONDARY' : 'PRIMARY'}</span></div>
         <div class="itag">${locked ? '&nbsp;' : esc(w.tag)}</div>
         <div class="ifx">${locked ? '&nbsp;' : esc(stats)}</div>
-        <div class="ufoot"><span class="und">${owned ? '✔ OWNED' : '&nbsp;'}</span>${btn}</div></div>`);
+        <div class="ufoot"><span class="und">${owned ? '✔ OWNED' : '&nbsp;'}${(() => { const m = NA.Prog.mastery(id); return m.kills ? ` · <span style="color:${m.color || '#94a3b8'}">${m.name} mastery ${m.kills}${m.next ? '/' + m.next : ''}</span>` : ''; })()}</span>${btn}</div></div>`);
     }
     html.push('</div>');
     html.push(`<div class="teaser">Restocking next update: ${D.TEASERS.join(' · ')}</div>`);
@@ -376,7 +407,7 @@
     const acc = st.shotsFired ? (100 * st.shotsHit / st.shotsFired).toFixed(1) : '0.0';
     const kd = st.deaths ? (st.kills / st.deaths).toFixed(2) : st.kills.toFixed(2);
     const card = (v, l, wide) => `<div class="stat ${wide ? 'wide' : ''}"><b>${v}</b><span>${l}</span></div>`;
-    const ach = { first_buy: "First One's Half Off", skill_issue: 'Skill Issue', placebo: 'Placebo', flawless: 'Flawless', arsenal: 'Arsenal', champion: 'FRAGLINE Open Champion', kicked: 'Democracy', ragequits: 'Lobby Cleaner' };
+    const ach = { first_buy: "First One's Half Off", skill_issue: 'Skill Issue', placebo: 'Placebo', flawless: 'Flawless', arsenal: 'Arsenal', champion: 'FRAGLINE Open Champion', kicked: 'Democracy', ragequits: 'Lobby Cleaner', snitch: 'Hall Monitor', jury: 'Court of Public Opinion', scammed: 'Scammed', banned: 'Detected', banwave: 'Caught in the Wave' };
     $('prof-body').innerHTML = [
       card(esc(s.username), 'Username'), card(rankLabel(), 'Rank'),
       card(NA.Save.accountAge() + ' days', 'Account age'), card(U.fmt(s.lifetimeCredits), 'Lifetime credits'),
@@ -397,6 +428,16 @@
       g.fillStyle = '#8d97a8'; g.font = '18px sans-serif'; g.fillText(`best ${Math.max(...h)}%`, cv.width - 110, 22);
     } else { g.fillStyle = '#8d97a8'; g.font = '22px sans-serif'; g.fillText('Play a few matches to see your accuracy here.', 10, 50); }
   };
+  UI.renderCrosshairPick = function () {
+    const P = NA.Prog, c = NA.Save.data.cosmetics;
+    $('set-xstyle').innerHTML = Object.keys(P.STYLES).map(k => `<button class="chip ${c.style === k ? 'on' : ''} ${P.owns('style', k) ? '' : 'locked'}" data-xs="${k}">${P.STYLES[k]}${P.owns('style', k) ? '' : ' 🔒'}</button>`).join('');
+    $('set-xcolor').innerHTML = Object.keys(P.CROSS_COLORS).map(k => { const v = P.CROSS_COLORS[k]; return `<button class="chip sw ${c.color === k ? 'on' : ''} ${P.owns('color', k) ? '' : 'locked'}" data-xc="${k}" title="${k}" style="--sw:${v === 'rainbow' ? 'linear-gradient(90deg,#f43f5e,#facc15,#4ade80,#22d3ee,#c084fc)' : v}">${P.owns('color', k) ? '' : '🔒'}</button>`; }).join('');
+  };
+  UI.showRanks = function () {
+    $('ranks-credits').textContent = U.fmt(NA.Save.data.credits);
+    NA.Prog.render();
+    UI.show('scr-ranks');
+  };
   UI.showSettings = function (from) {
     UI.settingsFrom = from;
     const st = NA.Save.data.settings;
@@ -405,6 +446,7 @@
     $('set-auto').checked = !!st.autoQueue; $('set-fps').checked = !!st.showFps;
     $('set-lang').innerHTML = NA.I18N.LANGS.map(l => `<option value="${l[0]}" ${l[0] === st.lang ? 'selected' : ''}>${l[1]}</option>`).join('');
     $('set-pad').textContent = UI.padName ? 'Controller: ' + UI.padName : 'Controller: none connected (pair one in iOS Settings → Bluetooth)';
+    UI.renderCrosshairPick();
     UI.resetArm = false; $('set-reset').textContent = 'Reset all progress';
     UI.show('scr-settings');
   };
@@ -436,9 +478,15 @@
   UI.cmTab = 'aim';
   UI.renderCheatMenu = function () {
     const s = NA.Save.data, T = NA.I18N.t, rows = [];
-    const tabs = ['aim', 'visuals', 'misc', 'exploits', 'config'];
+    const tabs = ['aim', 'visuals', 'misc', 'exploits', 'advanced', 'config'];
     $('cm-tabs').innerHTML = tabs.map(t => `<button data-tab="${t}" class="${UI.cmTab === t ? 'on' : ''}">${T(t)}</button>`).join('');
     $('cm-head').textContent = `skillissue v2.0 | ${T('undetected')} | ${T('hide')}` + (G.mods && G.mods.streamProof ? ` | ● ${T('hidden')}` : '');
+    if (UI.cmTab === 'advanced') {
+      $('cm-list').innerHTML = NA.Cfg.renderAdvanced();
+      $('cm-panic').classList.toggle('on', G.panic);
+      $('cm-panic').textContent = G.panic ? T('panicOn') : T('panic');
+      return;
+    }
     if (UI.cmTab === 'config') {
       rows.push(`<div class="cm-opt"><span>${T('language')}</span><select data-lang="1">${NA.I18N.LANGS.map(l => `<option value="${l[0]}" ${l[0] === s.settings.lang ? 'selected' : ''}>${l[1]}</option>`).join('')}</select></div>`);
       rows.push(`<div class="cm-note">config: default.cfg · ${G.bots.length} entities · ping ${U.randInt(18, 40)} ms</div>`);
@@ -492,6 +540,7 @@
     $('adm-god').textContent = 'God mode: ' + (G.god ? 'ON' : 'off');
     $('adm-god').classList.toggle('on', !!G.god);
     $('adm-speed').textContent = 'Game speed: ' + G.speed + '×';
+    $('adm-events').textContent = 'Events always live: ' + (NA.Save.data.flags.eventsAlwaysLive ? 'ON' : 'off');
     $('adm-head-credits').textContent = U.fmt(NA.Save.data.credits);
     $('adm-reset').textContent = UI.admResetArm ? 'Tap again to erase everything' : 'Reset all progress';
   };
@@ -560,6 +609,16 @@
     $('sus-fill').style.width = sus + '%';
     $('sus-val').textContent = sus;
     $('sus').className = 's' + C.band(sus, 0);
+    const killer = !p.alive && G.lastKiller && !G.lastKiller.isPlayer && G.bots.indexOf(G.lastKiller) >= 0 ? G.lastKiller : null;
+    $('death-actions').classList.toggle('hidden', !killer);
+    if (killer && UI.daFor !== killer) {
+      UI.daFor = killer;
+      $('da-name').textContent = `Killed by ${killer.name}`;
+      $('da-report').disabled = !!killer.reported; $('da-report').textContent = killer.reported ? 'REPORTED' : 'REPORT';
+      $('da-clip').disabled = !!killer.clipped; $('da-clip').textContent = killer.clipped ? 'CLIPPED' : 'CLIP IT';
+    }
+    if (!killer) UI.daFor = null;
+    $('minimap').dataset.size = G.mods.adv.radarSize;
     $('det').classList.toggle('hidden', !G.ranked);
     if (G.ranked) {
       const d = Math.round(mt.det);
@@ -649,15 +708,19 @@
     const r = Math.tan(G.spreadCone() * U.DEG) / Math.tan(NA.R.camera.fov * U.DEG / 2) * h / 2;
     if (r > 5) { g.beginPath(); g.arc(s.x, s.y, r, 0, Math.PI * 2); g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1; g.stroke(); }
     const gap = Math.max(4, Math.min(r * 0.5, 22)), len = 7;
-    const col = G.aimLock ? '#ff3b5c' : '#ffffff';
-    const lines = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    const style = NA.Save.data.cosmetics.style || 'cross';
+    const col = G.aimLock ? '#ff3b5c' : NA.Prog.crossColor(now);
+    const lines = style === 'tee' ? [[0, 1], [-1, 0], [1, 0]] : [[0, -1], [0, 1], [-1, 0], [1, 0]];
     for (const pass of [0, 1]) {
       g.strokeStyle = pass ? col : 'rgba(0,0,0,0.65)';
       g.lineWidth = pass ? 2 : 4;
       g.beginPath();
-      for (const [lx, ly] of lines) { g.moveTo(s.x + lx * gap, s.y + ly * gap); g.lineTo(s.x + lx * (gap + len), s.y + ly * (gap + len)); }
+      if (style === 'circle') g.arc(s.x, s.y, gap + 2, 0, Math.PI * 2);
+      else if (style === 'chevron') { g.moveTo(s.x - gap - 4, s.y + gap + 2); g.lineTo(s.x, s.y + 2); g.lineTo(s.x + gap + 4, s.y + gap + 2); }
+      else if (style !== 'dot') for (const [lx, ly] of lines) { g.moveTo(s.x + lx * gap, s.y + ly * gap); g.lineTo(s.x + lx * (gap + len), s.y + ly * (gap + len)); }
       g.stroke();
     }
+    g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(s.x - 2.5, s.y - 2.5, 5, 5);
     g.fillStyle = col; g.fillRect(s.x - 1.5, s.y - 1.5, 3, 3);
     const ht = (now - UI.hitT) / 1000;
     if (ht < 0.18) {
@@ -704,7 +767,7 @@
       label(g, `${name} ${Math.round(d)}m`, s.x, s.y - 7, col);
     }
   }
-  const JOINTS = { head: [0, 1.62, 0], neck: [0, 1.42, 0], pelvis: [0, 0.8, 0], ls: [-0.3, 1.36, 0], rs: [0.3, 1.36, 0], lh: [-0.38, 1.0, -0.12], rh: [0.38, 1.0, -0.12], lf: [-0.16, 0.03, 0], rf: [0.16, 0.03, 0] };
+  const JOINTS = { head: [0, 1.66, 0], neck: [0, 1.44, 0], pelvis: [0, 0.8, 0], ls: [-0.38, 1.4, 0], rs: [0.38, 1.4, 0], lh: [-0.2, 1.3, -0.55], rh: [0.38, 1.38, -0.6], lf: [-0.125, 0.03, 0], rf: [0.125, 0.03, 0] };
   const BONES = [['head', 'neck'], ['neck', 'pelvis'], ['neck', 'ls'], ['ls', 'lh'], ['neck', 'rs'], ['rs', 'rh'], ['pelvis', 'lf'], ['pelvis', 'rf']];
   function drawESP(g, w, h) {
     const lvl = G.mods.esp, o = G.mods.espOpt, p = G.player;
@@ -714,7 +777,7 @@
     // text only for the nearest few, or a big lobby turns into soup
     const list = G.bots.filter(b => b.alive && G.isEnemy(p, b)).map(b => [p.pos.distanceTo(b.pos), b]).sort((a, c) => a[0] - c[0]);
     list.forEach(([dist, b], idx) => {
-      if (dist > 140) return;
+      if (dist > G.mods.adv.espDist) return;
       const text = idx < 6 && dist < 90;
       let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, ok = true;
       for (const cx of [-0.4, 0.4]) for (const cy of [0, 1.86]) for (const cz of [-0.4, 0.4]) {
@@ -725,7 +788,9 @@
       if (!ok) return;
       const bw = maxX - minX, bh = maxY - minY, cx = (minX + maxX) / 2;
       const bot = has('botTag', 4);
-      const col = b.frozenT > 0 ? '#9be7ff' : bot ? '#22d3ee' : b.visToPlayer ? '#ffd23f' : '#ff2f5b';
+      const sch = G.mods.adv.espColor;
+      const vc = sch === 'ice' ? ['#7dd3fc', '#3b82f6'] : sch === 'mono' ? ['#ffffff', '#94a3b8'] : sch === 'rainbow' ? [`hsl(${(performance.now() / 10 + idx * 40) % 360},90%,60%)`, `hsl(${(performance.now() / 10 + idx * 40) % 360},90%,45%)`] : ['#ffd23f', '#ff2f5b'];
+      const col = b.frozenT > 0 ? '#9be7ff' : bot ? '#22d3ee' : b.visToPlayer ? vc[0] : vc[1];
       if (has('box', 1) || !has('skeleton', 4)) {
         g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 3; g.strokeRect(minX, minY, bw, bh);
         g.strokeStyle = col; g.lineWidth = 1.5; g.strokeRect(minX, minY, bw, bh);
@@ -1010,11 +1075,45 @@
     });
     click('m-play', () => UI.showPlay());
     click('m-shop', () => UI.showShop('scr-menu'));
+    click('m-ranks', () => UI.showRanks());
+    click('m-comms', () => { if (NA.Comms) NA.Comms.open(); });
+    document.getElementById('scr-ranks').addEventListener('click', e => {
+      if (e.target.id === 'rk-prest-btn') {
+        if (UI.prestArm) { UI.prestArm = false; if (NA.Prog.prestige()) { A.win(); UI.toast(`Prestige ${NA.Save.data.prestige}!`); } UI.showRanks(); }
+        else { UI.prestArm = true; e.target.textContent = 'TAP AGAIN: tiers reset to 1'; setTimeout(() => { UI.prestArm = false; }, 3000); }
+      }
+    });
+    const findBot = name => G.bots.find(b => b.name === name);
+    $('pause-players').addEventListener('click', e => {
+      const r = e.target.closest('[data-prep]'), c = e.target.closest('[data-pclip]');
+      if (r) { G.report(findBot(r.dataset.prep)); UI.renderPausePlayers(); }
+      if (c) { G.clip(findBot(c.dataset.pclip)); UI.renderPausePlayers(); }
+    });
+    tap($('da-report'), () => { if (UI.daFor) { G.report(UI.daFor); $('da-report').disabled = true; $('da-report').textContent = 'REPORTED'; } });
+    tap($('da-clip'), () => { if (UI.daFor) { G.clip(UI.daFor); $('da-clip').disabled = true; $('da-clip').textContent = 'CLIPPED'; } });
+    $('res-board').addEventListener('click', e => {
+      const b = e.target.closest('[data-rep]');
+      if (!b) return;
+      const bot = findBot(b.dataset.rep);
+      if (bot && G.report(bot)) { b.disabled = true; b.textContent = 'reported'; }
+    });
+    $('set-xstyle').addEventListener('click', e => {
+      const b = e.target.closest('[data-xs]'); if (!b) return;
+      if (!NA.Prog.owns('style', b.dataset.xs)) { A.deny(); UI.toast('Unlocks by ranking up in Ranked'); return; }
+      NA.Save.data.cosmetics.style = b.dataset.xs; NA.Save.save(); A.click(); UI.renderCrosshairPick();
+    });
+    $('set-xcolor').addEventListener('click', e => {
+      const b = e.target.closest('[data-xc]'); if (!b) return;
+      if (!NA.Prog.owns('color', b.dataset.xc)) { A.deny(); UI.toast('Unlocks by ranking up in Ranked'); return; }
+      NA.Save.data.cosmetics.color = b.dataset.xc; NA.Save.save(); A.click(); UI.renderCrosshairPick();
+    });
     click('m-profile', () => UI.showProfile());
     click('m-settings', () => UI.showSettings('scr-menu'));
     document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => { A.click(); if (b.dataset.back === 'scr-menu') UI.showMenu(); else UI.show(b.dataset.back); }));
     document.querySelector('[data-back-shop]').addEventListener('click', () => { A.click(); UI.shopBack(); });
     $('tier-list').addEventListener('click', e => {
+      const ev = e.target.closest('[data-event]');
+      if (ev) { A.unlock(); A.click(); if (!NA.Events.play(ev.dataset.event)) A.deny(); return; }
       const tt = e.target.closest('[data-tourney]');
       if (tt) {
         if (tt.classList.contains('locked')) return;
@@ -1028,6 +1127,15 @@
       UI.queue(+el.dataset.tier);
     });
     $('shop-list').addEventListener('click', e => {
+      const cb = e.target.closest('[data-cfg-buy]'), ca = e.target.closest('[data-cfg-apply]');
+      if (cb) {
+        const r = NA.Cfg.buy(cb.dataset.cfgBuy);
+        if (!r.ok) { A.deny(); cb.classList.remove('shake'); void cb.offsetWidth; cb.classList.add('shake'); return; }
+        A.buy();
+        UI.toast(r.scam === 'never' ? 'Payment sent. Waiting for the seller…' : r.scam === 'trash' ? 'Config applied. Something feels off…' : 'Config applied' + (r.missing.length ? ` (you don't own: ${r.missing.slice(0, 3).join(', ')})` : ''));
+        UI.renderShop(); return;
+      }
+      if (ca) { const c = NA.Cfg.CONFIGS.find(x => x.id === ca.dataset.cfgApply); const miss = NA.Cfg.apply(c.cfg); A.buy(); UI.toast(`Applied ${c.name}` + (miss.length ? ` (missing: ${miss.slice(0, 3).join(', ')})` : '')); return; }
       const gb = e.target.closest('[data-gun]'), eb = e.target.closest('[data-equip]');
       if (eb) { G.equipGun(eb.dataset.equip); A.click(); UI.toast('Equipped ' + D.WEAPONS[eb.dataset.equip].name); UI.renderShop(); return; }
       if (gb) {
@@ -1045,6 +1153,7 @@
     click('res-again', () => {
       const t = G.match.tier;
       if (t.tourney !== undefined) { if (G.tourney) G.startMatch(G.tourneyTier(G.tourney.round)); else { G.toIdle(); UI.showPlay(); } }
+      else if (t.lootMode || t.chaos) { if (!NA.Events.play(t.chaos ? 'chaos' : 'loot')) { G.toIdle(); UI.showPlay(); } }
       else UI.queue(t.id, G.ranked);
     });
     click('res-lobbies', () => { G.toIdle(); UI.showPlay(); });
@@ -1055,6 +1164,14 @@
       const b = e.target.closest('[data-play]'); if (b) { A.click(); UI.queue(+b.dataset.play, G.ranked); }
     });
     click('pause-resume', () => UI.resume());
+    $('diff-row').addEventListener('click', e => {
+      const b = e.target.closest('[data-diff]');
+      if (!b) return;
+      A.click();
+      NA.Save.data.settings.difficulty = b.dataset.diff; NA.Save.save();
+      UI.showPlay();
+    });
+    click('mode-events', () => { NA.Save.data.playMode = 'events'; NA.Save.save(); A.click(); UI.showPlay(); });
     click('mode-casual', () => { NA.Save.data.playMode = 'casual'; NA.Save.save(); A.click(); UI.showPlay(); });
     click('mode-ranked', () => {
       if (!NA.Ranked.unlocked()) { A.deny(); UI.toast(`Ranked unlocks at Tier ${D.RANKED.unlockTier}`); return; }
@@ -1144,8 +1261,14 @@
     $('cm-close').addEventListener('click', () => UI.closeCheatMenu());
     $('cm-panic').addEventListener('click', () => { G.setPanic(!G.panic); UI.renderCheatMenu(); });
     $('cm-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { UI.cmTab = b.dataset.tab; A.click(); UI.renderCheatMenu(); } });
+    $('cm-list').addEventListener('click', e => {
+      const sv = e.target.closest('[data-psave]'), ld = e.target.closest('[data-pload]');
+      if (sv) { NA.Cfg.saveProfile(sv.dataset.psave); A.click(); UI.toast(`Saved profile: ${sv.dataset.psave}`); UI.renderCheatMenu(); }
+      if (ld) { const miss = NA.Cfg.loadProfile(ld.dataset.pload); A.buy(); UI.toast(`Loaded ${ld.dataset.pload}` + (miss && miss.length ? ` (missing: ${miss.join(', ')})` : '')); UI.renderCheatMenu(); }
+    });
     $('cm-list').addEventListener('change', e => {
       const t = e.target;
+      if (t.dataset.adv) { NA.Cfg.onAdvChange(t); if (t.type !== 'range') UI.renderCheatMenu(); return; }
       if (t.dataset.lang) { NA.Save.data.settings.lang = t.value; NA.Save.save(); UI.renderCheatMenu(); return; }
       if (t.dataset.opt) {
         const [id, key] = t.dataset.opt.split('.');
@@ -1162,6 +1285,7 @@
     });
     $('cm-list').addEventListener('input', e => {
       const t = e.target;
+      if (t.dataset.adv && t.type === 'range') { NA.Cfg.onAdvChange(t); return; }
       if (t.dataset.opt && t.type === 'range') {
         const [id, key] = t.dataset.opt.split('.');
         G.setOpt(id, key, +t.value);

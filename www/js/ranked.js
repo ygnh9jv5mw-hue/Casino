@@ -9,7 +9,7 @@
 
   R.unlocked = () => NA.Save.data.highestTier >= RK().unlockTier;
   R.version = () => S().acVersion.join('.');
-  R.rankName = rr => { let n = RK().ranks[0][1]; for (const [min, name] of RK().ranks) if (rr >= min) n = name; return n; };
+  R.rankName = rr => NA.Prog.rankOf(rr).name;
   R.banned = () => S().perma || Date.now() < S().banUntil;
   R.banLeft = () => Math.max(0, S().banUntil - Date.now());
   R.fmtLeft = ms => { const s = Math.ceil(ms / 1000), m = Math.floor(s / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}:${String(s % 60).padStart(2, '0')}`; };
@@ -39,6 +39,9 @@
         const o = NA.Game.opt('aimbot');
         x *= 1 - 0.07 * (U.clamp(+o.smooth || 1, 1, 10) - 1);
         if (o.type === 'silent' && use >= 3) x *= 1.4;
+        const adv = NA.Cfg.adv();
+        x *= (1 - 0.05 * adv.humanizer) * (adv.curve === 'human' ? 0.85 : adv.curve === 'smooth' ? 0.92 : 1) * (0.5 + 0.5 * adv.hitChance / 100) * (adv.visCheck === false ? 1.3 : 1);
+        if (adv.reaction >= 150) x *= 0.9;
       }
       h += x;
     }
@@ -123,14 +126,12 @@
   };
 
   // After every ranked match: rank points, a delayed ban wave roll, and anticheat updates.
-  R.afterMatch = function (won, peak, banned) {
+  R.afterMatch = function (won, peak, banned, ctx) {
     const s = S(), out = {};
     s.matches++;
     if (!banned) {
-      const d = won ? U.randInt(18, 26) : -U.randInt(10, 16);
-      s.rr = Math.max(0, s.rr + d);
-      s.peakRR = Math.max(s.peakRR, s.rr);
-      out.rr = d;
+      out.rank = NA.Prog.applyRanked(won, ctx || { diff: D.DIFFICULTY[1], promo: false });
+      out.rr = out.rank.delta;
       if (peak >= 70) {
         const p = (peak - 70) / 30 * 0.55 * (lvl('cleaner') ? 0.4 : 1);
         if (Math.random() < p) out.wave = R.ban('Ban wave: flagged by Warden AC after the match', peak, true);

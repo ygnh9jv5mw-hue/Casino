@@ -25,6 +25,7 @@
       <svg viewBox="0 0 24 24" class="eye"><path d="M12 5C6.5 5 2.4 9.2 1 12c1.4 2.8 5.5 7 11 7s9.6-4.2 11-7c-1.4-2.8-5.5-7-11-7zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg>
       <div class="bar"><i id="sus-fill"></i></div><b id="sus-val">0</b>
     </div>
+    <div id="death-actions" class="hidden"><span id="da-name"></span><button class="btn tiny" id="da-report">REPORT</button><button class="btn tiny" id="da-clip">CLIP IT</button></div>
     <div id="det" class="hidden" title="Warden AC detection"><span>WARDEN</span><div class="bar"><i id="det-fill"></i></div><b id="det-val">0%</b></div>
     <div id="credits-live">+&#8353;0</div>
     <canvas id="minimap" width="220" height="220"></canvas>
@@ -75,6 +76,7 @@
     <h1 class="glitch" data-text="NO ANTICHEAT">NO ANTICHEAT</h1>
     <p class="tagline">you can't aim. good thing nobody's checking.</p>
     <button class="btn primary big" id="title-go">TAP TO START</button>
+    <p class="muted small title-ver">v0.4</p>
   </div>
 </section>
 
@@ -98,6 +100,8 @@
     <div class="menu-grid">
       <button class="tile play" id="m-play"><span class="t-big">PLAY</span><span class="t-sub" id="m-play-sub"></span></button>
       <button class="tile shop" id="m-shop"><span class="t-big">SHOP</span><span class="t-sub">skillissue.shop</span><i class="badge hidden" id="shop-badge"></i></button>
+      <button class="tile ranks" id="m-ranks"><span class="t-big">RANKS</span><span class="t-sub" id="m-ranks-sub">ladder · dailies</span><i class="badge hidden" id="ranks-badge"></i></button>
+      <button class="tile comms" id="m-comms"><span class="t-big">COMMS</span><span class="t-sub">clips · servers</span><i class="badge hidden" id="comms-badge"></i></button>
       <button class="tile" id="m-profile"><span class="t-big">PROFILE</span><span class="t-sub">stats &amp; achievements</span></button>
       <button class="tile" id="m-settings"><span class="t-big">SETTINGS</span><span class="t-sub">controls &amp; sound</span></button>
     </div>
@@ -115,7 +119,9 @@
     <div class="mode-row">
       <button class="mode on" id="mode-casual">CASUAL<small>No anticheat</small></button>
       <button class="mode" id="mode-ranked">RANKED<small>Warden AC</small></button>
+      <button class="mode" id="mode-events">EVENTS<small>Loot Rush · Tournament · Chaos</small></button>
     </div>
+    <div class="diff-row" id="diff-row"></div>
     <div id="ranked-panel" class="hidden"></div>
     <div id="tier-list" class="tier-list"></div>
   </div>
@@ -187,10 +193,42 @@
       <label class="check"><input type="checkbox" id="set-auto"> Auto-Queue starts the next match (when owned)</label>
       <label class="check"><input type="checkbox" id="set-fps"> Show FPS</label>
       <label>Cheat menu language <select id="set-lang"></select></label>
+      <div class="set-x"><span>Crosshair</span><div id="set-xstyle" class="chips"></div></div>
+      <div class="set-x"><span>Crosshair color</span><div id="set-xcolor" class="chips"></div></div>
+      <p class="muted small">More crosshairs unlock as you rank up in Ranked.</p>
       <p class="muted small" id="set-pad">Controller: none</p>
       <button class="btn danger" id="set-reset">Reset all progress</button>
-      <p class="muted small">NO ANTICHEAT v0.3 &middot; a single-player game. Every "player" is a bot and every cheat is an in-game upgrade.</p>
+      <p class="muted small">NO ANTICHEAT v0.4 &middot; a single-player game. Every "player" is a bot and every cheat is an in-game upgrade.</p>
     </div>
+  </div>
+</section>
+
+<section id="scr-ranks" class="screen hidden">
+  <div class="menu">
+    <header class="topbar"><button class="btn ghost" data-back="scr-menu">&larr; Back</button><div class="who"><b>Ranks</b></div><div class="credits" id="ranks-credits"></div></header>
+    <div class="ranks-wrap">
+      <div id="rk-head" class="rk-head"></div>
+      <div class="ranks-cols">
+        <div class="ranks-left"><div id="rk-daily"></div><div id="rk-prestige"></div></div>
+        <div id="rk-board" class="ranks-right"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="scr-comms" class="screen hidden">
+  <div class="comms-app">
+    <aside class="co-side">
+      <div class="co-app">COMMS <small>v2.4</small></div>
+      <div class="co-server">FRAGLINE Official <small id="co-online"></small></div>
+      <div id="co-channels" class="co-channels"></div>
+      <div id="co-me" class="co-me"></div>
+      <button class="btn ghost tiny" data-back="scr-menu">&larr; Back</button>
+    </aside>
+    <main class="co-main">
+      <div class="co-top" id="co-top"></div>
+      <div id="co-msgs" class="co-msgs"></div>
+    </main>
   </div>
 </section>
 
@@ -200,6 +238,8 @@
     <button class="btn primary" id="pause-resume">RESUME</button>
     <button class="btn" id="pause-settings">SETTINGS</button>
     <button class="btn danger" id="pause-leave">LEAVE MATCH (keep kill credits)</button>
+    <div class="pp-h">Players · report cheaters or clip them for Comms</div>
+    <div id="pause-players" class="pause-players"></div>
   </div>
 </section>
 
@@ -227,6 +267,7 @@
       <button data-adm="speed" id="adm-speed">Game speed: 1&times;</button>
       <button data-adm="det0">Warden detection &rarr; 0</button>
       <button data-adm="unban">Clear ranked ban</button>
+      <button data-adm="events" id="adm-events">Events always live: off</button>
     </div>
     <div class="adm-sec">Danger</div>
     <div class="adm-grid"><button data-adm="reset" class="danger" id="adm-reset">Reset all progress</button></div>
@@ -266,6 +307,10 @@
 <script src="js/world.js"></script>
 <script src="js/chat.js"></script>
 <script src="js/ranked.js"></script>
+<script src="js/progression.js"></script>
+<script src="js/events.js"></script>
+<script src="js/configs.js"></script>
+<script src="js/comms.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

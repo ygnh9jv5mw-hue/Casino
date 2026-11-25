@@ -8,27 +8,27 @@ window.NA = window.NA || {};
   // well it tracks movement. rateMul slows trigger fingers on the early tiers.
   const fill = (names, total) => { const a = names.slice(); while (a.length < total) a.push('*'); return a; };
   const TIERS = [
-    { id: 1, name: 'Aim Map 1v1', rank: 'Wood V', map: 'aim_map', mode: 'duel', modeLabel: 'Duel',
+    { id: 1, name: 'Aim Map 1v1', rank: 'Iron', map: 'aim_map', mode: 'duel', modeLabel: 'Duel',
       scoreToWin: 5, timeLimit: 240, base: 10, kill: 2, winsToUnlock: 2,
       bot: { hp: 100, skill: 0.16, react: 0.85, rateMul: 0.6, weapons: ['p9'] },
       enemies: ['BOT_Kevin'], allies: [] },
-    { id: 2, name: 'Aim Map 2v2', rank: 'Wood I', map: 'aim_map', mode: 'tdm', modeLabel: 'Team deathmatch',
+    { id: 2, name: 'Aim Map 2v2', rank: 'Bronze', map: 'aim_map', mode: 'tdm', modeLabel: 'Team deathmatch',
       scoreToWin: 10, timeLimit: 240, base: 30, kill: 4, winsToUnlock: 3,
       bot: { hp: 100, skill: 0.24, react: 0.72, rateMul: 0.62, weapons: ['p9', 'wasp'] },
       enemies: ['BOT_Kevin', 'NotABot42'], allies: ['mom_plays_too'] },
-    { id: 3, name: 'Warehouse', rank: 'Bronze', map: 'warehouse', mode: 'ffa', modeLabel: 'Free-for-all',
+    { id: 3, name: 'Warehouse', rank: 'Silver', map: 'warehouse', mode: 'ffa', modeLabel: 'Free-for-all',
       scoreToWin: 10, timeLimit: 300, base: 90, kill: 8, winsToUnlock: 3,
       bot: { hp: 100, skill: 0.32, react: 0.6, rateMul: 0.68, weapons: ['p9', 'wasp', 'ar7', 'thumper', 'kodiak'] },
       enemies: ['xX_Gr1ndM4ster_Xx', 'ttv_clipfarmer', '*'], allies: [] },
-    { id: 4, name: 'Courtyard 5v5', rank: 'Silver', map: 'courtyard', mode: 'tdm', modeLabel: 'Team deathmatch',
+    { id: 4, name: 'Courtyard 5v5', rank: 'Gold', map: 'courtyard', mode: 'tdm', modeLabel: 'Team deathmatch',
       scoreToWin: 30, timeLimit: 420, base: 260, kill: 16, winsToUnlock: 3, shield: 50, loot: true,
       bot: { hp: 100, skill: 0.4, react: 0.55, rateMul: 0.72, weapons: ['wasp', 'ar7', 'kodiak', 'thumper', 'tec', 'talon'] },
       enemies: fill(['sgt_sweatpants'], 5), allies: fill(['mom_plays_too'], 4) },
-    { id: 5, name: 'Shipyard', rank: 'Gold', map: 'shipyard', mode: 'ffa', modeLabel: 'Free-for-all',
+    { id: 5, name: 'Shipyard', rank: 'Platinum', map: 'shipyard', mode: 'ffa', modeLabel: 'Free-for-all',
       scoreToWin: 15, timeLimit: 420, base: 650, kill: 32, winsToUnlock: 3, shield: 50, loot: true,
       bot: { hp: 100, skill: 0.48, react: 0.5, rateMul: 0.78, weapons: ['ar7', 'kodiak', 'talon', 'hornet', 'dmr', 'brawler', 'longbow'] },
       enemies: fill(['ttv_clipfarmer'], 7), allies: [] },
-    { id: 6, name: 'Office 8v8', rank: 'Platinum', map: 'office', mode: 'tdm', modeLabel: 'Team deathmatch',
+    { id: 6, name: 'Office 8v8', rank: 'Emerald', map: 'office', mode: 'tdm', modeLabel: 'Team deathmatch',
       scoreToWin: 50, timeLimit: 480, base: 1500, kill: 60, winsToUnlock: 3, shield: 75, loot: true,
       bot: { hp: 100, skill: 0.56, react: 0.45, rateMul: 0.84, weapons: ['hornet', 'kodiak', 'talon', 'vanguard', 'brawler', 'grinder', 'viper'] },
       enemies: fill(['xX_Gr1ndM4ster_Xx'], 8), allies: fill([], 7) },
@@ -61,6 +61,15 @@ window.NA = window.NA || {};
     names: ['FaZe_Wannabe', 'org_less_pro', 'Seed1_Dominator', 'coach_says_aim', 'lan_legend_04', 'ProbablyPro'],
   };
 
+  // ---------------------------------------------------------------- difficulty
+  // Applies to every lobby. Harder bots pay more credits and more rank points.
+  const DIFFICULTY = [
+    { id: 'easy', name: 'Easy', skill: -0.12, react: 1.3, rate: 0.75, pay: 0.6, rp: 0.5, rpLoss: 1, cheater: -0.04, shield: 0, color: '#4ade80', tag: 'Bots warm up first. Pays less.' },
+    { id: 'normal', name: 'Normal', skill: 0, react: 1, rate: 1, pay: 1, rp: 1, rpLoss: 1, cheater: 0, shield: 0, color: '#facc15', tag: 'The standard lobby.' },
+    { id: 'hard', name: 'Hard', skill: 0.08, react: 0.85, rate: 1.1, pay: 1.6, rp: 1.4, rpLoss: 0.85, cheater: 0.04, shield: 0, color: '#fb923c', tag: 'Sweats only. Pays more.' },
+    { id: 'nightmare', name: 'Nightmare', skill: 0.16, react: 0.7, rate: 1.2, pay: 2.5, rp: 1.8, rpLoss: 0.7, cheater: 0.08, shield: 25, color: '#f43f5e', tag: 'Every bot is cracked. Huge pay.' },
+  ];
+
   // ---------------------------------------------------------------- ranked (Warden AC)
   const RANKED = {
     unlockTier: 2, payMult: 2.5, skillBonus: 0.05, ac: 'Warden AC',
@@ -84,7 +93,6 @@ window.NA = window.NA || {};
       { text: 'I was testing your anticheat for you', base: 0.1, deny: 'Thank you for testing. The test result is: banned.' },
       { text: "I don't even know what an aimbot is", base: 0.18, deny: 'Your config file named "aimbot_final_v2" says otherwise.' },
     ],
-    ranks: [[0, 'Iron'], [100, 'Bronze'], [250, 'Silver'], [450, 'Gold'], [700, 'Platinum'], [1000, 'Diamond'], [1400, 'Ascendant'], [1900, 'Immortal'], [2500, 'Radiant']],
     altBase: 2500,
   };
 
@@ -122,7 +130,7 @@ window.NA = window.NA || {};
     { name: 'Legendary', color: '#fbbf24', mult: 1.25 },
   ];
   const PLATFORMS = ['PC', 'PC', 'PC', 'PS5', 'XBOX', 'MOBILE', 'SWITCH'];
-  const RANKS = ['Wood', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Master', 'Grandmaster', 'Pro'];
+  const RANKS = ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Emerald', 'Diamond', 'Master', 'Grandmaster', 'Legend'];
 
   // ---------------------------------------------------------------- cheats
   // toggle: shows in the in-match cheat menu. levels > 1 get an intensity slider.
@@ -300,6 +308,12 @@ window.NA = window.NA || {};
     },
     rageQuit: ['im out', 'uninstalling', 'not playing with this guy', 'alt f4', 'done. reported.', 'this game is a joke'],
     backfill: ['why did i join mid game', 'hi', 'whats the score', 'why is everyone mad', 'who are we mad at'],
+    cheater: {
+      accuse: ['{name} is cheating fr', 'yo {name} is hacking', 'is {name} cheating or just cracked', '{name} just headshot me thru a wall??', 'report {name}',
+        '{name} is not even hiding it', 'two cheaters in one lobby lmao', 'someone spectate {name}', '{name} knows where everyone is', 'clip {name} pls'],
+      switched: ['bro {name} just turned it on', '{name} stopped hiding it lol', 'ok {name} is raging now', '{name} went full send', 'what happened to {name} hes cracked now'],
+      banned: ['W', 'finally', 'gg {name}', 'reported him too', 'thanks whoever reported', 'cya {name}', 'justice'],
+    },
     // Ranked (Warden AC) lobby talk
     ac: {
       ambient: ['ranked is so sweaty', 'warden banned my friend for nothing lol', 'ban wave tonight trust', 'finally a lobby with anticheat',
@@ -366,7 +380,7 @@ window.NA = window.NA || {};
   };
 
   NA.DATA = {
-    TIERS, LOCKED_TIERS, MAX_PLAYABLE_TIER, BOT_SKILL, TOURNAMENT, RANKED, WEAPONS, WEAPON_ORDER, CLASS_LABEL, RARITY, PLATFORMS, RANKS, CHEATS, CHEAT, CATEGORIES, TEASERS, MAPS,
+    TIERS, LOCKED_TIERS, MAX_PLAYABLE_TIER, BOT_SKILL, TOURNAMENT, RANKED, DIFFICULTY, WEAPONS, WEAPON_ORDER, CLASS_LABEL, RARITY, PLATFORMS, RANKS, CHEATS, CHEAT, CATEGORIES, TEASERS, MAPS,
     CHARACTERS, NAME_FIRST, NAME_WORD, NAME_ADJ, NAME_CLAN, NAME_SPECIAL, CHAT, STORY, SELLER_BUY,
     ANTICHEAT_DAYS_BASE: 1204,
   };

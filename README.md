@@ -15,20 +15,23 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v0.2)
+## What's in this build (v0.4)
 
-- 3D low-poly shooter (three.js), landscape, touch controls, mouse/keyboard, and **game controllers** (MFi, Xbox, DualSense)
+- 3D blocky shooter (three.js): Roblox-style box players with faces, hats and walk animations; touch, mouse/keyboard and **game controllers**
 - Your aim is broken on purpose: crosshair sway, twitches, spread, recoil, panic and fumbled reloads
-- **9 lobby tiers** from Aim Map 1v1 to a 24-player Megalobby, on 5 new big maps (Courtyard 5v5, Shipyard, Office 8v8, Metro, Island 16v16)
-- **Smarter bots**: real aim model (starts off target and settles, struggles with fast strafes), counter-strafing, bursts, reloads, retreating when hurt, hearing gunshots, roaming to fights
-- **18 guns** with fictional names: pistols, hand cannon, revolver, SMGs, ARs, burst rifle, battle rifle, DMR, snipers with scopes, pump and auto shotguns, LMG, minigun, Railspike. Buy them in the **Armory**
-- **Loot and shields** on the big maps: floor guns in 5 rarities (Common to Legendary), shield cells and medkits
-- Cheats: **Aimbot** (Memory or Silent, hitbox head / neck / pelvis / random, smoothing, prediction, FOV circle), Triggerbot (head-only option), **ESP** (box, skeleton, health, shield, name, distance, weapon, platform, rank, kills, bot tags, snaplines, chams), **Loot ESP** (rarity and type filters), Radar, **Stream Proof**, **Shoot Through Walls**, **Freeze Target**, **Vote Rigging** and more
-- In-match cheat menu with tabs (Aim / Visuals / Misc / Exploits / Config) in **11 languages**
-- **Vote kicks** in big lobbies (they can actually kick you), **rage quits** and backfills
-- **Tournament**: the 3-round FRAGLINE Open bracket with entry fee and prizes
-- **Ranked mode with a fake anticheat to bypass** (see below), realistic gamertags and lobby chat
-- Suspicion meter, reports counter, lobby chat that reacts to how blatantly you play, seller DMs and story beats on every tier
+- **Four difficulties** (Easy / Normal / Hard / Nightmare): harder bots, bigger payouts and more rank points
+- **9 lobby tiers** from Aim Map 1v1 to a 24-player Megalobby on big maps (Courtyard, Shipyard, Office, Metro, Island)
+- **Smarter bots** with a real aim model, counter-strafing, bursts, retreating and hearing gunshots
+- **Cheater bots** (rare, 10 levels from closet to spinbot, some flip from legit to rage mid-match). **Report** them or **clip** them; obvious ones get banned and you get a bounty
+- **18 guns** with fictional names, the **Armory**, gun **mastery camos**, floor **loot** in 5 rarities, shields and medkits
+- **Events**: the **FRAGLINE Open** tournament, **Loot Rush** (everyone starts with a pistol, bots loot too, guns drop on death) and **Chaos FFA** (rotating goofy modifiers: big heads, moon gravity, aimbot for all… live on weekends and 6–9 pm daily)
+- Cheats: Aimbot (Memory/Silent, bones, smoothing, prediction), Triggerbot, full ESP options, Loot ESP, Radar, Stream Proof, Shoot Through Walls, Freeze Target, Vote Rigging and more
+- **Advanced tab**: reaction delay, aim curve, target priority, hit chance, humanizer, visibility check, aim key, trigger delay and fire mode, ESP distance and colors, radar size, **safe mode**, and saved **profiles** (Legit / Closet / Rage). Cheat menu in **11 languages**
+- **Config Market**: buy ready-made configs from made-up config makers, with ratings and reviews (some sellers are scams)
+- **Ranks**: Iron → Bronze → Silver → Gold → Platinum → Emerald → Diamond → Master → Grandmaster → **Legend**, three divisions each, **promotion matches**, rank-up rewards (credits + crosshairs), **seasons**, and a **Legend leaderboard** of bots that keep climbing
+- **Prestige**, **daily challenges** and a daily login streak
+- **Comms**: a fake community app. Post clips for the server to vote on, get clipped yourself (notoriety makes lobbies suspicious of you), announcements, config ads, ban appeals
+- Vote kicks, rage quits and backfills; suspicion meter; lobby chat that reacts to how blatant you are; seller DMs
 - Progress saves on the device
 
 ## Ranked mode (Warden AC)
@@ -81,4 +84,4 @@ ios/                 Capacitor iOS wrapper (Swift Package Manager)
 .github/workflows/   the IPA build
 ```
 
-Next stages from the design doc: alt accounts, the full story ending, and the Pro League.
+Ideas for later: real online leaderboard, kill cam, spectator replays after a ban, Overwatch mode, rival cheater bot.

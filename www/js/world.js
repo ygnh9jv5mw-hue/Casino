@@ -121,6 +121,28 @@
   }
 
   // ---------------------------------------------------------------- build
+  function mergeBoxes(geos) {
+    let nv = 0, ni = 0;
+    for (const g of geos) { nv += g.attributes.position.count; ni += g.index.count; }
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2);
+    const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    let vo = 0, io = 0;
+    for (const g of geos) {
+      pos.set(g.attributes.position.array, vo * 3);
+      nor.set(g.attributes.normal.array, vo * 3);
+      uv.set(g.attributes.uv.array, vo * 2);
+      const src = g.index.array;
+      for (let i = 0; i < src.length; i++) idx[io + i] = src[i] + vo;
+      vo += g.attributes.position.count; io += src.length;
+    }
+    const m = new THREE.BufferGeometry();
+    m.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    m.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    m.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    m.setIndex(new THREE.BufferAttribute(idx, 1));
+    m.computeBoundingSphere();
+    return m;
+  }
   W.build = function (scene, mapId) {
     if (W.current && W.current.id === mapId) return W.current;
     if (W.current) {
@@ -130,13 +152,21 @@
     const def = NA.DATA.MAPS[mapId];
     const group = new THREE.Group();
     const colliders = [];
+    // One mesh per material instead of one per box: big maps drop from ~170 draw calls to ~20.
+    const byMat = new Map();
     for (const b of def.boxes) {
       const x = b[0], z = b[1], y = b[2], w = b[3], h = b[4], d = b[5];
       const mat = material(b[6]);
-      const mesh = new THREE.Mesh(boxGeometry(w, h, d, mat.userData.tile), mat);
-      mesh.position.set(x, y + h / 2, z);
-      group.add(mesh);
+      const geo = boxGeometry(w, h, d, mat.userData.tile);
+      geo.translate(x, y + h / 2, z);
+      if (!byMat.has(mat)) byMat.set(mat, []);
+      byMat.get(mat).push(geo);
       colliders.push({ minX: x - w / 2, maxX: x + w / 2, minY: y, maxY: y + h, minZ: z - d / 2, maxZ: z + d / 2 });
+    }
+    for (const [mat, geos] of byMat) {
+      const merged = mergeBoxes(geos);
+      geos.forEach(g => g.dispose());
+      group.add(new THREE.Mesh(merged, mat));
     }
     scene.add(group);
     scene.background = new THREE.Color(def.sky);
@@ -147,14 +177,56 @@
 
   // ---------------------------------------------------------------- collision
   // Push a vertical cylinder (approximated as a square) out of boxes along one axis.
-  W.collide = function (pos, r, h, axis) {
+  // Is a box in the way of an entity standing at pos? (ignores boxes you are standing on or under)
+  function blocks(c, pos, r, h) {
+    if (pos.y >= c.maxY - 0.02 || pos.y + h <= c.minY) return false;
+    return !(pos.x + r <= c.minX || pos.x - r >= c.maxX || pos.z + r <= c.minZ || pos.z - r >= c.maxZ);
+  }
+  // Move along one axis in small steps and stop flush against whatever you hit, on the side you
+  // came from. The old version pushed you to the nearer side of a box's centre, so a long frame
+  // could carry you past the middle of a thin wall and pop you out the other side.
+  function moveAxis(pos, d, axis, r, h) {
+    if (!d) return false;
     const cs = W.current.colliders;
-    for (let i = 0; i < cs.length; i++) {
-      const c = cs[i];
-      if (pos.y >= c.maxY - 0.02 || pos.y + h <= c.minY) continue;
-      if (pos.x + r <= c.minX || pos.x - r >= c.maxX || pos.z + r <= c.minZ || pos.z - r >= c.maxZ) continue;
-      if (axis === 'x') pos.x = pos.x < (c.minX + c.maxX) / 2 ? c.minX - r : c.maxX + r;
-      else pos.z = pos.z < (c.minZ + c.maxZ) / 2 ? c.minZ - r : c.maxZ + r;
+    const steps = Math.max(1, Math.ceil(Math.abs(d) / 0.12));
+    const step = d / steps;
+    let hit = false;
+    for (let s = 0; s < steps; s++) {
+      pos[axis] += step;
+      for (let i = 0; i < cs.length; i++) {
+        const c = cs[i];
+        if (!blocks(c, pos, r, h)) continue;
+        if (axis === 'x') pos.x = step > 0 ? c.minX - r - 1e-4 : c.maxX + r + 1e-4;
+        else pos.z = step > 0 ? c.minZ - r - 1e-4 : c.maxZ + r + 1e-4;
+        hit = true;
+      }
+      if (hit) break;
+    }
+    return hit;
+  }
+  W.move = function (pos, dx, dz, r, h) {
+    const hx = moveAxis(pos, dx, 'x', r, h);
+    const hz = moveAxis(pos, dz, 'z', r, h);
+    return hx || hz;
+  };
+  // Static push-out (spawning, teleports): leave each box by its shallowest side.
+  W.collide = function (pos, r, h) {
+    const cs = W.current.colliders;
+    for (let pass = 0; pass < 3; pass++) {
+      let moved = false;
+      for (let i = 0; i < cs.length; i++) {
+        const c = cs[i];
+        if (!blocks(c, pos, r, h)) continue;
+        const left = pos.x + r - c.minX, right = c.maxX - (pos.x - r);
+        const back = pos.z + r - c.minZ, front = c.maxZ - (pos.z - r);
+        const m = Math.min(left, right, back, front);
+        if (m === left) pos.x = c.minX - r - 1e-4;
+        else if (m === right) pos.x = c.maxX + r + 1e-4;
+        else if (m === back) pos.z = c.minZ - r - 1e-4;
+        else pos.z = c.maxZ + r + 1e-4;
+        moved = true;
+      }
+      if (!moved) break;
     }
   };
   W.groundAt = function (x, z, r, feetY) {
