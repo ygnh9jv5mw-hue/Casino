@@ -93,6 +93,9 @@
     guns: { p9: true },   // owned Armory guns
     loadout: { primary: null, secondary: 'p9' },
     tourney: { played: 0, won: 0 },
+    playMode: 'casual',
+    ranked: { rr: 0, peakRR: 0, offenses: 0, banUntil: 0, perma: false, ban: null, appeal: null, acVersion: [3, 0, 0], bypassDetected: false, patchReadyAt: 0,
+      sinceUpdate: 0, nextUpdate: 4, alts: 0, bans: 0, appealsWon: 0, matches: 0 },
     settings: { sens: 1, volume: 0.8, autoQueue: true, showFps: false, lang: 'en' },
   });
   Save.load = () => {
@@ -101,7 +104,7 @@
     try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { d = null; }
     if (!d || typeof d !== 'object') d = def;
     for (const k of Object.keys(def)) if (d[k] === undefined) d[k] = def[k];
-    for (const k of ['stats', 'settings']) {
+    for (const k of ['stats', 'settings', 'ranked']) {
       for (const kk of Object.keys(def[k])) if (d[k][kk] === undefined) d[k][kk] = def[k][kk];
     }
     if (d.highestTier >= 2 && !d.guns.ar7) { d.guns.ar7 = true; if (!d.loadout.primary) d.loadout.primary = 'ar7'; }

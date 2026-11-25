@@ -48,8 +48,16 @@
     return `${t.enemies.length + 1} players`;
   }
   UI.showPlay = function () {
-    const s = NA.Save.data, html = [];
+    const s = NA.Save.data, html = [], R = NA.Ranked;
+    const ranked = s.playMode === 'ranked' && R.unlocked();
+    if (!R.unlocked()) s.playMode = 'casual';
     $('play-credits').textContent = U.fmt(s.credits);
+    $('mode-casual').classList.toggle('on', !ranked);
+    $('mode-ranked').classList.toggle('on', ranked);
+    $('mode-ranked').classList.toggle('locked', !R.unlocked());
+    $('mode-ranked').querySelector('small').textContent = R.unlocked() ? `${D.RANKED.ac} · ×${D.RANKED.payMult} pay` : `Unlocks at Tier ${D.RANKED.unlockTier}`;
+    $('ranked-panel').classList.toggle('hidden', !ranked);
+    if (ranked) UI.renderRankedPanel();
     for (const t of D.TIERS) {
       const open = s.highestTier >= t.id, wins = s.winsByTier[t.id] || 0;
       let prog;
@@ -59,8 +67,8 @@
       html.push(`<button class="tier ${open ? 'open' : 'locked'} m-${t.map}" data-tier="${t.id}">
         <div class="swatch"></div><div class="tnum">TIER ${t.id} · ${t.rank}</div><div class="tname">${t.name}</div>
         <div class="tmeta">${t.modeLabel} · ${botsLabel(t)} · first to ${t.scoreToWin}${t.loot ? ' · loot + shields' : ''}</div>
-        <div class="tpay">Win ${U.fmt(t.base)} + ${U.fmt(t.kill)}/kill</div><div class="tprog">${prog}</div></button>`);
-      if (t.id === D.TOURNAMENT.unlockTier - 1) html.push(tourneyCard());
+        <div class="tpay">Win ${U.fmt(t.base * (ranked ? D.RANKED.payMult : 1))} + ${U.fmt(t.kill * (ranked ? D.RANKED.payMult : 1))}/kill</div><div class="tprog">${prog}</div></button>`);
+      if (t.id === D.TOURNAMENT.unlockTier - 1 && !ranked) html.push(tourneyCard());
     }
     for (const t of D.LOCKED_TIERS) {
       html.push(`<div class="tier soon locked"><div class="swatch"></div><div class="tnum">TIER ${t.id} · ${t.rank}</div>
@@ -68,6 +76,104 @@
     }
     $('tier-list').innerHTML = html.join('');
     UI.show('scr-play');
+  };
+
+  // ---------------------------------------------------------------- ranked panel, loader, appeal
+  UI.renderRankedPanel = function () {
+    const R = NA.Ranked, rs = NA.Save.data.ranked, el = $('ranked-panel');
+    const verdict = R.tickAppeal();
+    if (verdict) UI.toast(verdict === 'won' ? 'Appeal accepted: ban lifted' : 'Appeal denied');
+    const status = R.bypassStatus();
+    const parts = [];
+    parts.push(`<div class="rk-row"><span class="rk-ac">🛡 ${D.RANKED.ac} v${R.version()}</span>
+      <span>Bypass: <b class="${status === 'DETECTED' ? 'bad' : 'good'}">${status}</b></span>
+      <span>Rank: <b>${R.rankName(rs.rr)}</b> ${rs.rr} RR</span><span>Offences: ${rs.offenses}</span>
+      <span>Detection rate ×${R.matchMult(2).toFixed(2)}</span></div>`);
+    if (status === 'DETECTED') {
+      parts.push(`<div class="rk-warn">Warden updated and your bypass is detected (detection ×2.5). Free patch in ${R.fmtLeft(rs.patchReadyAt - Date.now())}.
+        <button class="btn tiny" data-rk="patch">PRIORITY PATCH ${U.fmt(R.patchCost())}</button></div>`);
+    }
+    if (R.banned()) {
+      const b = rs.ban || { label: 'Banned', reason: '', ticket: 0 };
+      let act = '';
+      const a = rs.appeal;
+      if (a && !a.done) act = `<span class="muted">Appeal under review… ${R.fmtLeft(a.at - Date.now())}</span>`;
+      else if (a && a.done && !a.won) act = `<span class="muted">Appeal denied: "${esc(a.deny)}"</span>`;
+      else if (!b.appealed) act = '<button class="btn tiny primary" data-rk="appeal">APPEAL</button>';
+      if (rs.perma) act += NA.Save.level('hwid') ? ` <button class="btn tiny" data-rk="alt">NEW ALT ACCOUNT ${U.fmt(R.altCost())}</button>` : ' <span class="muted">Alt accounts need an HWID Spoofer (shop → Bypass).</span>';
+      parts.push(`<div class="rk-ban"><b>${rs.perma ? 'PERMANENTLY BANNED FROM RANKED' : 'BANNED · ' + R.fmtLeft(R.banLeft())}</b> · ${esc(b.label)} · ticket #${b.ticket}<br>
+        <span class="muted">${esc(b.reason || '')}</span><div class="rk-act">${act}</div></div>`);
+    } else if (rs.appeal && rs.appeal.done && rs.appeal.won && Date.now() - rs.appeal.at < 120000) {
+      parts.push('<div class="rk-ok">Appeal accepted. "After review, we found no evidence of cheating." (They did not look very hard.)</div>');
+    }
+    el.innerHTML = parts.join('');
+  };
+  // Every match start goes through here so Ranked can run its checks and the loader.
+  UI.queue = function (tierId, forceRanked) {
+    const s = NA.Save.data, R = NA.Ranked;
+    const ranked = (forceRanked !== undefined ? forceRanked : s.playMode === 'ranked') && R.unlocked();
+    if (!ranked) { G.startMatch(tierId); return; }
+    if (R.banned()) { A.deny(); UI.toast(NA.Save.data.ranked.perma ? 'Permanently banned from Ranked' : 'Banned from Ranked for ' + R.fmtLeft(R.banLeft())); UI.showPlay(); return; }
+    UI.openLoader(tierId);
+  };
+  // Loader minigame: stop the needle in the green zone three times.
+  UI.openLoader = function (tierId) {
+    const L = UI.loader = { tierId, stage: 0, hits: 0, t: 0, dir: 1, pos: 0, zone: 0, w: 0, log: [] };
+    const newZone = () => { L.w = [0.22, 0.16, 0.11][L.stage]; L.zone = U.rand(0.1, 0.9 - L.w); L.speed = [0.9, 1.15, 1.45][L.stage]; };
+    newZone();
+    L.newZone = newZone;
+    $('ld-log').innerHTML = `<div>&gt; skillissue loader v2.0</div><div>&gt; target: FRAGLINE.exe · ${esc(D.RANKED.ac)} v${NA.Ranked.version()} (${NA.Ranked.bypassStatus().toLowerCase()})</div><div>&gt; stage 1/3: map driver… press INJECT in the green zone</div>`;
+    $('ld-inject').disabled = false;
+    $('loader').classList.remove('hidden');
+    const tick = () => {
+      if (!UI.loader || UI.loader !== L) return;
+      const now = performance.now(), dt = L.last ? (now - L.last) / 1000 : 0; L.last = now;
+      if (L.stage < 3) {
+        L.pos += L.dir * L.speed * dt;
+        if (L.pos > 1) { L.pos = 1; L.dir = -1; } if (L.pos < 0) { L.pos = 0; L.dir = 1; }
+      }
+      $('ld-zone').style.left = (L.zone * 100) + '%'; $('ld-zone').style.width = (L.w * 100) + '%';
+      $('ld-needle').style.left = (L.pos * 100) + '%';
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const LD_STEPS = ['map driver', 'hide module from Warden', 'hook game memory'];
+  UI.loaderInject = function () {
+    const L = UI.loader;
+    if (!L || L.stage >= 3) return;
+    const ok = L.pos >= L.zone && L.pos <= L.zone + L.w;
+    if (ok) { L.hits++; A.buy(); } else A.deny();
+    const log = $('ld-log');
+    log.insertAdjacentHTML('beforeend', `<div class="${ok ? 'good' : 'bad'}">&gt; ${LD_STEPS[L.stage]}… ${ok ? 'OK' : 'ERROR 0x' + U.randInt(4096, 65535).toString(16).toUpperCase() + ' (trace left behind)'}</div>`);
+    L.stage++;
+    if (L.stage < 3) { L.newZone(); log.insertAdjacentHTML('beforeend', `<div>&gt; stage ${L.stage + 1}/3: ${LD_STEPS[L.stage]}…</div>`); }
+    else {
+      $('ld-inject').disabled = true;
+      const res = ['Injected with errors: you start the match at 45% detection', 'Sloppy injection: you start at 25% detection', 'Injected. Normal detection.', 'Clean injection: detection −25% this match'][L.hits];
+      log.insertAdjacentHTML('beforeend', `<div class="${L.hits >= 2 ? 'good' : 'bad'}">&gt; ${res}</div>`);
+      setTimeout(() => { if (UI.loader === L) { UI.closeLoader(); G.startMatch(L.tierId, { ranked: true, loader: L.hits }); } }, 1300);
+    }
+    log.scrollTop = log.scrollHeight;
+  };
+  UI.closeLoader = function () { UI.loader = null; $('loader').classList.add('hidden'); };
+
+  UI.openAppeal = function () {
+    const rs = NA.Save.data.ranked;
+    if (!rs.ban || rs.ban.appealed) return;
+    $('ap-ticket').textContent = `Ticket #${rs.ban.ticket} · ${rs.ban.label} · peak detection ${rs.ban.peak}%`;
+    $('ap-list').innerHTML = D.RANKED.excuses.map((e, i) => `<label class="ap-opt"><input type="radio" name="ap" value="${i}" ${i === 0 ? 'checked' : ''}> ${esc(e.text)}</label>`).join('') +
+      '<label class="ap-opt"><input type="radio" name="ap" value="-1"> Write my own:</label>';
+    $('ap-text').value = '';
+    $('appeal').classList.remove('hidden');
+  };
+  UI.submitAppeal = function () {
+    const sel = document.querySelector('input[name=ap]:checked');
+    const idx = sel ? +sel.value : 0, text = $('ap-text').value;
+    if (idx < 0 && text.trim().length < 5) { UI.toast('Write something first'); return; }
+    if (NA.Ranked.appeal(idx, text)) { UI.toast('Appeal submitted. Review takes about a minute.'); A.buy(); }
+    $('appeal').classList.add('hidden');
+    UI.showPlay();
   };
 
   function tourneyCard() {
@@ -108,18 +214,27 @@
   // ---------------------------------------------------------------- results
   UI.showResults = function (r) {
     const t = G.match.tier, p = G.player;
-    $('res-title').textContent = r.kicked ? 'KICKED' : r.tourney && r.tourney.champion ? 'CHAMPION' : r.won ? 'VICTORY' : 'DEFEAT';
+    $('res-title').textContent = r.kicked === 'ban' ? 'BANNED' : r.kicked ? 'KICKED' : r.tourney && r.tourney.champion ? 'CHAMPION' : r.won ? 'VICTORY' : 'DEFEAT';
     $('res-title').className = r.won ? 'win' : 'lose';
-    $('res-sub').textContent = `${t.name} · ${t.modeLabel}`;
+    $('res-sub').textContent = `${G.ranked ? 'RANKED · ' : ''}${t.name} · ${t.modeLabel}`;
     const order = t.mode === 'tdm' ? r.rows.filter(x => x.team === 'A').concat(r.rows.filter(x => x.team === 'B')) : r.rows;
     $('res-board').innerHTML = '<div class="row head"><span>Player</span><span>K</span><span>D</span></div>' +
       order.map(x => `<div class="row ${x.me ? 'me' : ''} ${t.mode === 'tdm' ? 't' + x.team : ''}"><span>${esc(x.name)}${x.spoof ? '<span class="spoof">spoofed</span>' : ''}</span><span>${x.k}</span><span>${x.d}</span></div>`).join('');
-    $('res-stats').textContent = `Accuracy ${r.acc}% · Headshots ${p.headshots} · Peak suspicion ${r.peakSus}`;
+    $('res-stats').textContent = `Accuracy ${r.acc}% · Headshots ${p.headshots} · Peak suspicion ${r.peakSus}` + (r.ranked ? ` · Peak Warden detection ${r.ranked.peak}%` : '');
     $('res-pay').innerHTML = r.pay.lines.map(l => `<div class="pl"><span>${esc(l[0])}</span><span>+${U.fmt(l[1])}</span></div>`).join('');
     countUp($('res-total'), r.pay.total);
     const un = $('res-unlock');
     un.classList.add('hidden'); un.classList.remove('soon');
-    if (r.tourney && r.tourney.next) {
+    const rk = r.ranked, RS = NA.Save.data.ranked;
+    if (rk && (rk.ban || rk.wave)) {
+      const b = rk.ban || rk.wave;
+      un.innerHTML = `<b class="ban">${rk.wave ? 'BAN WAVE · ' : ''}${esc(b.label)}</b><br>${esc(b.reason)}${b.fine ? ` · fined ${U.fmt(b.fine)}` : ''}${b.rrLost ? ` · rank reset (−${b.rrLost} RR)` : ''}${rk.confiscated ? ` · winnings confiscated (${U.fmt(rk.confiscated)})` : ''}<br><span class="muted">Ticket #${b.ticket}. You can appeal from the Ranked lobby list.</span>`;
+      un.classList.add('soon'); un.classList.remove('hidden');
+    } else if (rk) {
+      un.innerHTML = `<b>${rk.rr >= 0 ? '+' : ''}${rk.rr} RR</b> · ${NA.Ranked.rankName(RS.rr)} (${RS.rr} RR)${rk.legit ? ' · played legit' : ''}` +
+        (rk.update ? `<br>${esc(D.RANKED.ac)} updated to v${rk.update}: bypass ${rk.detected ? '<b class="ban">DETECTED</b>' : 'still undetected'}` : '');
+      un.classList.remove('hidden');
+    } else if (r.tourney && r.tourney.next) {
       un.innerHTML = `<b>You advance to the ${esc(r.tourney.label)}.</b><br><button class="btn primary tiny" data-next="1">PLAY ${esc(r.tourney.label.toUpperCase())}</button>`;
       un.classList.remove('hidden');
     } else if (r.tourney && r.tourney.champion) {
@@ -141,7 +256,7 @@
     UI.refreshDMBadge();
     UI.show('scr-results');
     const s = NA.Save.data;
-    if (NA.Save.level('autoqueue') && s.settings.autoQueue && !r.unlocked && t.tourney === undefined) UI.startAuto(t.id);
+    if (NA.Save.level('autoqueue') && s.settings.autoQueue && !r.unlocked && t.tourney === undefined && !G.ranked) UI.startAuto(t.id);
   };
   const UNLOCK_NOTES = {
     2: 'AR-7 Rifle + Armory guns', 3: 'new cheats in the shop', 4: 'loot, shields, Loot ESP, Stream Proof, the Tournament',
@@ -445,6 +560,13 @@
     $('sus-fill').style.width = sus + '%';
     $('sus-val').textContent = sus;
     $('sus').className = 's' + C.band(sus, 0);
+    $('det').classList.toggle('hidden', !G.ranked);
+    if (G.ranked) {
+      const d = Math.round(mt.det);
+      $('det-fill').style.width = d + '%';
+      $('det-val').textContent = G.legit ? 'LEGIT' : d + '%';
+      $('det').className = d >= 80 ? 'hot' : d >= 50 ? 'warm' : '';
+    }
     $('credits-live').textContent = `+${U.fmt(mt.liveCredits * m.payoutMult)} this match`;
     $('hp-fill').style.width = Math.max(0, p.hp) + '%';
     $('hp-fill').style.background = p.hp > 50 ? '#4ade80' : p.hp > 25 ? '#facc15' : '#f87171';
@@ -903,7 +1025,7 @@
       const el = e.target.closest('[data-tier]');
       if (!el || el.classList.contains('locked')) return;
       A.unlock(); A.click();
-      G.startMatch(+el.dataset.tier);
+      UI.queue(+el.dataset.tier);
     });
     $('shop-list').addEventListener('click', e => {
       const gb = e.target.closest('[data-gun]'), eb = e.target.closest('[data-equip]');
@@ -923,16 +1045,37 @@
     click('res-again', () => {
       const t = G.match.tier;
       if (t.tourney !== undefined) { if (G.tourney) G.startMatch(G.tourneyTier(G.tourney.round)); else { G.toIdle(); UI.showPlay(); } }
-      else G.startMatch(t.id);
+      else UI.queue(t.id, G.ranked);
     });
     click('res-lobbies', () => { G.toIdle(); UI.showPlay(); });
     click('res-menu', () => { G.toIdle(); UI.showMenu(); });
     click('res-auto-cancel', () => UI.stopAuto());
     $('res-unlock').addEventListener('click', e => {
       if (e.target.closest('[data-next]') && G.tourney) { A.click(); G.startMatch(G.tourneyTier(G.tourney.round)); return; }
-      const b = e.target.closest('[data-play]'); if (b) { A.click(); G.startMatch(+b.dataset.play); }
+      const b = e.target.closest('[data-play]'); if (b) { A.click(); UI.queue(+b.dataset.play, G.ranked); }
     });
     click('pause-resume', () => UI.resume());
+    click('mode-casual', () => { NA.Save.data.playMode = 'casual'; NA.Save.save(); A.click(); UI.showPlay(); });
+    click('mode-ranked', () => {
+      if (!NA.Ranked.unlocked()) { A.deny(); UI.toast(`Ranked unlocks at Tier ${D.RANKED.unlockTier}`); return; }
+      NA.Save.data.playMode = 'ranked'; NA.Save.save(); A.click(); UI.showPlay();
+      if (!NA.Save.data.flags.rankedIntro) { NA.Save.data.flags.rankedIntro = true; NA.Chat.dm('ranked has a real anticheat. Warden. buy bypass gear, inject clean, and dont be obvious. if you get banned, appeal. it works sometimes'); }
+    });
+    $('ranked-panel').addEventListener('click', e => {
+      const b = e.target.closest('[data-rk]');
+      if (!b) return;
+      const R = NA.Ranked, act = b.dataset.rk;
+      if (act === 'appeal') UI.openAppeal();
+      else if (act === 'patch') { if (R.patchNow()) { UI.toast('Bypass patched: undetected'); A.buy(); } else A.deny(); UI.showPlay(); }
+      else if (act === 'alt') { if (R.makeAlt()) { UI.toast('New account created. Fresh start, same cheats.'); A.buy(); } else A.deny(); UI.showPlay(); }
+    });
+    setInterval(() => { if (UI.current === 'scr-play' && NA.Save.data.playMode === 'ranked') UI.renderRankedPanel(); }, 1000);
+    click('ld-inject', () => UI.loaderInject());
+    click('ld-legit', () => { const L = UI.loader; if (!L) return; UI.closeLoader(); G.startMatch(L.tierId, { ranked: true, legit: true, loader: 2 }); });
+    click('ld-cancel', () => UI.closeLoader());
+    click('ap-send', () => UI.submitAppeal());
+    click('ap-cancel', () => $('appeal').classList.add('hidden'));
+    $('ap-text').addEventListener('focus', () => { const r = document.querySelector('input[name=ap][value="-1"]'); if (r) r.checked = true; });
     click('pause-settings', () => UI.showSettings('scr-pause'));
     click('pause-leave', () => G.leaveMatch());
     click('set-back', () => { if (UI.settingsFrom === 'scr-pause' && G.state === 'playing') UI.show('scr-pause'); else UI.showMenu(); });

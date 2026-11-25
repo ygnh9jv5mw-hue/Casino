@@ -100,7 +100,7 @@
     let reply = null, speaker = G.randomBot(), susAdd = 0;
     for (const k of D.CHAT.keywords) {
       if (k.re.test(text)) {
-        reply = U.pick(act >= 2 ? k.late : k.early);
+        reply = U.pick(G.ranked && k.ranked ? k.ranked : act >= 2 ? k.late : k.early);
         susAdd = k.sus || 0;
         if (k.mom && G.botByName('mom_plays_too') && Math.random() < 0.5) { speaker = G.botByName('mom_plays_too'); reply = k.mom; }
         break;

@@ -61,6 +61,33 @@ window.NA = window.NA || {};
     names: ['FaZe_Wannabe', 'org_less_pro', 'Seed1_Dominator', 'coach_says_aim', 'lan_legend_04', 'ProbablyPro'],
   };
 
+  // ---------------------------------------------------------------- ranked (Warden AC)
+  const RANKED = {
+    unlockTier: 2, payMult: 2.5, skillBonus: 0.05, ac: 'Warden AC',
+    // detection per second while a cheat is enabled, multiplied by the level you use
+    heat: { aimassist: 0.08, steady: 0.05, nospread: 0.1, norecoil: 0.12, triggerbot: 0.35, aimbot: 0.45, radar: 0.2, wallhack: 0.15, lootesp: 0.12,
+      speedhack: 0.8, rapidfire: 0.55, infammo: 0.9, kdspoof: 0, streamproof: 0, voterig: 0.4, wallbang: 1.1, freeze: 1.4 },
+    decay: 0.9,          // per second, always
+    // the ban ladder: offence 1, 2, 3, 4+ (minutes; 0 = permanent)
+    ladder: [
+      { mins: 5, fine: 0, rrReset: false, label: '5-minute ranked ban' },
+      { mins: 30, fine: 0.15, rrReset: false, label: '30-minute ban + 15% fine' },
+      { mins: 120, fine: 0.25, rrReset: true, label: '2-hour ban, 25% fine, rank reset' },
+      { mins: 0, fine: 0.25, rrReset: true, label: 'Permanent ranked ban' },
+    ],
+    appealMins: 0.75,    // review time
+    excuses: [
+      { text: 'My little brother was playing on my account', base: 0.34, deny: 'Your little brother also needs to stop cheating.' },
+      { text: 'It was lag, my ping spiked', base: 0.24, deny: 'Lag does not turn you 180° onto a head.' },
+      { text: "I'm just really good. Check my match history", base: 0.28, deny: 'We checked your match history. That is the problem.' },
+      { text: 'I bought a new gaming chair', base: 0.14, deny: 'Chairs are not a valid input device.' },
+      { text: 'I was testing your anticheat for you', base: 0.1, deny: 'Thank you for testing. The test result is: banned.' },
+      { text: "I don't even know what an aimbot is", base: 0.18, deny: 'Your config file named "aimbot_final_v2" says otherwise.' },
+    ],
+    ranks: [[0, 'Iron'], [100, 'Bronze'], [250, 'Silver'], [450, 'Gold'], [700, 'Platinum'], [1000, 'Diamond'], [1400, 'Ascendant'], [1900, 'Immortal'], [2500, 'Radiant']],
+    altBase: 2500,
+  };
+
   // ---------------------------------------------------------------- weapons
   // spread: hip cone in degrees. adsMul scales it while scoped. falloff: [full-damage range, min range, min mult].
   // pen: walls a bullet goes through by itself. burst: rounds per trigger pull (rate counts pulls).
@@ -141,6 +168,14 @@ window.NA = window.NA || {};
       tag: 'Cover is a social construct.', fx: l => [`Bullets pierce 1 wall, keep 55% damage`, `Pierce 2 walls, keep 75%`, `Pierce everything, keep 90%`][l - 1] },
     { id: 'freeze', name: 'Freeze Target', cat: 'Exploit', tab: 'exploits', tier: 6, base: 16000, growth: 2.5, max: 2, toggle: true,
       tag: 'Desync them. Politely.', fx: l => `Enemies you hit freeze for ${[1.2, 2.2][l - 1]} s (4 s cooldown each)` },
+    { id: 'hwid', name: 'HWID Spoofer', cat: 'Bypass', tier: 2, base: 400, growth: 3.0, max: 3,
+      tag: 'New motherboard serial every boot. Ranked only.', fx: l => `Warden detection −${10 * l}% · lets you make alt accounts` },
+    { id: 'kernel', name: 'Kernel Driver', cat: 'Bypass', tier: 3, base: 1500, growth: 3.5, max: 2,
+      tag: 'Runs below the anticheat. Allegedly.', fx: l => `Warden detection −${18 * l}%` },
+    { id: 'sigmask', name: 'Signature Mask', cat: 'Bypass', tier: 3, base: 1200, growth: 3.0, max: 2,
+      tag: 'Scrambles the cheat so updates miss it.', fx: l => `Anticheat updates detect your bypass ${35 * l}% less often, patches −${40 * l}%` },
+    { id: 'cleaner', name: 'Trace Cleaner', cat: 'Bypass', tier: 4, base: 5000, growth: 1, max: 1,
+      tag: 'Wipes logs after every match.', fx: () => 'Delayed ban waves are 60% less likely' },
     { id: 'autoqueue', name: 'Auto-Queue', cat: 'Farm', tier: 1, base: 50, growth: 1, max: 1,
       tag: 'Skip the menus.', fx: () => 'The next match starts by itself' },
     { id: 'affiliate', name: 'Affiliate Program', cat: 'Misc', tier: 3, base: 500, growth: 3.0, max: 10,
@@ -152,7 +187,7 @@ window.NA = window.NA || {};
   ];
   const CHEAT = {};
   CHEATS.forEach(c => { CHEAT[c.id] = c; });
-  const CATEGORIES = ['Aim', 'Vision', 'Movement', 'Weapon', 'Server', 'Exploit', 'Farm', 'Misc'];
+  const CATEGORIES = ['Aim', 'Vision', 'Movement', 'Weapon', 'Server', 'Exploit', 'Bypass', 'Farm', 'Misc'];
   const TEASERS = ['God Mode', 'Kill All', 'Spinbot', 'Teleport', 'Rank Boost'];
 
   // ---------------------------------------------------------------- maps
@@ -203,70 +238,84 @@ window.NA = window.NA || {};
     BOT_Kevin: 'npc', mom_plays_too: 'wholesome', NotABot42: 'npc',
     'xX_Gr1ndM4ster_Xx': 'tryhard', ttv_clipfarmer: 'streamer', sgt_sweatpants: 'tryhard',
   };
-  const NAME_A = ['Silent', 'Salty', 'Frosty', 'Lazy', 'Hyper', 'Spicy', 'Sleepy', 'Cyber', 'Turbo', 'Toxic', 'Crispy', 'Feral', 'Soggy', 'Quiet', 'Mild'];
-  const NAME_B = ['Panda', 'Sniper', 'Goblin', 'Potato', 'Falcon', 'Noodle', 'Ghost', 'Taco', 'Viper', 'Llama', 'Wizard', 'Pickle', 'Frog', 'Waffle', 'Moose'];
-  const NAME_SPECIAL = ['definitely_human', 'real_person_irl', 'totally_organic_gamer', 'eepy_frog', 'grandpa_gamer'];
+  // Gamertag parts. The generator mixes real-world patterns: name+year, two lowercase words,
+  // l33t swaps, clan tags, underscores, the odd ttv_ and the odd xX_ _Xx (rare, like in real lobbies).
+  const NAME_FIRST = ['jake', 'tyler', 'ethan', 'mason', 'liam', 'noah', 'aiden', 'kyle', 'josh', 'connor', 'dylan', 'brandon', 'luis', 'diego', 'mateo',
+    'marcus', 'andre', 'jayden', 'emma', 'mia', 'sofia', 'chloe', 'ava', 'lena', 'nina', 'zoe', 'yuki', 'kenji', 'arjun', 'omar', 'ivan', 'luka', 'felix', 'max', 'leo', 'sam'];
+  const NAME_WORD = ['frog', 'toast', 'goose', 'moth', 'crow', 'otter', 'raven', 'wolf', 'fox', 'bean', 'noodle', 'pickle', 'cactus', 'static', 'nova', 'ghost',
+    'drift', 'ember', 'frost', 'void', 'echo', 'pixel', 'blaze', 'storm', 'shadow', 'reaper', 'hawk', 'viper', 'lynx', 'koala', 'mango', 'biscuit', 'waffle', 'yeti', 'ninja', 'tofu'];
+  const NAME_ADJ = ['sleepy', 'silent', 'lazy', 'salty', 'quiet', 'tiny', 'angry', 'soft', 'cold', 'lucky', 'sad', 'sneaky', 'feral', 'crispy', 'dizzy', 'shy', 'zesty', 'spooky', 'lowkey', 'notso'];
+  const NAME_CLAN = ['KRM', 'NVS', 'L0L', 'TTV', 'FAZ', 'SLP', 'DRK', 'VLT', 'OWO', 'RNG', 'GG', 'AIM'];
+  const NAME_SPECIAL = ['definitely_human', 'notacheater', 'dad_with_a_job', 'mom_said_1_more', 'hardstuckgold', 'ping_999', 'controller_player', 'just_vibing',
+    'lagswitch_larry', 'uninstalling_soon', 'ImNotLaggingYouAre', 'no_scope_nate', 'touchgrass', 'skill_issue_tbh', 'one_more_game', 'wifi_on_a_train'];
 
   // ---------------------------------------------------------------- chat
-  // Bands: 0 Chill, 1 Curious, 2 Suspicious, 3 Accusing, 4 Meltdown
+  // Banded pools (index = suspicion band 0..4). {player} = you, {accountAge} = fake account age.
   const CHAT = {
     ambient: [
-      ['anyone else lagging', 'gl hf', 'my cat just walked on my keyboard', 'how do u unlock the gold skin', 'this map is so old lol',
-        'first game today', 'brb snacks', 'is this ranked?', 'tip: hold W', 'the servers feel extra empty today', 'w lobby',
-        'anyone wanna duo after', 'tip: the enemy is the one shooting at you', 'love this map', 'chat is quiet today'],
-      ['ok who is actually good here', 'this lobby got sweaty', 'someone is warming up', 'wait who is {player}', '{player} is cooking',
-        'lucky shots tonight', 'is {player} new?', 'ok {player} chill', 'the aim on some people tonight', '{player} woke up and chose violence'],
-      ['bro?', "{player}'s account is {accountAge} days old and he's top frag", 'how does he know where i am', 'spectating {player} rn',
-        'his crosshair is glued to heads', 'that was not human reaction time', 'he prefired every corner. EVERY corner.',
-        'check his profile', "i've never seen anyone improve this fast", 'something is off with {player}'],
-      ['HACKER', 'report {player}', "he's not even trying to hide it", 'he turned 180 and headshot me without looking',
-        'everyone report {player} after this', 'reported. obviously.', 'this is so blatant', 'why is nobody banning him',
-        'turn it off bro', "{player} you're not slick"],
-      ['THERE IS NO ANTICHEAT', 'devs??????', 'support email bounced', 'why do i keep queueing into him', 'this game is dead',
-        'i reported him 30 times', 'can someone record this', 'how is this allowed', 'anticheat when', 'i give up. genuinely.'],
+      ['gl', 'glhf', 'hi', 'anyone else lagging or just me', 'my ping is cooked', 'last game then bed', 'who wants to duo after',
+        'this map again lol', 'w lobby', 'brb', 'is this ranked', 'my dog is barking at nothing', 'servers are kinda empty today',
+        'why do i always spawn here', 'new mouse who dis', 'school tmrw ugh', 'im on wifi sorry', 'lets gooo', 'chat dead', 'ok im warmed up'],
+      ['ok who is actually good', 'lobby got sweaty fast', 'who is {player}', '{player} is cooking', 'ok {player} relax',
+        'bro is locked in', 'is {player} a smurf', 'mans is warmed up', '{player} chill its casual', 'nice aim {player} lol', 'he is kinda nasty ngl'],
+      ['bro?', "{player}'s acc is {accountAge} days old and hes top frag", 'how does he always know where i am', 'spectating {player} rn',
+        'his crosshair stays on head level the whole time', 'that reaction time is crazy', 'he prefired every corner', 'check his profile',
+        'nobody improves this fast', 'something is off with {player}', 'hmm', 'ok thats weird'],
+      ['hacker', 'report {player}', 'hes not even hiding it', 'he 180d and hit me without looking', 'everyone report {player}',
+        'reported', 'this is so blatant', 'how is he not banned', 'turn it off bro', '{player} ur not slick', 'clip that', 'cheater in lobby fyi'],
+      ['THERE IS NO ANTICHEAT', 'devs????', 'support email bounced lmao', 'why do i keep getting his lobby', 'game is dead fr',
+        'reported him like 30 times', 'someone record this', 'how is this allowed', 'anticheat when', 'i give up', 'uninstalling after this'],
     ],
     killed: [
-      ['nice shot!', 'gg', 'ok fair', 'how did that hit lol', 'nice one', 'lol ok', 'you got me', 'good shot'],
-      ['lucky', 'ok that was clean', 'bro got good overnight', "who's coaching u", 'nice flick… wait', 'how', 'that was crazy'],
-      ['bro?', 'how did you know i was there', "that's the third time", "nah something's off", 'what was that tracking'],
-      ['HACKER', 'aimbot', 'lmao turn it off', 'reported', "you're so obvious", 'wow. just wow.'],
-      ['WHY IS THERE NO ANTICHEAT', "i'm done", 'unbelievable', '????', 'devs are asleep'],
+      ['ns', 'nice shot', 'gg', 'ok fair', 'how did that hit lol', 'lol ok', 'u got me', 'nt me', 'mb', 'clean'],
+      ['lucky', 'ok that was clean', 'bro got good overnight', 'who coaching u', 'nice flick... wait', 'how', 'thats crazy', 'nah wtf'],
+      ['bro?', 'how did u know i was there', 'thats 3 times now', 'nah somethings off', 'what was that tracking', 'u were looking at me thru the wall??'],
+      ['hacker', 'aimbot', 'lmao turn it off', 'reported', 'so obvious', 'wow', 'actual cheater', 'enjoy ur ban'],
+      ['WHY IS THERE NO ANTICHEAT', 'im done', 'unreal', '????', 'devs are asleep', 'not even mad anymore'],
     ],
     taunt: {
-      1: ['nice try!', "you'll get there", 'gg', 'tip: aim at the head', 'close one!', 'keep practicing!', 'u got this'],
-      2: ['ez', 'sit', 'maybe buy aimbot lol', 'skill issue', 'lmao', 'that was free'],
+      1: ['nt', 'unlucky', 'gg', 'aim at the head lol', 'close one', 'almost had me', 'u got this'],
+      2: ['ez', 'sit', 'maybe buy aimbot lol', 'skill issue', 'lmao', 'free', 'L', 'go next'],
     },
-    postWin: ['gg', 'gg wp', 'good game everyone', 'gg {player}', 'nice game'],
-    postWinSus: ['gg (reported)', 'enjoy your "win"', 'reported. gg.', "can't wait for the ban wave", 'gg i guess'],
-    postLoss: ['gg', 'gg ez', 'nice try {player}', 'gg go next', 'gg wp'],
-    fumble: ['lmao he dropped his mag', 'bro fumbled the reload', 'reload skill: 0', 'butterfingers'],
+    postWin: ['gg', 'gg wp', 'ggs', 'gg {player}', 'good game', 'gg go next'],
+    postWinSus: ['gg (reported)', 'enjoy ur "win"', 'reported gg', 'cant wait for the ban wave', 'gg i guess', 'gg cheater'],
+    postLoss: ['gg', 'gg ez', 'nt {player}', 'gg go next', 'ggs', 'ez'],
+    fumble: ['lmao he dropped his mag', 'bro fumbled the reload', 'reload skill 0', 'butterfingers', 'he forgot how to reload lol'],
     firstSeen: {
-      aimbot: ['he turned 180 and headshot me without looking', 'his crosshair just snapped', 'that flick was not human'],
-      speedhack: ['why is he so fast', 'is he on a scooter', 'bro has the zoomies'],
-      wallhack: ['how did he know i was there', "he's tracking me through the wall", 'he prefired me'],
-      triggerbot: ['he shoots the exact frame i peek', 'reaction time: 0 ms??'],
+      aimbot: ['he 180d and headshot me without looking', 'his crosshair just snapped', 'that flick was not human', 'aim lock???'],
+      speedhack: ['why is he so fast', 'is he on a scooter', 'bro has the zoomies', 'speed hacking lol'],
+      wallhack: ['how did he know i was there', 'hes tracking me thru the wall', 'he prefired me', 'walls bro'],
+      triggerbot: ['he shoots the exact frame i peek', 'reaction time 0ms??'],
       rapidfire: ['is his gun on fast forward', 'that pistol fires like a minigun'],
-      infammo: ['does he ever reload', 'bro has had the same mag for 2 minutes'],
-      silent: ['his bullets CURVE', 'he was looking at the wall and i died', 'bro shot left and hit me on the right'],
-      wallbang: ['i was behind a WALL', 'he shot me through two containers??', 'cover does nothing against this guy'],
-      freeze: ['i cant move?? lag??', 'i just froze mid strafe', 'my game froze right when he shot me. every time.'],
+      infammo: ['does he ever reload', 'same mag for 2 minutes'],
+      silent: ['his bullets CURVE', 'he was looking at the wall and i died', 'he shot left and hit me on the right', 'silent aim lmao'],
+      wallbang: ['i was behind a WALL', 'he shot me thru two containers', 'cover does nothing vs this guy'],
+      freeze: ['i cant move?? lag??', 'i froze mid strafe', 'my game freezes every time he shoots me'],
       lootesp: ['how does he always have a gold gun', 'he walked straight to the legendary'],
     },
     vote: {
-      start: ['vote yes', 'F1 F1 F1', 'kick him', 'finally', 'yes. obviously.'],
-      fail: ['how did that fail', 'who voted no???', 'rigged', 'the vote is rigged too??', 'devs pls'],
-      pass: ['bye', 'gg ez kicked', 'justice', 'cya'],
+      start: ['f1', 'F1 F1 F1', 'kick him', 'finally', 'yes obviously', 'vote yes'],
+      fail: ['how did that fail', 'who voted no', 'rigged', 'the vote is rigged too??', 'devs pls'],
+      pass: ['bye', 'cya', 'kicked lol', 'justice', 'later cheater'],
     },
-    rageQuit: ["i'm out. enjoy your empty lobby", 'uninstalling', 'not playing with this guy', 'alt+f4', 'done. reported.'],
-    backfill: ['wait why did i join mid game', 'hi', 'whats the score', 'why is the lobby so salty'],
+    rageQuit: ['im out', 'uninstalling', 'not playing with this guy', 'alt f4', 'done. reported.', 'this game is a joke'],
+    backfill: ['why did i join mid game', 'hi', 'whats the score', 'why is everyone mad', 'who are we mad at'],
+    // Ranked (Warden AC) lobby talk
+    ac: {
+      ambient: ['ranked is so sweaty', 'warden banned my friend for nothing lol', 'ban wave tonight trust', 'finally a lobby with anticheat',
+        'kernel anticheat on my pc is crazy', 'warden caught 3 people yesterday', 'if hes cheating warden will get him', 'rr gains are mid today'],
+      sus: ['warden should pick him up soon', 'reported, warden will handle it', 'bro is risking his account', 'enjoy the ban wave', 'he must have a bypass'],
+      banned: ['LMAO BANNED', 'warden got him', 'gg cheater', 'see ya', 'the ban hammer', 'W anticheat', 'clip of the ban pls'],
+      flagged: ['did warden just flag someone', 'ooh someone got flagged', 'warden is watching'],
+    },
     keywords: [
       { re: /\bgg\b/i, early: ['gg!', 'gg wp'], late: ['gg', 'gg (reported)'] },
       { re: /not cheat|legit|no hack|not hack|no cheat/i, early: ['sure buddy', 'then turn it off', "that's what a cheater would say"], late: ['sure buddy', 'then turn it off', "that's what a cheater would say"], sus: 10, mom: 'i believe you sweetie' },
       { re: /\bez\b|easy/i, early: ['ez? you can barely aim', 'you could not hit kevin on the aim map'], late: ['ez with aimbot', 'you could not hit kevin on the aim map'], sus: 5 },
       { re: /sorry|sry/i, early: ['apology not accepted', 'its ok', 'sorry for what lol'], late: ['apology not accepted', 'sorry for what lol'] },
-      { re: /anticheat|anti-cheat|ban/i, early: ['LMAO', 'coming soon™', 'what anticheat'], late: ['LMAO', 'coming soon™', 'what anticheat'] },
+      { re: /anticheat|anti-cheat|ban/i, early: ['LMAO', 'coming soon™', 'what anticheat'], late: ['LMAO', 'coming soon™', 'what anticheat'], ranked: ['warden is watching u', 'ban wave soon', 'enjoy it while it lasts'] },
     ],
-    fallback: ['nobody asked', 'what', 'ok', '??', 'who asked'],
+    fallback: ['nobody asked', 'what', 'ok', '??', 'who asked', 'k', 'lol', 'mhm'],
     // Lines a specific character says instead of the shared ambient pool.
     personal: {
       BOT_Kevin: ['i am strafing now.', 'please aim at me.', 'i believe in you.', 'i have been here a long time.', 'beep.', 'i am a training bot. i am here to help.'],
@@ -311,12 +360,14 @@ window.NA = window.NA || {};
     rgb: '…ok', practice: 'lol. lmao even.',
     lootesp: 'gold guns glow now. you know where to walk', streamproof: "streamers can't clip what they can't see",
     voterig: 'votes are a suggestion too', wallbang: 'cover is for people who paid less', freeze: 'this one is my favorite. dont tell anyone',
+    hwid: 'new serial, new you. ranked is fair game now', kernel: 'ring 0 baby. warden cant see what it cant reach',
+    sigmask: 'when they update, you stay invisible. mostly', cleaner: 'no logs no problems',
     gun: ['nice piece', 'that one hits different', 'gun + aimbot = combo meal'],
   };
 
   NA.DATA = {
-    TIERS, LOCKED_TIERS, MAX_PLAYABLE_TIER, BOT_SKILL, TOURNAMENT, WEAPONS, WEAPON_ORDER, CLASS_LABEL, RARITY, PLATFORMS, RANKS, CHEATS, CHEAT, CATEGORIES, TEASERS, MAPS,
-    CHARACTERS, NAME_A, NAME_B, NAME_SPECIAL, CHAT, STORY, SELLER_BUY,
+    TIERS, LOCKED_TIERS, MAX_PLAYABLE_TIER, BOT_SKILL, TOURNAMENT, RANKED, WEAPONS, WEAPON_ORDER, CLASS_LABEL, RARITY, PLATFORMS, RANKS, CHEATS, CHEAT, CATEGORIES, TEASERS, MAPS,
+    CHARACTERS, NAME_FIRST, NAME_WORD, NAME_ADJ, NAME_CLAN, NAME_SPECIAL, CHAT, STORY, SELLER_BUY,
     ANTICHEAT_DAYS_BASE: 1204,
   };
 })(window.NA);

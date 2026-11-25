@@ -34,7 +34,7 @@
     const s = NA.Save.data;
     const on = id => {
       const c = s.cheats[id];
-      if (!c || !c.level || G.panic || c.enabled === false) return 0;
+      if (!c || !c.level || G.panic || G.legit || c.enabled === false) return 0;
       return Math.max(1, Math.min(c.level, c.use || c.level));
     };
     const ab = on('aimbot'), tb = on('triggerbot'), wb = on('wallbang'), fz = on('freeze'), le = on('lootesp');
@@ -213,22 +213,43 @@
     return g;
   }
   function genName(used) {
-    for (let i = 0; i < 30; i++) {
-      let n;
-      const r = Math.random();
-      if (r < 0.12) n = U.pick(D.NAME_SPECIAL);
-      else {
-        n = U.pick(D.NAME_A) + U.pick(D.NAME_B) + U.pick(['', '7', '99', '1337', '_', '2009', '42', 'TTV', 'YT', '_irl']);
-        if (Math.random() < 0.2) n = 'xX_' + n + '_Xx';
-        else if (Math.random() < 0.12) n = 'ttv_' + n.toLowerCase();
-      }
+    const leet = s => s.replace(/[aeios]/g, c => (Math.random() < 0.35 ? { a: '4', e: '3', i: '1', o: '0', s: '5' }[c] : c));
+    const cap = s => s[0].toUpperCase() + s.slice(1);
+    const year = () => U.pick(['2007', '2008', '2009', '2010', '06', '07', '09', '11', '99', '04']);
+    const num = () => U.pick([String(U.randInt(1, 99)), String(U.randInt(100, 999)), year(), 'x', '_']);
+    const F = () => U.pick(D.NAME_FIRST), Wd = () => U.pick(D.NAME_WORD), Ad = () => U.pick(D.NAME_ADJ);
+    const patterns = [
+      () => F() + num(),                                   // jake2009
+      () => Ad() + Wd(),                                   // sleepyfrog
+      () => Ad() + '_' + Wd() + (Math.random() < 0.4 ? U.randInt(1, 99) : ''), // lazy_otter42
+      () => cap(F()) + cap(Wd()),                          // MiaFrost
+      () => leet(Wd()) + U.randInt(1, 999),                // gh0st317
+      () => F() + '.' + Wd(),                              // luis.nova
+      () => 'its' + F(),                                   // itsjake
+      () => F() + U.pick(['yt', 'plays', 'gaming', 'fps', 'aim', 'tv']), // mateoplays
+      () => cap(Wd()) + cap(Wd()),                         // VoidRaven
+      () => `[${U.pick(D.NAME_CLAN)}] ${F()}`,             // [KRM] dante
+      () => 'not' + F(),                                   // notkyle
+      () => U.pick(D.NAME_SPECIAL),
+      () => 'ttv_' + F() + Wd(),
+      () => 'xX' + cap(leet(Wd())) + 'Xx',
+      () => F() + '_' + F(),                               // sam_lena
+      () => (Math.random() < 0.5 ? 'The' : 'Mr') + cap(Wd()),
+    ];
+    const weights = [16, 14, 10, 8, 8, 5, 6, 6, 7, 5, 4, 4, 2, 2, 2, 3];
+    for (let i = 0; i < 40; i++) {
+      let r = Math.random() * weights.reduce((x, y) => x + y, 0), k = 0;
+      while (r > weights[k]) { r -= weights[k]; k++; }
+      let n = patterns[k]();
+      if (Math.random() < 0.08) n = n.toUpperCase();
+      if (n.length > 18) continue;
       if (!used.has(n)) { used.add(n); return n; }
     }
-    return 'player' + U.randInt(100, 9999);
+    return 'player' + U.randInt(1000, 99999);
   }
   function rankIndex(rank) { const i = D.RANKS.indexOf(String(rank).split(' ')[0]); return i < 0 ? D.RANKS.length - 1 : i; }
   function botSkill(name, tier) {
-    let s = tier.bot.skill + U.rand(-0.06, 0.06);
+    let s = tier.bot.skill + U.rand(-0.06, 0.06) + (G.ranked ? D.RANKED.skillBonus : 0);
     const adj = D.BOT_SKILL[name];
     if (adj) s += adj[tier.id] !== undefined ? adj[tier.id] : (adj['*'] || 0);
     return U.clamp(s, 0.05, 0.99);
@@ -330,9 +351,14 @@
     return true;
   };
 
-  G.startMatch = function (tierOrId) {
+  // opts: { ranked, legit, loader (0..3 clean injections) }
+  G.startMatch = function (tierOrId, opts) {
     const tier = typeof tierOrId === 'object' ? tierOrId : D.TIERS.find(t => t.id === tierOrId);
     if (tier.tourney === undefined) G.tourney = null;
+    opts = opts || {};
+    G.ranked = !!opts.ranked && tier.tourney === undefined;
+    G.legit = G.ranked && !!opts.legit;
+    G.loader = opts.loader === undefined ? 2 : opts.loader;
     W.build(NA.R.scene, tier.map);
     clearBots();
     clearLoot();
@@ -354,7 +380,13 @@
       reportT: 0, reports: 0, ambientT: U.rand(6, 10), multiExtra: 0, liveCredits: 0, firstSeen: {}, rapidShots: 0,
       killfeed: [], visT: 0, momNice: 0, startTime: 0, ended: false, vote: null, voteCD: 40, pendingLeave: [], backfill: [],
       ragequits: 0, used, sndT: 0, snd: 0,
+      det: 0, detPeak: 0, detMult: 1, flagged: false, warned: false,
     };
+    if (G.ranked) {
+      G.match.detMult = NA.Ranked.matchMult(G.loader);
+      if (!G.legit && G.loader <= 1) G.match.det = G.loader === 0 ? 45 : 25;
+      G.match.detPeak = G.match.det;
+    }
     spawnPlayer();
     G.bots.forEach(respawnBot);
     spawnLoot(tier);
@@ -367,7 +399,11 @@
     const shown = G.bots.slice(0, 6);
     shown.forEach((b, i) => C.post('SYSTEM', `${b.name} joined the lobby`, 'system', { delay: i * 200 }));
     if (G.bots.length > shown.length) C.system(`…and ${G.bots.length - shown.length} more joined`);
-    C.system(`Anticheat status: Coming Soon™ (posted {days} days ago)`);
+    if (G.ranked) {
+      C.system(`RANKED · protected by ${D.RANKED.ac} v${NA.Ranked.version()} (kernel mode)`);
+      if (G.legit) C.system('Playing legit: cheats are unloaded for this match.');
+      else if (NA.Save.data.ranked.bypassDetected) C.system('Warden signature database is up to date.');
+    } else C.system(`Anticheat status: Coming Soon™ (posted {days} days ago)`);
     NA.UI.showLobby();
   };
 
@@ -399,6 +435,11 @@
       NA.Save.save();
     }
     G.tourney = null;
+    // leaving a ranked match counts as a loss, and Warden still reviews what it saw
+    if (G.ranked && G.state === 'playing') {
+      const out = NA.Ranked.afterMatch(false, G.match.detPeak, false);
+      if (out.wave) NA.UI.toast('Ban wave: ' + out.wave.label);
+    }
     G.toIdle();
     NA.UI.showMenu();
   };
@@ -414,6 +455,7 @@
   function computePayout(won, kicked) {
     const t = G.match.tier, p = G.player;
     const lines = [];
+    if (kicked === 'ban') return { lines: [['Banned by ' + D.RANKED.ac + ': winnings confiscated', 0]], total: 0 };
     if (kicked) lines.push(['Kicked by vote (no win bonus)', 0]);
     else if (t.tourney !== undefined) lines.push([won ? `${D.TOURNAMENT.rounds[t.tourney].label} won` : 'Eliminated', won ? t.base : 0]);
     else lines.push([won ? 'Win' : 'Loss (25% of base)', won ? t.base : Math.round(t.base * 0.25)]);
@@ -424,7 +466,9 @@
     const sub = lines.reduce((a, l) => a + l[1], 0);
     const mult = G.mods.payoutMult;
     if (mult > 1) lines.push([`Affiliate ×${mult.toFixed(2)}`, Math.round(sub * (mult - 1))]);
-    return { lines, total: Math.round(sub * mult) };
+    let total = Math.round(sub * mult);
+    if (G.ranked) { lines.push([`Ranked ×${D.RANKED.payMult}`, Math.round(total * (D.RANKED.payMult - 1))]); total = Math.round(total * D.RANKED.payMult); }
+    return { lines, total };
   }
 
   function endMatch(won, kicked) {
@@ -442,14 +486,21 @@
     st.kills += p.kills; st.deaths += p.deaths; st.headshots += p.headshots;
     st.shotsFired += p.shotsFired; st.shotsHit += p.shotsHit;
     st.accHistory.push(acc); if (st.accHistory.length > 60) st.accHistory.shift();
-    let unlocked = null, comingSoon = false, tourney = null;
+    let unlocked = null, comingSoon = false, tourney = null, ranked = null;
+    if (G.ranked) {
+      ranked = NA.Ranked.afterMatch(won, mt.detPeak, kicked === 'ban');
+      ranked.peak = Math.round(mt.detPeak);
+      ranked.legit = G.legit;
+      if (kicked === 'ban') ranked.ban = NA.Save.data.ranked.ban;
+      if (ranked.wave) { s.credits -= pay.total; s.lifetimeCredits -= pay.total; ranked.confiscated = pay.total; }
+    }
     if (t.tourney !== undefined) {
       if (won) {
         G.tourney.round++;
         if (G.tourney.round >= 3) { s.tourney.won++; G.achieve('champion', 'FRAGLINE Open Champion'); tourney = { champion: true }; G.tourney = null; }
         else tourney = { next: G.tourney.round, label: D.TOURNAMENT.rounds[G.tourney.round].label };
       } else { tourney = { out: true }; G.tourney = null; }
-    } else if (won) {
+    } else if (won && kicked !== 'ban') {
       s.winsByTier[t.id] = (s.winsByTier[t.id] || 0) + 1;
       if (s.winsByTier[t.id] >= t.winsToUnlock && s.highestTier <= t.id) {
         if (t.id < D.MAX_PLAYABLE_TIER) {
@@ -460,11 +511,14 @@
     }
     if (p.shotsFired >= 10 && acc < 5) G.achieve('skill_issue', 'Skill Issue');
     if (won && p.deaths === 0) G.achieve('flawless', 'Flawless');
-    if (kicked) G.achieve('kicked', 'Democracy');
+    if (kicked === 'vote') G.achieve('kicked', 'Democracy');
+    if (kicked === 'ban') G.achieve('banned', 'Detected');
+    if (ranked && ranked.wave) G.achieve('banwave', 'Caught in the Wave');
     const band = C.band(mt.sus, G.act());
     const speakers = U.shuffle(G.bots).slice(0, Math.min(2, G.bots.length));
     speakers.forEach((b, i) => {
       if (b.name === 'BOT_Kevin' && st.matches === 1) return;
+      if (kicked === 'ban') { C.post(b.name, U.pick(D.CHAT.ac.banned), G.isAlly(b) ? 'team' : 'bot', { delay: 400 + i * 700 }); return; }
       const pool = kicked ? null : won ? (band >= 2 ? 'postWinSus' : 'postWin') : 'postLoss';
       C.post(b.name, pool ? U.pick(D.CHAT[pool]) : U.pick(D.CHAT.vote.pass), G.isAlly(b) ? 'team' : 'bot', { delay: 600 + i * 900 });
     });
@@ -478,7 +532,7 @@
     }
     NA.Save.save();
     if (won) A.win(); else A.lose();
-    NA.UI.showResults({ won, kicked, pay, acc, unlocked, comingSoon, tourney, rows: scoreboard(), peakSus: Math.round(mt.susPeak) });
+    NA.UI.showResults({ won, kicked, pay, acc, unlocked, comingSoon, tourney, ranked, rows: scoreboard(), peakSus: Math.round(mt.susPeak) });
   }
 
   function scoreboard() {
@@ -518,6 +572,35 @@
     if (amt > 0) mt.susIdle = 0;
     if (mt.sus > mt.susPeak) mt.susPeak = mt.sus;
   };
+  // ---------------------------------------------------------------- Warden AC (ranked only)
+  G.addDet = function (amt) {
+    const mt = G.match;
+    if (!G.ranked || !mt || G.state !== 'playing' || G.legit || amt <= 0) return;
+    mt.det = Math.min(100, mt.det + amt * mt.detMult);
+  };
+  function updateDetection(dt) {
+    const mt = G.match;
+    const heat = NA.Ranked.heatRate(G.mods) * mt.detMult;
+    const decay = (G.panic || G.legit) ? 6 : D.RANKED.decay;
+    mt.det = U.clamp(mt.det + (heat - decay) * dt, 0, 100);
+    if (mt.det > mt.detPeak) mt.detPeak = mt.det;
+    if (mt.det >= 55 && !mt.flagged) {
+      mt.flagged = true;
+      const b = G.randomBot(); if (b) C.post(b.name, U.pick(D.CHAT.ac.flagged), 'bot', { delay: 600 });
+    }
+    if (mt.det >= 80 && !mt.warned) { mt.warned = true; NA.UI.centerMsg('⚠ WARDEN DETECTION HIGH: hit PANIC or play legit', 2600); A.deny(); }
+    if (mt.det < 60) mt.warned = false;
+    if (mt.det >= 100) G.banNow();
+  }
+  G.banNow = function () {
+    if (!G.ranked || G.state !== 'playing') return;
+    const mt = G.match;
+    NA.Ranked.ban(`Cheat software detected by ${D.RANKED.ac} v${NA.Ranked.version()}`, Math.max(mt.detPeak, 100), false);
+    C.system(`A player in your match has been banned by ${D.RANKED.ac}. Thank you for reporting.`, { priority: true });
+    NA.UI.centerMsg('BANNED BY WARDEN AC', 2500);
+    endMatch(false, 'ban');
+  };
+
   function firstSeen(id) {
     const mt = G.match;
     if (!mt || mt.firstSeen[id] || !D.CHAT.firstSeen[id]) return;
@@ -547,9 +630,11 @@
       }
       p.lastKillT = now;
       const turned = G.turnLog.reduce((a, e) => a + (now - e.t < 150 ? e.deg : 0), 0);
-      if (turned > 60) { susGain += 4; firstSeen('aimbot'); }
-      if (info && info.silentDev > 8) { susGain += 3; firstSeen('silent'); }
-      if (info && info.walls) { susGain += 3; firstSeen('wallbang'); }
+      if (turned > 60) { susGain += 4; firstSeen('aimbot'); G.addDet(7); }
+      if (info && info.silentDev > 8) { susGain += 3; firstSeen('silent'); G.addDet(4); }
+      if (info && info.walls) { susGain += 3; firstSeen('wallbang'); G.addDet(8); }
+      if (head && p.streak >= 3) G.addDet(1.5);
+      if (now - p.lastKillT < 2000) G.addDet(3);
       if (G.mods.esp && victim.visibleSince > 0 && now - victim.visibleSince < 700) firstSeen('wallhack');
       if (G.usedTrigger) firstSeen('triggerbot');
       G.addSus(susGain);
@@ -597,7 +682,7 @@
       if (fz && b.hp > 0 && performance.now() > b.freezeCD) {
         b.frozenT = fz; b.freezeCD = performance.now() + 4000 + fz * 1000;
         b.mesh.userData.ice.visible = true;
-        G.addSus(2); firstSeen('freeze');
+        G.addSus(2); firstSeen('freeze'); G.addDet(6);
       }
     }
     if (b.hp <= 0) {
@@ -852,7 +937,7 @@
     if (st && st.b.alive) {
       base.set(st.x - o.x, st.y - o.y, st.z - o.z).normalize();
       silentDev = Math.acos(U.clamp(base.dot(camDir), -1, 1)) / DEG;
-      if (silentDev > 6) G.addSus(0.6);
+      if (silentDev > 6) { G.addSus(0.6); G.addDet(0.8); }
     }
     const cone = (st && w.pellets === 1) ? 0 : G.spreadCone() * DEG;
     p.bloom = Math.min(5, p.bloom + 1);
@@ -1278,7 +1363,7 @@
     const need = Math.ceil(total * 0.6);
     if (yes >= need && Math.random() < 0.6) {
       C.system(`Vote passed: ${yes} yes / ${total - yes} no. ${G.player.name} was kicked.`, { priority: true });
-      endMatch(false, true);
+      endMatch(false, 'vote');
     } else {
       C.system(`Vote failed: ${Math.min(yes, need - 1)} yes / ${total - Math.min(yes, need - 1)} no${mom ? ' (mom_plays_too voted no)' : ''}`, { priority: true });
       const b = G.randomEnemy(); if (b) C.post(b.name, U.pick(D.CHAT.vote.fail), 'bot', { delay: 700 });
@@ -1301,6 +1386,7 @@
       if (mt.reportT >= 5) {
         mt.reportT = 0; mt.reports++;
         NA.Save.data.stats.reports++;
+        G.addDet(1.2);
         if (mt.reports % 3 === 1) C.system('Thank you for your report! Our team will review it within 3–5 business years.');
       }
     }
@@ -1311,7 +1397,8 @@
       if (b) {
         const own = D.CHAT.personal[b.name];
         const band = C.band(mt.sus, G.act());
-        const text = own && (band < 2 || b.name === 'mom_plays_too') && Math.random() < 0.75 ? U.pick(own) : C.line('ambient', band);
+        let text = own && (band < 2 || b.name === 'mom_plays_too') && Math.random() < 0.75 ? U.pick(own) : C.line('ambient', band);
+        if (G.ranked && !b.story && Math.random() < 0.45) text = U.pick(band >= 2 ? D.CHAT.ac.sus : D.CHAT.ac.ambient);
         C.post(b.name, text, G.isAlly(b) ? 'team' : 'bot');
       }
     }
@@ -1328,6 +1415,7 @@
     }
     updateSocial(dt);
     updateLoot(dt, now);
+    if (G.ranked && G.state === 'playing') updateDetection(dt);
   }
 
   // ---------------------------------------------------------------- frame
@@ -1528,6 +1616,7 @@
     endMatch(won) { endMatch(won); },
     give(id, rarity) { const w = D.WEAPONS[id]; G.player.slots[w.slot] = inst(id, rarity || 0); G.selectSlot(w.slot); },
     sus(v) { G.match.sus = v; },
+    det(v) { G.match.det = v; },
   };
 
   // ---------------------------------------------------------------- admin panel actions
@@ -1544,6 +1633,8 @@
         if (n <= 0) return 'Type an amount first';
         s.credits = Math.min(1e15, s.credits + n); s.lifetimeCredits += n; msg = '+' + U.fmt(n); break;
       }
+      case 'unban': { const r = s.ranked; r.banUntil = 0; r.perma = false; r.offenses = 0; r.appeal = null; r.bypassDetected = false; msg = 'Ranked ban cleared'; break; }
+      case 'det0': if (!G.match) return 'Start a match first'; G.match.det = 0; G.match.detPeak = 0; msg = 'Warden detection cleared'; break;
       case 'setzero': s.credits = 0; msg = 'Credits set to ₡0'; break;
       case 'c1m': s.credits += 1e6; s.lifetimeCredits += 1e6; msg = '+₡1,000,000'; break;
       case 'tiers': tiers(); msg = 'All tiers unlocked'; break;

@@ -27,8 +27,20 @@ It's unsigned, so sign it with your own signer (or a sideloading tool with your 
 - In-match cheat menu with tabs (Aim / Visuals / Misc / Exploits / Config) in **11 languages**
 - **Vote kicks** in big lobbies (they can actually kick you), **rage quits** and backfills
 - **Tournament**: the 3-round FRAGLINE Open bracket with entry fee and prizes
+- **Ranked mode with a fake anticheat to bypass** (see below), realistic gamertags and lobby chat
 - Suspicion meter, reports counter, lobby chat that reacts to how blatantly you play, seller DMs and story beats on every tier
 - Progress saves on the device
+
+## Ranked mode (Warden AC)
+
+Casual is the original game: there is no anticheat. **Ranked** (unlocks at Tier 2) pays ×2.5, but **Warden AC** is watching:
+
+- A live **WARDEN** detection meter fills while cheats are on (blatant ones faster) and spikes on snaps, silent-aim shots, wallbang kills, freezes and multikills. Aimbot smoothing lowers it. Hit 100% and you are banned mid-match.
+- **Bypass gear** in the shop: HWID Spoofer, Kernel Driver, Signature Mask, Trace Cleaner.
+- A **loader minigame** before every ranked match: inject cleanly for less detection, botch it and you start the match already flagged. Or play legit with no cheats loaded.
+- **Anticheat updates** every few matches can detect your bypass (detection ×2.5) until the seller patches it, or you pay for a priority patch.
+- **Bans scale like a real game**: 5 minutes, then 30 minutes + fine, then 2 hours + fine + rank reset, then permanent. Matches you finish with high detection can still get you caught in a **ban wave** afterwards.
+- **Appeals**: pick an excuse or write your own (don't mention the cheat). Review takes about a minute. Permanent bans can also be dodged with an **alt account** (needs an HWID Spoofer).
 
 ## Hidden admin panel
 

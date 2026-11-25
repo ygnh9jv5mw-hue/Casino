@@ -25,6 +25,7 @@
       <svg viewBox="0 0 24 24" class="eye"><path d="M12 5C6.5 5 2.4 9.2 1 12c1.4 2.8 5.5 7 11 7s9.6-4.2 11-7c-1.4-2.8-5.5-7-11-7zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg>
       <div class="bar"><i id="sus-fill"></i></div><b id="sus-val">0</b>
     </div>
+    <div id="det" class="hidden" title="Warden AC detection"><span>WARDEN</span><div class="bar"><i id="det-fill"></i></div><b id="det-val">0%</b></div>
     <div id="credits-live">+&#8353;0</div>
     <canvas id="minimap" width="220" height="220"></canvas>
   </div>
@@ -111,6 +112,11 @@
       <div class="who"><b>Choose a lobby</b></div>
       <div class="credits" id="play-credits"></div>
     </header>
+    <div class="mode-row">
+      <button class="mode on" id="mode-casual">CASUAL<small>No anticheat</small></button>
+      <button class="mode" id="mode-ranked">RANKED<small>Warden AC</small></button>
+    </div>
+    <div id="ranked-panel" class="hidden"></div>
     <div id="tier-list" class="tier-list"></div>
   </div>
 </section>
@@ -183,7 +189,7 @@
       <label>Cheat menu language <select id="set-lang"></select></label>
       <p class="muted small" id="set-pad">Controller: none</p>
       <button class="btn danger" id="set-reset">Reset all progress</button>
-      <p class="muted small">NO ANTICHEAT v0.2 &middot; a single-player game. Every "player" is a bot and every cheat is an in-game upgrade.</p>
+      <p class="muted small">NO ANTICHEAT v0.3 &middot; a single-player game. Every "player" is a bot and every cheat is an in-game upgrade.</p>
     </div>
   </div>
 </section>
@@ -219,9 +225,34 @@
       <button data-adm="sus">Suspicion &rarr; 0</button>
       <button data-adm="legendary">Legendary current gun</button>
       <button data-adm="speed" id="adm-speed">Game speed: 1&times;</button>
+      <button data-adm="det0">Warden detection &rarr; 0</button>
+      <button data-adm="unban">Clear ranked ban</button>
     </div>
     <div class="adm-sec">Danger</div>
     <div class="adm-grid"><button data-adm="reset" class="danger" id="adm-reset">Reset all progress</button></div>
+  </div>
+</div>
+<!-- ======================= RANKED: loader + appeal ======================= -->
+<div id="loader" class="hidden">
+  <div class="ld-box">
+    <div class="ld-head">skillissue loader <span>· bypass for Warden AC</span></div>
+    <div id="ld-log" class="ld-log"></div>
+    <div class="ld-bar"><i id="ld-zone"></i><b id="ld-needle"></b></div>
+    <div class="ld-buttons">
+      <button class="btn primary" id="ld-inject">INJECT</button>
+      <button class="btn" id="ld-legit">PLAY LEGIT (no cheats)</button>
+      <button class="btn ghost" id="ld-cancel">CANCEL</button>
+    </div>
+  </div>
+</div>
+<div id="appeal" class="hidden">
+  <div class="ap-box">
+    <div class="ap-head">Warden Support · Ban Appeal</div>
+    <div id="ap-ticket" class="muted small"></div>
+    <div class="ap-q">Why should your ban be lifted?</div>
+    <div id="ap-list"></div>
+    <textarea id="ap-text" maxlength="200" rows="2" placeholder="Explain yourself (don't mention the cheat)"></textarea>
+    <div class="ap-buttons"><button class="btn primary" id="ap-send">SUBMIT APPEAL</button><button class="btn ghost" id="ap-cancel">CANCEL</button></div>
   </div>
 </div>
 <div id="toast"></div>
@@ -234,6 +265,7 @@
 <script src="js/core.js"></script>
 <script src="js/world.js"></script>
 <script src="js/chat.js"></script>
+<script src="js/ranked.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
