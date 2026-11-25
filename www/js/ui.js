@@ -354,6 +354,33 @@
     $('cm-panic').textContent = G.panic ? T('panicOn') : T('panic');
   };
 
+  // ---------------------------------------------------------------- hidden admin panel
+  UI.openAdmin = function () {
+    UI.adminOpen = true;
+    UI.adminAt = performance.now();
+    if (G.state === 'playing' && !G.paused) { G.paused = true; UI.adminPaused = true; }
+    if (document.pointerLockElement) document.exitPointerLock();
+    if (UI.resetTouch) UI.resetTouch();
+    UI.adminRefresh();
+    $('admin').classList.remove('hidden');
+    A.buy();
+  };
+  UI.closeAdmin = function () {
+    UI.adminOpen = false;
+    $('admin').classList.add('hidden');
+    if (UI.adminPaused) { UI.adminPaused = false; if (G.state === 'playing') G.paused = false; }
+    if (UI.current === 'scr-menu') UI.showMenu();
+    else if (UI.current === 'scr-play') UI.showPlay();
+    else if (UI.current === 'scr-shop') UI.renderShop();
+  };
+  UI.adminRefresh = function () {
+    $('adm-god').textContent = 'God mode: ' + (G.god ? 'ON' : 'off');
+    $('adm-god').classList.toggle('on', !!G.god);
+    $('adm-speed').textContent = 'Game speed: ' + G.speed + '×';
+    $('adm-head-credits').textContent = U.fmt(NA.Save.data.credits);
+    $('adm-reset').textContent = UI.admResetArm ? 'Tap again to erase everything' : 'Reset all progress';
+  };
+
   // ---------------------------------------------------------------- chat input
   UI.openChat = function () {
     if (UI.chatOpen) return;
@@ -917,6 +944,40 @@
       if (!UI.resetArm) { UI.resetArm = true; $('set-reset').textContent = 'Tap again to erase everything'; setTimeout(() => { UI.resetArm = false; $('set-reset').textContent = 'Reset all progress'; }, 3000); return; }
       NA.Save.reset();
       location.reload();
+    });
+    // Hidden admin: tap the FRAGLINE logo 5 times quickly, hold the match timer for 1.5 s, or press Ctrl+Shift+A.
+    let logoTaps = [];
+    $('menu-logo').addEventListener('pointerup', () => {
+      const now = performance.now();
+      logoTaps = logoTaps.filter(t => now - t < 3000).concat(now);
+      if (logoTaps.length >= 5) { logoTaps = []; UI.openAdmin(); }
+    });
+    let holdT = null;
+    const timer = $('timer');
+    timer.style.pointerEvents = 'auto';
+    const startHold = e => { e.preventDefault(); clearTimeout(holdT); holdT = setTimeout(() => UI.openAdmin(), 1500); };
+    const endHold = () => clearTimeout(holdT);
+    timer.addEventListener('touchstart', startHold, { passive: false });
+    timer.addEventListener('mousedown', startHold);
+    ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => timer.addEventListener(ev, endHold));
+    window.addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') { e.preventDefault(); UI.adminOpen ? UI.closeAdmin() : UI.openAdmin(); } });
+    $('adm-close').addEventListener('click', () => UI.closeAdmin());
+    $('admin').addEventListener('click', e => {
+      if (performance.now() - UI.adminAt < 500) return; // the tap that opened it
+      if (e.target.id === 'admin') { UI.closeAdmin(); return; }
+      const b = e.target.closest('[data-adm]');
+      if (!b) return;
+      A.click();
+      const act = b.dataset.adm;
+      if (act === 'reset') {
+        if (!UI.admResetArm) { UI.admResetArm = true; UI.adminRefresh(); setTimeout(() => { UI.admResetArm = false; UI.adminRefresh(); }, 3000); return; }
+        NA.Save.reset(); location.reload(); return;
+      }
+      const msg = G.admin(act, $('adm-amount').value);
+      if (act === 'custom' && msg && msg[0] === '+') $('adm-amount').value = '';
+      if (msg) UI.toast(msg);
+      if (act === 'win') { UI.adminOpen = false; UI.adminPaused = false; $('admin').classList.add('hidden'); return; }
+      UI.adminRefresh();
     });
     $('cm-close').addEventListener('click', () => UI.closeCheatMenu());
     $('cm-panic').addEventListener('click', () => { G.setPanic(!G.panic); UI.renderCheatMenu(); });

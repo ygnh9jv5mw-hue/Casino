@@ -90,7 +90,7 @@
 <section id="scr-menu" class="screen hidden">
   <div class="menu">
     <header class="topbar">
-      <div class="client-logo">FRAGLINE</div>
+      <div class="client-logo" id="menu-logo">FRAGLINE</div>
       <div class="who"><b id="menu-user"></b><span id="menu-rank" class="rank"></span></div>
       <div class="credits" id="menu-credits"></div>
     </header>
@@ -197,6 +197,33 @@
   </div>
 </section>
 
+<!-- ======================= ADMIN (hidden: tap the FRAGLINE logo 5 times, or hold the match timer) ======================= -->
+<div id="admin" class="hidden">
+  <div class="adm-box">
+    <div class="adm-head"><b>ADMIN</b><span>dev build &middot; <b id="adm-head-credits"></b></span><button id="adm-close">&times;</button></div>
+    <div class="adm-sec">Progress</div>
+    <div class="adm-grid">
+      <button data-adm="c10k">+&#8353;10,000</button>
+      <button data-adm="c1m">+&#8353;1,000,000</button>
+      <button data-adm="tiers">Unlock all tiers</button>
+      <button data-adm="cheats">Max every cheat</button>
+      <button data-adm="guns">Own every gun</button>
+      <button data-adm="everything">Unlock everything</button>
+    </div>
+    <div class="adm-money"><input id="adm-amount" type="number" inputmode="numeric" min="0" placeholder="Any amount, e.g. 250000"><button data-adm="custom">ADD &#8353;</button><button data-adm="setzero" class="ghost">Set to &#8353;0</button></div>
+    <div class="adm-sec">Match</div>
+    <div class="adm-grid">
+      <button data-adm="god" id="adm-god">God mode: off</button>
+      <button data-adm="killall">Kill all enemies</button>
+      <button data-adm="win">Win match now</button>
+      <button data-adm="sus">Suspicion &rarr; 0</button>
+      <button data-adm="legendary">Legendary current gun</button>
+      <button data-adm="speed" id="adm-speed">Game speed: 1&times;</button>
+    </div>
+    <div class="adm-sec">Danger</div>
+    <div class="adm-grid"><button data-adm="reset" class="danger" id="adm-reset">Reset all progress</button></div>
+  </div>
+</div>
 <div id="toast"></div>
 <div id="rotate" class="hidden"><div>&#8635;</div><p>Turn your phone sideways to play</p></div>
 

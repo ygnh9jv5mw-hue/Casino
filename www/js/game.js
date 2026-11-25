@@ -608,7 +608,7 @@
   }
   function damagePlayer(dmg, attacker) {
     const p = G.player;
-    if (!p.alive) return;
+    if (!p.alive || G.god) return;
     applyDamage(p, dmg);
     p.lastHurtT = performance.now();
     NA.UI.hurt(attacker);
@@ -1528,6 +1528,42 @@
     endMatch(won) { endMatch(won); },
     give(id, rarity) { const w = D.WEAPONS[id]; G.player.slots[w.slot] = inst(id, rarity || 0); G.selectSlot(w.slot); },
     sus(v) { G.match.sus = v; },
+  };
+
+  // ---------------------------------------------------------------- admin panel actions
+  G.admin = function (act, amount) {
+    const s = NA.Save.data, inMatch = G.state === 'playing';
+    const maxCheats = () => { for (const c of D.CHEATS) { s.cheats[c.id] = Object.assign(s.cheats[c.id] || {}, { level: c.max, use: c.max, enabled: true }); } s.flags.firstBuy = true; };
+    const allGuns = () => { for (const id of D.WEAPON_ORDER) s.guns[id] = true; };
+    const tiers = () => { s.highestTier = D.MAX_PLAYABLE_TIER; s.guns.ar7 = true; if (!s.loadout.primary) s.loadout.primary = 'ar7'; };
+    let msg = '';
+    switch (act) {
+      case 'c10k': s.credits += 1e4; s.lifetimeCredits += 1e4; msg = '+₡10,000'; break;
+      case 'custom': {
+        const n = Math.floor(+amount || 0);
+        if (n <= 0) return 'Type an amount first';
+        s.credits = Math.min(1e15, s.credits + n); s.lifetimeCredits += n; msg = '+' + U.fmt(n); break;
+      }
+      case 'setzero': s.credits = 0; msg = 'Credits set to ₡0'; break;
+      case 'c1m': s.credits += 1e6; s.lifetimeCredits += 1e6; msg = '+₡1,000,000'; break;
+      case 'tiers': tiers(); msg = 'All tiers unlocked'; break;
+      case 'cheats': maxCheats(); msg = 'Every cheat maxed'; break;
+      case 'guns': allGuns(); msg = 'Every gun owned'; break;
+      case 'everything': tiers(); maxCheats(); allGuns(); s.credits += 1e6; msg = 'Everything unlocked'; break;
+      case 'god': G.god = !G.god; msg = 'God mode ' + (G.god ? 'on' : 'off'); break;
+      case 'speed': G.speed = G.speed >= 4 ? 1 : G.speed * 2; msg = 'Game speed ' + G.speed + '×'; break;
+      case 'killall': if (!inMatch && !G.paused) return 'Start a match first'; G.dev.killAll(); msg = 'Lobby deleted'; break;
+      case 'win': if (!G.match || G.state !== 'playing') return 'Start a match first'; G.paused = false; endMatch(true); msg = 'GG'; break;
+      case 'sus': if (!G.match) return 'Start a match first'; G.match.sus = 0; G.match.susPeak = 0; msg = 'Suspicion cleared'; break;
+      case 'legendary': {
+        if (!G.player || G.state !== 'playing') return 'Start a match first';
+        const wi = G.curInst(); wi.rarity = 4; wi.ammo = D.WEAPONS[wi.id].mag; msg = 'Legendary ' + D.WEAPONS[wi.id].name; break;
+      }
+      default: return '';
+    }
+    NA.Save.save();
+    G.computeMods();
+    return msg;
   };
 
   NA.Game = G;

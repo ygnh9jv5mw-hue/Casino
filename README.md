@@ -30,6 +30,10 @@ It's unsigned, so sign it with your own signer (or a sideloading tool with your 
 - Suspicion meter, reports counter, lobby chat that reacts to how blatantly you play, seller DMs and story beats on every tier
 - Progress saves on the device
 
+## Hidden admin panel
+
+Tap the **FRAGLINE** logo on the main menu 5 times, hold the **match timer** for 1.5 seconds during a match, or press **Ctrl+Shift+A** on desktop. It can add any amount of money, unlock every tier, cheat and gun, and in a match turn on god mode, kill everyone, win instantly, clear suspicion, make your gun Legendary or speed the game up.
+
 ## Controls
 
 | iPhone | Controller | Desktop | Action |
