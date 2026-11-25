@@ -946,20 +946,39 @@
       location.reload();
     });
     // Hidden admin: tap the FRAGLINE logo 5 times quickly, hold the match timer for 1.5 s, or press Ctrl+Shift+A.
-    let logoTaps = [];
-    $('menu-logo').addEventListener('pointerup', () => {
-      const now = performance.now();
-      logoTaps = logoTaps.filter(t => now - t < 3000).concat(now);
-      if (logoTaps.length >= 5) { logoTaps = []; UI.openAdmin(); }
-    });
-    let holdT = null;
+    // Raw touch events: iOS can swallow quick repeated taps on plain elements as a double-tap gesture.
+    const onPress = (el, fn) => {
+      let lastTouch = 0;
+      el.addEventListener('touchstart', e => { lastTouch = performance.now(); fn(e, 'down'); }, { passive: false });
+      el.addEventListener('mousedown', e => { if (performance.now() - lastTouch > 800) fn(e, 'down'); });
+      ['touchend', 'touchcancel'].forEach(ev => el.addEventListener(ev, e => fn(e, 'up')));
+      ['mouseup', 'mouseleave'].forEach(ev => el.addEventListener(ev, e => { if (performance.now() - lastTouch > 800) fn(e, 'up'); }));
+    };
+    const tapsToOpen = el => {
+      let taps = [];
+      onPress(el, (e, kind) => {
+        if (kind !== 'down') return;
+        if (e.cancelable) e.preventDefault();
+        const now = performance.now();
+        taps = taps.filter(t => now - t < 3000).concat(now);
+        if (taps.length >= 5) { taps = []; UI.openAdmin(); }
+      });
+    };
+    const holdToOpen = (el, ms) => {
+      let t = null;
+      onPress(el, (e, kind) => {
+        clearTimeout(t);
+        if (kind === 'down') { if (e.cancelable) e.preventDefault(); t = setTimeout(() => UI.openAdmin(), ms); }
+      });
+    };
+    // 1) tap any FRAGLINE logo 5 times  2) hold your credits for 1.5 s  3) hold the match timer for 1.5 s  4) Ctrl+Shift+A
+    document.querySelectorAll('.client-logo').forEach(el => { el.classList.add('adm-trigger'); tapsToOpen(el); });
+    holdToOpen($('menu-credits'), 1500);
+    $('menu-credits').classList.add('adm-trigger');
     const timer = $('timer');
     timer.style.pointerEvents = 'auto';
-    const startHold = e => { e.preventDefault(); clearTimeout(holdT); holdT = setTimeout(() => UI.openAdmin(), 1500); };
-    const endHold = () => clearTimeout(holdT);
-    timer.addEventListener('touchstart', startHold, { passive: false });
-    timer.addEventListener('mousedown', startHold);
-    ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => timer.addEventListener(ev, endHold));
+    timer.classList.add('adm-trigger');
+    holdToOpen(timer, 1500);
     window.addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') { e.preventDefault(); UI.adminOpen ? UI.closeAdmin() : UI.openAdmin(); } });
     $('adm-close').addEventListener('click', () => UI.closeAdmin());
     $('admin').addEventListener('click', e => {

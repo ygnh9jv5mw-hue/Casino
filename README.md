@@ -32,7 +32,7 @@ It's unsigned, so sign it with your own signer (or a sideloading tool with your 
 
 ## Hidden admin panel
 
-Tap the **FRAGLINE** logo on the main menu 5 times, hold the **match timer** for 1.5 seconds during a match, or press **Ctrl+Shift+A** on desktop. It can add any amount of money, unlock every tier, cheat and gun, and in a match turn on god mode, kill everyone, win instantly, clear suspicion, make your gun Legendary or speed the game up.
+Tap the **FRAGLINE** logo 5 times, hold your **credits** (top right of the main menu) for 1.5 seconds, hold the **match timer** for 1.5 seconds during a match, or press **Ctrl+Shift+A** on desktop. It can add any amount of money, unlock every tier, cheat and gun, and in a match turn on god mode, kill everyone, win instantly, clear suspicion, make your gun Legendary or speed the game up.
 
 ## Controls
 
