@@ -10,6 +10,9 @@ Every push to this branch builds the app on a GitHub macOS runner. The unsigned 
 
 **[`dist/NoAnticheat-unsigned.ipa`](dist/NoAnticheat-unsigned.ipa)**
 
+Direct download link for signers that take a URL:
+`https://github.com/ygnh9jv5mw-hue/Casino/raw/no-anticheat/dist/NoAnticheat-unsigned.ipa`
+
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
 ## What's in this build (v0.1)

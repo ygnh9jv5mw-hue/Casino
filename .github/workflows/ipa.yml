@@ -20,6 +20,8 @@ jobs:
       matrix:
         runner: [macos-15, macos-15-intel]
     runs-on: ${{ matrix.runner }}
+    # The Intel runner is the one we rely on; the Apple-silicon one is a bonus when it's free.
+    continue-on-error: ${{ matrix.runner == 'macos-15' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
