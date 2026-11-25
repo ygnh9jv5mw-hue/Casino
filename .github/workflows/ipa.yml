@@ -67,11 +67,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git fetch -q origin "${GITHUB_REF_NAME}"
-          if git log -1 --format=%s "origin/${GITHUB_REF_NAME}" | grep -q "${GITHUB_SHA::7}"; then
-            echo "The IPA for this commit is already published."; exit 0
+          published() { git fetch -q origin "${GITHUB_REF_NAME}"; git log -1 --format=%s "origin/${GITHUB_REF_NAME}" | grep -q "${GITHUB_SHA::7}"; }
+          # Prefer the Apple Silicon build: the Intel runner waits up to 25 min for it before publishing its own.
+          if [ "${{ matrix.runner }}" != "macos-15" ]; then
+            for i in $(seq 1 25); do published && break; sleep 60; done
           fi
-          git add -f dist/NoAnticheat-unsigned.ipa
+          if published; then echo "The IPA for this commit is already published."; exit 0; fi
+          cp dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.3-unsigned.ipa"
+          git add -f dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.3-unsigned.ipa"
           git commit -m "Build unsigned IPA (run ${{ github.run_number }}, ${GITHUB_SHA::7}, ${{ matrix.runner }}) [skip ci]" || exit 0
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
