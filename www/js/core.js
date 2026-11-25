@@ -45,20 +45,13 @@
   };
   // Ray vs axis-aligned box. Returns distance along a normalized direction, or Infinity.
   U.rayBox = (ox, oy, oz, dx, dy, dz, b, maxT) => {
-    let tmin = 0, tmax = maxT;
-    const axes = [[ox, dx, b.minX, b.maxX], [oy, dy, b.minY, b.maxY], [oz, dz, b.minZ, b.maxZ]];
-    for (let i = 0; i < 3; i++) {
-      const o = axes[i][0], d = axes[i][1], lo = axes[i][2], hi = axes[i][3];
-      if (Math.abs(d) < 1e-9) {
-        if (o < lo || o > hi) return Infinity;
-      } else {
-        let t1 = (lo - o) / d, t2 = (hi - o) / d;
-        if (t1 > t2) { const s = t1; t1 = t2; t2 = s; }
-        if (t1 > tmin) tmin = t1;
-        if (t2 < tmax) tmax = t2;
-        if (tmin > tmax) return Infinity;
-      }
-    }
+    let tmin = 0, tmax = maxT, t1, t2, s;
+    if (dx > -1e-9 && dx < 1e-9) { if (ox < b.minX || ox > b.maxX) return Infinity; }
+    else { t1 = (b.minX - ox) / dx; t2 = (b.maxX - ox) / dx; if (t1 > t2) { s = t1; t1 = t2; t2 = s; } if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2; if (tmin > tmax) return Infinity; }
+    if (dy > -1e-9 && dy < 1e-9) { if (oy < b.minY || oy > b.maxY) return Infinity; }
+    else { t1 = (b.minY - oy) / dy; t2 = (b.maxY - oy) / dy; if (t1 > t2) { s = t1; t1 = t2; t2 = s; } if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2; if (tmin > tmax) return Infinity; }
+    if (dz > -1e-9 && dz < 1e-9) { if (oz < b.minZ || oz > b.maxZ) return Infinity; }
+    else { t1 = (b.minZ - oz) / dz; t2 = (b.maxZ - oz) / dz; if (t1 > t2) { s = t1; t1 = t2; t2 = s; } if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2; if (tmin > tmax) return Infinity; }
     return tmin;
   };
   U.raySphere = (ox, oy, oz, dx, dy, dz, cx, cy, cz, r) => {
@@ -97,7 +90,10 @@
     achievements: [],
     sellerDMs: [],        // { text, t, read }
     practiceStartedAt: null,
-    settings: { sens: 1, volume: 0.8, autoQueue: true, showFps: false },
+    guns: { p9: true },   // owned Armory guns
+    loadout: { primary: null, secondary: 'p9' },
+    tourney: { played: 0, won: 0 },
+    settings: { sens: 1, volume: 0.8, autoQueue: true, showFps: false, lang: 'en' },
   });
   Save.load = () => {
     const def = Save.defaults();
@@ -108,6 +104,7 @@
     for (const k of ['stats', 'settings']) {
       for (const kk of Object.keys(def[k])) if (d[k][kk] === undefined) d[k][kk] = def[k][kk];
     }
+    if (d.highestTier >= 2 && !d.guns.ar7) { d.guns.ar7 = true; if (!d.loadout.primary) d.loadout.primary = 'ar7'; }
     Save.data = d;
     return d;
   };
@@ -173,6 +170,11 @@
   };
   A.shot = (kind, distance) => {
     const att = 1 / (1 + (distance || 0) * 0.07);
+    const cls = NA.DATA.WEAPONS[kind] ? NA.DATA.WEAPONS[kind].cls : kind;
+    if (cls === 'sniper' || cls === 'dmr') { A.noiseBurst('lowpass', 1800, 0.3, 0.75 * att); A.tone(90, 0.25, 'sine', 0.6 * att, 0, 35); return; }
+    if (cls === 'shotgun') { A.noiseBurst('lowpass', 1200, 0.25, 0.8 * att); A.tone(80, 0.18, 'sine', 0.6 * att, 0, 40); return; }
+    if (cls === 'smg' || cls === 'lmg') { A.noiseBurst('lowpass', 3400, 0.07, 0.45 * att); A.tone(190, 0.06, 'sine', 0.35 * att, 0, 70); return; }
+    kind = cls;
     if (kind === 'rifle') { A.noiseBurst('lowpass', 2800, 0.11, 0.55 * att); A.tone(160, 0.09, 'sine', 0.45 * att, 0, 55); }
     else if (kind === 'pistol') { A.noiseBurst('lowpass', 2000, 0.16, 0.6 * att); A.tone(130, 0.12, 'sine', 0.5 * att, 0, 45); }
     else { A.noiseBurst('lowpass', 1300, 0.12, 0.35 * att); A.tone(110, 0.1, 'sine', 0.25 * att, 0, 45); }

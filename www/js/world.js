@@ -18,6 +18,23 @@
       for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(0, i * 32); g.lineTo(size, i * 32); g.stroke(); }
       g.strokeStyle = bold; g.lineWidth = 6; g.strokeRect(3, 3, size - 6, size - 6);
       g.beginPath(); g.moveTo(0, 0); g.lineTo(size, size); g.stroke();
+    } else if (opts && opts.ribs) {
+      g.fillStyle = line;
+      for (let i = 0; i < 16; i++) g.fillRect(i * 8, 0, 3, size);
+      g.strokeStyle = bold; g.lineWidth = 6; g.strokeRect(0, 0, size, size);
+    } else if (opts && opts.bricks) {
+      g.strokeStyle = line; g.lineWidth = 3;
+      for (let r = 0; r < 8; r++) {
+        g.beginPath(); g.moveTo(0, r * 16); g.lineTo(size, r * 16); g.stroke();
+        for (let k = 0; k < 4; k++) { const x = k * 32 + (r % 2) * 16; g.beginPath(); g.moveTo(x, r * 16); g.lineTo(x, r * 16 + 16); g.stroke(); }
+      }
+    } else if (opts && opts.soft) {
+      for (let i = 0; i < 1400; i++) {
+        g.fillStyle = Math.random() < 0.5 ? line : bold;
+        g.globalAlpha = 0.25;
+        g.fillRect(Math.random() * size, Math.random() * size, 3, 3);
+      }
+      g.globalAlpha = 1;
     } else if (opts && opts.noise) {
       for (let i = 0; i < 900; i++) {
         g.fillStyle = Math.random() < 0.5 ? line : bold;
@@ -51,6 +68,33 @@
     pillar: ['#d9a441', '#c18f30', '#a77a24', null, 2],
     crate: ['#a0703a', '#87602f', '#6d4c24', { planks: true }, 2],
     crate2: ['#8b5e34', '#77502b', '#603f21', { planks: true }, 2],
+    paving: ['#b9b3a7', '#a49e92', '#8f897d', null, 2],
+    brick: ['#9c4f3c', '#c9b8a6', '#7d3f30', { bricks: true }, 2],
+    stone: ['#a8a39a', '#938e85', '#7d786f', { noise: true }, 2],
+    roof: ['#6b3a2e', '#5a3026', '#4a271f', null, 3],
+    hedge: ['#3f7d3a', '#336b2f', '#2a5a27', { soft: true }, 2],
+    asphalt: ['#4b4f55', '#3f4348', '#5a5e64', { noise: true }, 6],
+    contR: ['#b23a2e', '#8f2e25', '#6d231c', { ribs: true }, 3],
+    contB: ['#2e5fa8', '#244c87', '#1b3a68', { ribs: true }, 3],
+    contG: ['#3c8a4a', '#2f6e3b', '#24552d', { ribs: true }, 3],
+    contY: ['#d9a628', '#b88b1f', '#946f17', { ribs: true }, 3],
+    crane: ['#e3b23c', '#2b2b2b', '#c2952c', null, 2],
+    carpet: ['#5b6475', '#535c6c', '#4b5363', { soft: true }, 3],
+    officeWall: ['#d9dce1', '#c7cad0', '#b3b7be', null, 4],
+    desk: ['#8a6b4c', '#7a5d41', '#694f37', null, 2],
+    cabinet: ['#7b828c', '#6b727b', '#5c626a', null, 1],
+    tile: ['#cfd3d6', '#b8bcc0', '#a2a6aa', null, 1.5],
+    tileWall: ['#e6e1d3', '#d3cdbf', '#3b6ea5', null, 2],
+    track: ['#3a3532', '#2c2826', '#55504c', { noise: true }, 2],
+    train: ['#c8ccd2', '#1f6fb2', '#9aa0a8', { ribs: true }, 4],
+    bench: ['#6f4e37', '#5c412e', '#4a3425', null, 1],
+    kiosk: ['#c2410c', '#9a3412', '#7c2d12', null, 2],
+    grass: ['#5c9a46', '#4f8a3c', '#6aa953', { soft: true }, 6],
+    sand: ['#d8c48f', '#c9b47e', '#e3d29f', { soft: true }, 6],
+    rock: ['#7f8288', '#6c6f75', '#909399', { noise: true }, 3],
+    trunk: ['#6b4a2f', '#5a3e27', '#4a331f', null, 1],
+    leaves: ['#3f8a3a', '#347532', '#2b6229', { soft: true }, 2],
+    houseWall: ['#e8dcc5', '#d8cbb2', '#c4b79e', null, 3],
   };
   const matCache = {};
   function material(key) {
@@ -134,6 +178,16 @@
     }
     return best;
   };
+  // How many boxes a ray enters before maxT (used for wallbangs). Floors don't count.
+  W.countWalls = function (ox, oy, oz, dx, dy, dz, maxT) {
+    let n = 0;
+    const cs = W.current.colliders;
+    for (let i = 0; i < cs.length; i++) {
+      if (cs[i].maxY <= 0.05) continue;
+      if (U.rayBox(ox, oy, oz, dx, dy, dz, cs[i], maxT) < maxT) n++;
+    }
+    return n;
+  };
   W.los = function (ax, ay, az, bx, by, bz) {
     const dx = bx - ax, dy = by - ay, dz = bz - az;
     const dist = Math.hypot(dx, dy, dz);
@@ -144,7 +198,7 @@
 
   // ---------------------------------------------------------------- navigation
   function buildNav(def, colliders) {
-    const cell = 1;
+    const cell = def.cell || 1;
     const nx = Math.round(def.size[0] / cell), nz = Math.round(def.size[1] / cell);
     const ox = -def.size[0] / 2, oz = -def.size[1] / 2;
     const walk = new Uint8Array(nx * nz);
@@ -204,15 +258,36 @@
     const closed = new Uint8Array(N);
     const start = s[0] + s[1] * n.nx, goal = t[0] + t[1] * n.nx;
     const h = (i, j) => { const dx = Math.abs(i - t[0]), dz = Math.abs(j - t[1]); return Math.max(dx, dz) + 0.414 * Math.min(dx, dz); };
-    const open = [start];
     const f = new Float32Array(N).fill(Infinity);
+    // binary min-heap of cell indices keyed by f
+    const heap = [];
+    const push = k => {
+      heap.push(k);
+      let i = heap.length - 1;
+      while (i > 0) { const p = (i - 1) >> 1; if (f[heap[p]] <= f[heap[i]]) break; const t = heap[p]; heap[p] = heap[i]; heap[i] = t; i = p; }
+    };
+    const pop = () => {
+      const top = heap[0], last = heap.pop();
+      if (heap.length) {
+        heap[0] = last;
+        let i = 0;
+        for (;;) {
+          const l = 2 * i + 1, r = l + 1;
+          let m = i;
+          if (l < heap.length && f[heap[l]] < f[heap[m]]) m = l;
+          if (r < heap.length && f[heap[r]] < f[heap[m]]) m = r;
+          if (m === i) break;
+          const t = heap[m]; heap[m] = heap[i]; heap[i] = t; i = m;
+        }
+      }
+      return top;
+    };
     g[start] = 0; f[start] = h(s[0], s[1]);
+    push(start);
+    const open = { push };
     let found = false, iter = 0;
-    while (open.length && iter++ < 4000) {
-      let bi = 0;
-      for (let k = 1; k < open.length; k++) if (f[open[k]] < f[open[bi]]) bi = k;
-      const cur = open[bi];
-      open[bi] = open[open.length - 1]; open.pop();
+    while (heap.length && iter++ < N * 3) {
+      const cur = pop();
       if (cur === goal) { found = true; break; }
       if (closed[cur]) continue;
       closed[cur] = 1;

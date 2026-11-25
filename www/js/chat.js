@@ -20,7 +20,12 @@
   // kind: bot | team | system | player | enemyteam
   C.post = (name, text, kind, opts) => {
     const msg = { name, text: C.fill(text), kind: kind || 'bot', t: performance.now(), delay: (opts && opts.delay) || 0 };
-    if (opts && opts.priority) C.queue.unshift(msg); else C.queue.push(msg);
+    msg.priority = !!(opts && opts.priority);
+    if (msg.priority) {
+      let i = 0;
+      while (i < C.queue.length && C.queue[i].priority) i++;
+      C.queue.splice(i, 0, msg);
+    } else C.queue.push(msg);
     if (C.queue.length > 10) C.queue.length = 10;
   };
   C.system = (text, opts) => C.post('SYSTEM', text, 'system', opts);

@@ -4,65 +4,143 @@ window.NA = window.NA || {};
   'use strict';
 
   // ---------------------------------------------------------------- tiers
+  // bot.skill (0..1) drives the aim model: how far off a bot starts, how fast it settles and how
+  // well it tracks movement. rateMul slows trigger fingers on the early tiers.
+  const fill = (names, total) => { const a = names.slice(); while (a.length < total) a.push('*'); return a; };
   const TIERS = [
     { id: 1, name: 'Aim Map 1v1', rank: 'Wood V', map: 'aim_map', mode: 'duel', modeLabel: 'Duel',
       scoreToWin: 5, timeLimit: 240, base: 10, kill: 2, winsToUnlock: 2,
-      bot: { hp: 100, acc: 0.08, dmg: 5, rate: 1.5, react: 0.9 },
+      bot: { hp: 100, skill: 0.16, react: 0.85, rateMul: 0.6, weapons: ['p9'] },
       enemies: ['BOT_Kevin'], allies: [] },
     { id: 2, name: 'Aim Map 2v2', rank: 'Wood I', map: 'aim_map', mode: 'tdm', modeLabel: 'Team deathmatch',
       scoreToWin: 10, timeLimit: 240, base: 30, kill: 4, winsToUnlock: 3,
-      bot: { hp: 100, acc: 0.12, dmg: 8, rate: 1.69, react: 0.75 },
+      bot: { hp: 100, skill: 0.24, react: 0.72, rateMul: 0.62, weapons: ['p9', 'wasp'] },
       enemies: ['BOT_Kevin', 'NotABot42'], allies: ['mom_plays_too'] },
     { id: 3, name: 'Warehouse', rank: 'Bronze', map: 'warehouse', mode: 'ffa', modeLabel: 'Free-for-all',
       scoreToWin: 10, timeLimit: 300, base: 90, kill: 8, winsToUnlock: 3,
-      bot: { hp: 100, acc: 0.16, dmg: 10, rate: 1.88, react: 0.65 },
+      bot: { hp: 100, skill: 0.32, react: 0.6, rateMul: 0.68, weapons: ['p9', 'wasp', 'ar7', 'thumper', 'kodiak'] },
       enemies: ['xX_Gr1ndM4ster_Xx', 'ttv_clipfarmer', '*'], allies: [] },
+    { id: 4, name: 'Courtyard 5v5', rank: 'Silver', map: 'courtyard', mode: 'tdm', modeLabel: 'Team deathmatch',
+      scoreToWin: 30, timeLimit: 420, base: 260, kill: 16, winsToUnlock: 3, shield: 50, loot: true,
+      bot: { hp: 100, skill: 0.4, react: 0.55, rateMul: 0.72, weapons: ['wasp', 'ar7', 'kodiak', 'thumper', 'tec', 'talon'] },
+      enemies: fill(['sgt_sweatpants'], 5), allies: fill(['mom_plays_too'], 4) },
+    { id: 5, name: 'Shipyard', rank: 'Gold', map: 'shipyard', mode: 'ffa', modeLabel: 'Free-for-all',
+      scoreToWin: 15, timeLimit: 420, base: 650, kill: 32, winsToUnlock: 3, shield: 50, loot: true,
+      bot: { hp: 100, skill: 0.48, react: 0.5, rateMul: 0.78, weapons: ['ar7', 'kodiak', 'talon', 'hornet', 'dmr', 'brawler', 'longbow'] },
+      enemies: fill(['ttv_clipfarmer'], 7), allies: [] },
+    { id: 6, name: 'Office 8v8', rank: 'Platinum', map: 'office', mode: 'tdm', modeLabel: 'Team deathmatch',
+      scoreToWin: 50, timeLimit: 480, base: 1500, kill: 60, winsToUnlock: 3, shield: 75, loot: true,
+      bot: { hp: 100, skill: 0.56, react: 0.45, rateMul: 0.84, weapons: ['hornet', 'kodiak', 'talon', 'vanguard', 'brawler', 'grinder', 'viper'] },
+      enemies: fill(['xX_Gr1ndM4ster_Xx'], 8), allies: fill([], 7) },
+    { id: 7, name: 'Metro', rank: 'Diamond', map: 'metro', mode: 'ffa', modeLabel: 'Free-for-all',
+      scoreToWin: 20, timeLimit: 480, base: 3600, kill: 120, winsToUnlock: 3, shield: 75, loot: true,
+      bot: { hp: 100, skill: 0.64, react: 0.4, rateMul: 0.9, weapons: ['kodiak', 'vanguard', 'hornet', 'dmr', 'grinder', 'brawler', 'ranger', 'hailstorm'] },
+      enemies: fill(['NotABot42'], 11), allies: [] },
+    { id: 8, name: 'Island 16v16', rank: 'Master', map: 'island', mode: 'tdm', modeLabel: 'Team deathmatch',
+      scoreToWin: 80, timeLimit: 600, base: 8500, kill: 240, winsToUnlock: 3, shield: 100, loot: true,
+      bot: { hp: 100, skill: 0.72, react: 0.35, rateMul: 0.95, weapons: ['kodiak', 'vanguard', 'dmr', 'longbow', 'hailstorm', 'grinder', 'talon', 'brawler'] },
+      enemies: fill([], 16), allies: fill(['mom_plays_too'], 15) },
+    { id: 9, name: 'Megalobby', rank: 'Grandmaster', map: 'island', mode: 'ffa', modeLabel: 'Free-for-all',
+      scoreToWin: 25, timeLimit: 600, base: 22000, kill: 520, winsToUnlock: 3, shield: 100, loot: true,
+      bot: { hp: 100, skill: 0.8, react: 0.3, rateMul: 1, weapons: ['vanguard', 'hailstorm', 'longbow', 'grinder', 'buzzsaw', 'kodiak', 'railspike'] },
+      enemies: fill(['BOT_Kevin', 'xX_Gr1ndM4ster_Xx', 'ttv_clipfarmer', 'sgt_sweatpants'], 23), allies: [] },
   ];
+  // Story bots that are better (or worse) than the lobby around them.
+  const BOT_SKILL = { BOT_Kevin: { 1: -0.02, 2: -0.04, 9: 0.17 }, mom_plays_too: { '*': -0.08 }, sgt_sweatpants: { '*': 0.08 }, 'xX_Gr1ndM4ster_Xx': { '*': 0.06 } };
   const LOCKED_TIERS = [
-    { id: 4, name: 'Courtyard 5v5', rank: 'Silver' },
-    { id: 5, name: 'Shipyard', rank: 'Gold' },
-    { id: 6, name: 'Office 8v8', rank: 'Platinum' },
-    { id: 7, name: 'Metro', rank: 'Diamond' },
-    { id: 8, name: 'Island 16v16', rank: 'Master' },
-    { id: 9, name: 'Megalobby', rank: 'Grandmaster' },
+    { id: 10, name: 'Pro League', rank: 'Pro' },
   ];
-  const MAX_PLAYABLE_TIER = 3;
+  const MAX_PLAYABLE_TIER = 9;
+  const TOURNAMENT = {
+    unlockTier: 4, fee: 400, prize: [0, 900, 2600, 9000],
+    rounds: [
+      { label: 'Quarterfinal', map: 'aim_map', skill: 0.5, weapons: ['ar7', 'kodiak'] },
+      { label: 'Semifinal', map: 'warehouse', skill: 0.66, weapons: ['kodiak', 'vanguard', 'talon'] },
+      { label: 'Grand Final', map: 'courtyard', skill: 0.82, weapons: ['vanguard', 'dmr', 'kodiak'] },
+    ],
+    names: ['FaZe_Wannabe', 'org_less_pro', 'Seed1_Dominator', 'coach_says_aim', 'lan_legend_04', 'ProbablyPro'],
+  };
 
   // ---------------------------------------------------------------- weapons
+  // spread: hip cone in degrees. adsMul scales it while scoped. falloff: [full-damage range, min range, min mult].
+  // pen: walls a bullet goes through by itself. burst: rounds per trigger pull (rate counts pulls).
+  const W = (o) => Object.assign({ head: 2, spread: 4.5, bloom: 1, recoil: 2, pellets: 1, scope: 0, adsMul: 0.5, pen: 0, burst: 1, falloff: null, price: 0, tier: 1 }, o);
   const WEAPONS = {
-    pistol: { id: 'pistol', name: 'P9 Pistol', dmg: 25, head: 2, rate: 4, mag: 12, reload: 1.6, tier: 1 },
-    rifle: { id: 'rifle', name: 'AR-7 Rifle', dmg: 20, head: 2.5, rate: 10, mag: 30, reload: 2.2, tier: 2 },
+    p9: W({ id: 'p9', name: 'P9 Pistol', cls: 'pistol', slot: 1, dmg: 25, rate: 4, mag: 12, reload: 1.6, recoil: 2.5, tag: 'Standard issue. Standard aim not included.' }),
+    tec: W({ id: 'tec', name: 'Tec Spitter', cls: 'pistol', slot: 1, dmg: 14, head: 1.8, rate: 15, mag: 24, reload: 1.7, spread: 6, recoil: 1.4, falloff: [10, 26, 0.55], price: 420, tier: 2, tag: 'A machine pistol for people who hold the button.' }),
+    viper: W({ id: 'viper', name: 'Viper .50', cls: 'pistol', slot: 1, dmg: 52, head: 2.3, rate: 2.2, mag: 7, reload: 2, spread: 4, recoil: 6, price: 1600, tier: 4, tag: 'Hand cannon. Wrist sold separately.' }),
+    ranger: W({ id: 'ranger', name: 'Ranger Six', cls: 'pistol', slot: 1, dmg: 70, head: 2, rate: 1.6, mag: 6, reload: 2.6, spread: 3, recoil: 7, price: 4200, tier: 6, tag: 'Six shots. Make them count. Or buy aimbot.' }),
+    wasp: W({ id: 'wasp', name: 'Wasp-9 SMG', cls: 'smg', slot: 0, dmg: 16, head: 1.8, rate: 13, mag: 30, reload: 1.9, spread: 5.5, recoil: 1.6, falloff: [12, 32, 0.6], price: 650, tier: 2, tag: 'Spray, pray, repeat.' }),
+    hornet: W({ id: 'hornet', name: 'Hornet PDW', cls: 'smg', slot: 0, dmg: 13, head: 1.8, rate: 18, mag: 45, reload: 2.1, spread: 6, recoil: 1.3, falloff: [10, 28, 0.55], price: 2300, tier: 4, tag: 'Fifteen hundred rounds a minute of "trust me".' }),
+    ar7: W({ id: 'ar7', name: 'AR-7 Rifle', cls: 'rifle', slot: 0, dmg: 20, head: 2.5, rate: 10, mag: 30, reload: 2.2, spread: 4, recoil: 2, price: 0, tier: 2, tag: 'The rifle everyone starts with. Free at Tier 2.' }),
+    kodiak: W({ id: 'kodiak', name: 'Kodiak AK', cls: 'rifle', slot: 0, dmg: 29, head: 3.5, rate: 9, mag: 30, reload: 2.5, spread: 4.5, recoil: 3.2, price: 1900, tier: 3, tag: 'One-tap to the head. If you can find the head.' }),
+    talon: W({ id: 'talon', name: 'Talon Burst', cls: 'rifle', slot: 0, dmg: 27, head: 2.5, rate: 3.2, burst: 3, mag: 24, reload: 2.3, spread: 3, recoil: 1.8, price: 3100, tier: 4, tag: 'Three rounds per click. Two of them miss.' }),
+    vanguard: W({ id: 'vanguard', name: 'Vanguard BR', cls: 'rifle', slot: 0, dmg: 36, head: 2.5, rate: 6, mag: 20, reload: 2.6, spread: 3.5, recoil: 3.8, scope: 1.6, adsMul: 0.45, price: 6200, tier: 5, tag: 'Battle rifle with a red dot you will not need.' }),
+    dmr: W({ id: 'dmr', name: 'Marksman DMR', cls: 'dmr', slot: 0, dmg: 48, head: 2.2, rate: 4, mag: 15, reload: 2.4, spread: 3.5, recoil: 3.5, scope: 2.5, adsMul: 0.15, pen: 1, price: 5200, tier: 5, tag: 'Semi-auto, 2.5x scope, goes through a door.' }),
+    longbow: W({ id: 'longbow', name: 'Longbow AWR', cls: 'sniper', slot: 0, dmg: 115, head: 2, rate: 0.75, mag: 5, reload: 3.2, spread: 9, recoil: 9, scope: 5, adsMul: 0.03, pen: 2, price: 9500, tier: 5, tag: 'Bolt action. One shot, one "how?!"' }),
+    hailstorm: W({ id: 'hailstorm', name: 'Hailstorm Auto-Sniper', cls: 'sniper', slot: 0, dmg: 70, head: 2, rate: 2.6, mag: 10, reload: 3, spread: 7, recoil: 5, scope: 3.5, adsMul: 0.07, pen: 1, price: 15000, tier: 7, tag: 'An auto-sniper. Everyone in chat hates this gun.' }),
+    thumper: W({ id: 'thumper', name: 'Thumper Pump', cls: 'shotgun', slot: 0, dmg: 13, head: 1.5, pellets: 8, rate: 1.1, mag: 5, reload: 3, spread: 7, recoil: 7, falloff: [6, 18, 0.25], price: 850, tier: 3, tag: 'Point in their general direction.' }),
+    brawler: W({ id: 'brawler', name: 'Brawler Auto', cls: 'shotgun', slot: 0, dmg: 10, head: 1.5, pellets: 6, rate: 3.5, mag: 8, reload: 3.2, spread: 7.5, recoil: 4, falloff: [5, 15, 0.25], price: 4600, tier: 5, tag: 'Auto shotgun. The lobby will write essays.' }),
+    grinder: W({ id: 'grinder', name: 'Grinder LMG', cls: 'lmg', slot: 0, dmg: 23, head: 2, rate: 11, mag: 100, reload: 4.8, spread: 5, recoil: 1.9, pen: 1, price: 7200, tier: 6, tag: 'A hundred rounds. Reload during lunch.' }),
+    buzzsaw: W({ id: 'buzzsaw', name: 'Buzzsaw Minigun', cls: 'lmg', slot: 0, dmg: 12, head: 1.6, rate: 26, mag: 200, reload: 6, spread: 7, recoil: 0.9, price: 21000, tier: 7, tag: 'Holds the fire button for you emotionally.' }),
+    railspike: W({ id: 'railspike', name: 'Railspike', cls: 'sniper', slot: 0, dmg: 140, head: 1.6, rate: 0.9, mag: 4, reload: 3, spread: 1, adsMul: 0.3, scope: 2, recoil: 6, pen: 9, price: 42000, tier: 8, tag: 'Experimental. Walls are decorative.' }),
   };
+  const WEAPON_ORDER = ['p9', 'tec', 'viper', 'ranger', 'wasp', 'hornet', 'ar7', 'kodiak', 'talon', 'vanguard', 'dmr', 'longbow', 'hailstorm', 'thumper', 'brawler', 'grinder', 'buzzsaw', 'railspike'];
+  const CLASS_LABEL = { pistol: 'Pistol', smg: 'SMG', rifle: 'Assault rifle', dmr: 'Marksman', sniper: 'Sniper', shotgun: 'Shotgun', lmg: 'LMG' };
+  const RARITY = [
+    { name: 'Common', color: '#b4bcc8', mult: 1 },
+    { name: 'Uncommon', color: '#4ade80', mult: 1.06 },
+    { name: 'Rare', color: '#38bdf8', mult: 1.12 },
+    { name: 'Epic', color: '#c084fc', mult: 1.18 },
+    { name: 'Legendary', color: '#fbbf24', mult: 1.25 },
+  ];
+  const PLATFORMS = ['PC', 'PC', 'PC', 'PS5', 'XBOX', 'MOBILE', 'SWITCH'];
+  const RANKS = ['Wood', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Master', 'Grandmaster', 'Pro'];
 
   // ---------------------------------------------------------------- cheats
   // toggle: shows in the in-match cheat menu. levels > 1 get an intensity slider.
+  // tab: which cheat-menu tab it lives in. opts: defaults for its menu options.
   const CHEATS = [
-    { id: 'aimassist', name: 'Aim Assist (Lite)', cat: 'Aim', tier: 1, base: 15, growth: 2.0, max: 5, toggle: true,
+    { id: 'aimassist', name: 'Aim Assist (Lite)', cat: 'Aim', tab: 'aim', tier: 1, base: 15, growth: 2.0, max: 5, toggle: true,
       tag: "It's basically a controller.", fx: l => `Pulls your crosshair toward enemies within ${2 + l}°` },
-    { id: 'steady', name: 'Steady Hands', cat: 'Aim', tier: 1, base: 20, growth: 2.0, max: 5, toggle: true,
+    { id: 'steady', name: 'Steady Hands', cat: 'Aim', tab: 'aim', tier: 1, base: 20, growth: 2.0, max: 5, toggle: true,
       tag: 'Gaming chair firmware update.', fx: l => `Sway −${18 * l}%` + (l >= 3 ? ', no panic' : '') },
-    { id: 'nospread', name: 'No Spread', cat: 'Aim', tier: 1, base: 40, growth: 2.2, max: 5, toggle: true,
+    { id: 'nospread', name: 'No Spread', cat: 'Aim', tab: 'aim', tier: 1, base: 40, growth: 2.2, max: 5, toggle: true,
       tag: 'Bullets go where you point. Revolutionary.', fx: l => `Spread −${20 * l}%` },
-    { id: 'norecoil', name: 'No Recoil', cat: 'Aim', tier: 2, base: 60, growth: 2.5, max: 3, toggle: true,
+    { id: 'norecoil', name: 'No Recoil', cat: 'Aim', tab: 'aim', tier: 2, base: 60, growth: 2.5, max: 3, toggle: true,
       tag: 'Your mouse, but heavier.', fx: l => `Recoil −${Math.round(100 * l / 3)}%` },
-    { id: 'triggerbot', name: 'Triggerbot', cat: 'Aim', tier: 2, base: 250, growth: 3.0, max: 3, toggle: true,
+    { id: 'triggerbot', name: 'Triggerbot', cat: 'Aim', tab: 'aim', tier: 2, base: 250, growth: 3.0, max: 3, toggle: true,
+      opts: { headOnly: false },
       tag: 'You were going to click anyway.', fx: l => `Fires on enemies by itself, ${[250, 120, 0][l - 1]} ms delay` },
-    { id: 'aimbot', name: 'Aimbot', cat: 'Aim', tier: 3, base: 500, growth: 3.5, max: 5, toggle: true, hot: true,
-      tag: 'Aim is a setting now.',
-      fx: l => ['Legit: 10° FOV, slow and smooth', '20° FOV, faster', '45° FOV', '90° FOV, instant snap', 'RAGE: 360°, snaps behind you'][l - 1] },
-    { id: 'radar', name: 'Radar Hack', cat: 'Vision', tier: 2, base: 150, growth: 1, max: 1, toggle: true,
+    { id: 'aimbot', name: 'Aimbot', cat: 'Aim', tab: 'aim', tier: 3, base: 500, growth: 3.2, max: 5, toggle: true, hot: true,
+      opts: { type: 'memory', bone: 'head', smooth: 1, predict: true, fovCircle: true },
+      tag: 'Aim is a setting now. Memory or Silent, pick a bone.',
+      fx: l => ['Legit: 10° FOV · memory aim · bone select', '20° FOV · + prediction', '45° FOV · + SILENT aim', '90° FOV, instant snap', 'RAGE: 360°, snaps behind you'][l - 1] },
+    { id: 'radar', name: 'Radar Hack', cat: 'Vision', tab: 'visuals', tier: 2, base: 150, growth: 1, max: 1, toggle: true,
       tag: 'Minimap, but honest.', fx: () => 'Every enemy shows on your minimap' },
-    { id: 'wallhack', name: 'Wallhack (ESP)', cat: 'Vision', tier: 3, base: 300, growth: 2.5, max: 5, toggle: true, hot: true,
+    { id: 'wallhack', name: 'ESP', cat: 'Vision', tab: 'visuals', tier: 3, base: 300, growth: 2.5, max: 5, toggle: true, hot: true,
+      opts: { box: true, health: true, shield: true, name: true, distance: true, weapon: true, skeleton: true, platform: false, rank: false, kills: true, snaplines: false, chams: true, botTag: true },
       tag: 'Walls are a suggestion.',
-      fx: l => ['Red boxes through walls', '+ health bars', '+ names and distance', '+ skeletons', '+ snaplines and glowing chams'][l - 1] },
-    { id: 'speedhack', name: 'Speedhack', cat: 'Movement', tier: 3, base: 400, growth: 2.5, max: 4, toggle: true,
+      fx: l => ['Boxes through walls', '+ health and shield bars', '+ name, distance, weapon', '+ skeleton, platform, rank, kills, bot tags', '+ snaplines and glowing chams'][l - 1] },
+    { id: 'lootesp', name: 'Loot ESP', cat: 'Vision', tab: 'visuals', tier: 4, base: 1800, growth: 2.2, max: 3, toggle: true,
+      opts: { minRarity: 0, weapons: true, shields: true, meds: true },
+      tag: 'Know where the purple guns are.', fx: l => ['Weapons through walls', '+ rarity filter', '+ shields and medkits, full filters'][l - 1] },
+    { id: 'speedhack', name: 'Speedhack', cat: 'Movement', tab: 'misc', tier: 3, base: 400, growth: 2.5, max: 4, toggle: true,
       tag: 'Legs, but more.', fx: l => `Move speed +${25 * l}%` },
-    { id: 'rapidfire', name: 'Rapid Fire', cat: 'Weapon', tier: 2, base: 200, growth: 2.5, max: 4, toggle: true,
+    { id: 'rapidfire', name: 'Rapid Fire', cat: 'Weapon', tab: 'misc', tier: 2, base: 200, growth: 2.5, max: 4, toggle: true,
       tag: 'Click faster. Automatically.', fx: l => `Fire rate +${30 * l}%` },
-    { id: 'infammo', name: 'Infinite Ammo', cat: 'Weapon', tier: 3, base: 600, growth: 1, max: 1, toggle: true,
+    { id: 'infammo', name: 'Infinite Ammo', cat: 'Weapon', tab: 'misc', tier: 3, base: 600, growth: 1, max: 1, toggle: true,
       tag: 'Reloading is for other people.', fx: () => 'No reloads, no fumbles' },
-    { id: 'kdspoof', name: 'K/D Spoofer', cat: 'Server', tier: 3, base: 1200, growth: 1, max: 1, toggle: true,
+    { id: 'kdspoof', name: 'K/D Spoofer', cat: 'Server', tab: 'misc', tier: 3, base: 1200, growth: 1, max: 1, toggle: true,
       tag: 'Your stats, but believable.', fx: () => 'Fake scoreboard stats, suspicion gains −20%' },
+    { id: 'streamproof', name: 'Stream Proof', cat: 'Server', tab: 'misc', tier: 4, base: 3500, growth: 1, max: 1, toggle: true,
+      tag: 'Spectators and streamers see a clean screen.', fx: () => 'Hides the menu and visuals from spectators: suspicion gains −30%, no clips' },
+    { id: 'voterig', name: 'Vote Rigging', cat: 'Server', tab: 'misc', tier: 5, base: 9000, growth: 1, max: 1, toggle: true,
+      tag: 'Democracy, but you count the votes.', fx: () => 'Vote kicks against you always fail' },
+    { id: 'wallbang', name: 'Shoot Through Walls', cat: 'Exploit', tab: 'exploits', tier: 5, base: 6000, growth: 2.5, max: 3, toggle: true, hot: true,
+      tag: 'Cover is a social construct.', fx: l => [`Bullets pierce 1 wall, keep 55% damage`, `Pierce 2 walls, keep 75%`, `Pierce everything, keep 90%`][l - 1] },
+    { id: 'freeze', name: 'Freeze Target', cat: 'Exploit', tab: 'exploits', tier: 6, base: 16000, growth: 2.5, max: 2, toggle: true,
+      tag: 'Desync them. Politely.', fx: l => `Enemies you hit freeze for ${[1.2, 2.2][l - 1]} s (4 s cooldown each)` },
     { id: 'autoqueue', name: 'Auto-Queue', cat: 'Farm', tier: 1, base: 50, growth: 1, max: 1,
       tag: 'Skip the menus.', fx: () => 'The next match starts by itself' },
     { id: 'affiliate', name: 'Affiliate Program', cat: 'Misc', tier: 3, base: 500, growth: 3.0, max: 10,
@@ -74,8 +152,8 @@ window.NA = window.NA || {};
   ];
   const CHEAT = {};
   CHEATS.forEach(c => { CHEAT[c.id] = c; });
-  const CATEGORIES = ['Aim', 'Vision', 'Movement', 'Weapon', 'Server', 'Farm', 'Misc'];
-  const TEASERS = ['Headshot Lock', 'Damage Boost', 'Vote Rigging', 'Wallbang', 'Spinbot', 'Silent Aim', 'God Mode', 'Kill All'];
+  const CATEGORIES = ['Aim', 'Vision', 'Movement', 'Weapon', 'Server', 'Exploit', 'Farm', 'Misc'];
+  const TEASERS = ['God Mode', 'Kill All', 'Spinbot', 'Teleport', 'Rank Boost'];
 
   // ---------------------------------------------------------------- maps
   // box: [x, z, yBottom, w, h, d, material]
@@ -123,7 +201,7 @@ window.NA = window.NA || {};
   // ---------------------------------------------------------------- people
   const CHARACTERS = {
     BOT_Kevin: 'npc', mom_plays_too: 'wholesome', NotABot42: 'npc',
-    'xX_Gr1ndM4ster_Xx': 'tryhard', ttv_clipfarmer: 'streamer',
+    'xX_Gr1ndM4ster_Xx': 'tryhard', ttv_clipfarmer: 'streamer', sgt_sweatpants: 'tryhard',
   };
   const NAME_A = ['Silent', 'Salty', 'Frosty', 'Lazy', 'Hyper', 'Spicy', 'Sleepy', 'Cyber', 'Turbo', 'Toxic', 'Crispy', 'Feral', 'Soggy', 'Quiet', 'Mild'];
   const NAME_B = ['Panda', 'Sniper', 'Goblin', 'Potato', 'Falcon', 'Noodle', 'Ghost', 'Taco', 'Viper', 'Llama', 'Wizard', 'Pickle', 'Frog', 'Waffle', 'Moose'];
@@ -169,7 +247,18 @@ window.NA = window.NA || {};
       triggerbot: ['he shoots the exact frame i peek', 'reaction time: 0 ms??'],
       rapidfire: ['is his gun on fast forward', 'that pistol fires like a minigun'],
       infammo: ['does he ever reload', 'bro has had the same mag for 2 minutes'],
+      silent: ['his bullets CURVE', 'he was looking at the wall and i died', 'bro shot left and hit me on the right'],
+      wallbang: ['i was behind a WALL', 'he shot me through two containers??', 'cover does nothing against this guy'],
+      freeze: ['i cant move?? lag??', 'i just froze mid strafe', 'my game froze right when he shot me. every time.'],
+      lootesp: ['how does he always have a gold gun', 'he walked straight to the legendary'],
     },
+    vote: {
+      start: ['vote yes', 'F1 F1 F1', 'kick him', 'finally', 'yes. obviously.'],
+      fail: ['how did that fail', 'who voted no???', 'rigged', 'the vote is rigged too??', 'devs pls'],
+      pass: ['bye', 'gg ez kicked', 'justice', 'cya'],
+    },
+    rageQuit: ["i'm out. enjoy your empty lobby", 'uninstalling', 'not playing with this guy', 'alt+f4', 'done. reported.'],
+    backfill: ['wait why did i join mid game', 'hi', 'whats the score', 'why is the lobby so salty'],
     keywords: [
       { re: /\bgg\b/i, early: ['gg!', 'gg wp'], late: ['gg', 'gg (reported)'] },
       { re: /not cheat|legit|no hack|not hack|no cheat/i, early: ['sure buddy', 'then turn it off', "that's what a cheater would say"], late: ['sure buddy', 'then turn it off', "that's what a cheater would say"], sus: 10, mom: 'i believe you sweetie' },
@@ -202,7 +291,16 @@ window.NA = window.NA || {};
     aimbotReveal: [['*', 'lucky'], ['*', 'bro what'], ['xX_Gr1ndM4ster_Xx', "who is this guy. account is {accountAge} days old and he's top frag?"], ['xX_Gr1ndM4ster_Xx', 'smurf.']],
     clip: [['ttv_clipfarmer', 'CLIPPED. my chat says ur cracked.']],
     bestCustomer: "you're my best customer. don't tell the others.",
-    comingSoon: ["heads up. the lobbies above warehouse are still being 'set up'.", 'come back next update.'],
+    comingSoon: ["you cleared the megalobby. there's nothing left to cheat in.", 'pro league is "coming soon". like the anticheat.'],
+    tierHello: {
+      4: [['sgt_sweatpants', '5 stack. comms on. who is this solo'], ['mom_plays_too', 'hi sweetie! big lobby today :)']],
+      5: [['ttv_clipfarmer', 'chat said you would be here. CLIPPING EVERYTHING']],
+      6: [['xX_Gr1ndM4ster_Xx', 'i reported you 400 times. i have a spreadsheet.'], ['*', 'is that the guy']],
+      7: [['NotABot42', 'Hello again, fellow human. I have upgraded my humanity.']],
+      8: [['mom_plays_too', 'i brought the whole book club!! :)'], ['*', 'why are there 32 people here']],
+      9: [['BOT_Kevin', 'hello. i have been practicing.'], ['BOT_Kevin', 'i learned it from you.']],
+    },
+    tourney: [['SYSTEM', 'Welcome to the FRAGLINE Open. Prize pool: {prize}. Admins: 0.']],
   };
   const SELLER_BUY = {
     aimassist: 'pleasure doing business', steady: 'firmware updated', nospread: 'precision is a purchase',
@@ -211,10 +309,13 @@ window.NA = window.NA || {};
     speedhack: 'gotta go fast', rapidfire: 'your finger thanks you', infammo: 'reloading was holding you back',
     kdspoof: 'smart. sort of.', autoqueue: 'efficiency. i respect it', affiliate: 'referring yourself. bold.',
     rgb: '…ok', practice: 'lol. lmao even.',
+    lootesp: 'gold guns glow now. you know where to walk', streamproof: "streamers can't clip what they can't see",
+    voterig: 'votes are a suggestion too', wallbang: 'cover is for people who paid less', freeze: 'this one is my favorite. dont tell anyone',
+    gun: ['nice piece', 'that one hits different', 'gun + aimbot = combo meal'],
   };
 
   NA.DATA = {
-    TIERS, LOCKED_TIERS, MAX_PLAYABLE_TIER, WEAPONS, CHEATS, CHEAT, CATEGORIES, TEASERS, MAPS,
+    TIERS, LOCKED_TIERS, MAX_PLAYABLE_TIER, BOT_SKILL, TOURNAMENT, WEAPONS, WEAPON_ORDER, CLASS_LABEL, RARITY, PLATFORMS, RANKS, CHEATS, CHEAT, CATEGORIES, TEASERS, MAPS,
     CHARACTERS, NAME_A, NAME_B, NAME_SPECIAL, CHAT, STORY, SELLER_BUY,
     ANTICHEAT_DAYS_BASE: 1204,
   };

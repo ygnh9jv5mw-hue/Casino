@@ -271,3 +271,43 @@ body:not([data-screen="hud"]):not([data-screen="scr-lobby"]):not([data-screen="s
   .menu-grid { grid-template-columns: 1fr 1fr; }
   .tile.play { grid-row: auto; grid-column: span 2; }
 }
+
+/* ---------------------------------------------------------------- v0.2: big maps, guns, loot, menu tabs */
+.tier.m-aim_map .swatch { background: linear-gradient(135deg, #e8822e, #9ba1ab); }
+.tier.m-warehouse .swatch { background: linear-gradient(135deg, #a0703a, #2f6db5); }
+.tier.m-courtyard .swatch { background: linear-gradient(135deg, #9c4f3c, #b9b3a7 60%, #3f7d3a); }
+.tier.m-shipyard .swatch { background: repeating-linear-gradient(90deg, #b23a2e 0 22px, #2e5fa8 22px 44px, #3c8a4a 44px 66px, #d9a628 66px 88px); }
+.tier.m-office .swatch { background: linear-gradient(135deg, #d9dce1, #5b6475); }
+.tier.m-metro .swatch { background: linear-gradient(135deg, #e6e1d3, #1f6fb2 55%, #3a3532); }
+.tier.m-island .swatch { background: linear-gradient(135deg, #8ec5f0, #d8c48f 45%, #5c9a46); }
+.tier.tourney { border-color: #a16207; background: linear-gradient(160deg, #3b2a07, #111827); }
+.tier.tourney .swatch { background: radial-gradient(circle at 50% 120%, #fde047, #a16207 55%, #1c1404); }
+#lobby-players { max-height: 52vh; overflow-y: auto; }
+#lobby-players.many { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; font-size: 11px; }
+#res-board { max-height: 34vh; overflow-y: auto; }
+.item.gun .slot { float: right; font-size: 9px; font-weight: 800; color: #6b21a8; border: 1px solid #a855f7; padding: 0 4px; margin-left: 6px; }
+#vitals { display: flex; flex-direction: column; gap: 3px; }
+#sh { display: flex; align-items: center; gap: 6px; }
+#sh .bar { width: 90px; height: 6px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
+#sh .bar i { display: block; height: 100%; width: 0; background: #38bdf8; }
+#sh b { font-size: 11px; min-width: 26px; color: #7dd3fc; }
+#weapon-name { font-weight: 700; }
+#b-ads { width: 52px; height: 52px; right: calc(186px + var(--sr)); bottom: calc(86px + var(--sb)); font-size: 11px; }
+#b-ads.on { background: rgba(56,189,248,0.45); border-color: #7dd3fc; }
+#b-pick { width: auto; min-width: 96px; height: 46px; border-radius: 12px; right: calc(26px + var(--sr)); bottom: calc(186px + var(--sb)); font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 10px; background: rgba(250,204,21,0.35); border-color: #fde047; }
+#b-pick small { font-size: 9px; font-weight: 700; }
+.tb.dim { opacity: 0.35; }
+#cm-tabs { display: flex; gap: 2px; background: #1e1036; padding: 3px; overflow-x: auto; }
+#cm-tabs button { flex: 1; background: transparent; border: 0; color: #a78bfa; font-family: inherit; font-weight: 800; font-size: 10px; padding: 6px 4px; border-radius: 3px; white-space: nowrap; }
+#cm-tabs button.on { background: #6d28d9; color: #fff; }
+.cm-sub { margin: -2px 0 4px 28px; display: flex; flex-direction: column; gap: 3px; border-left: 2px solid #4c1d95; padding-left: 8px; }
+.cm-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: #ddd6fe; }
+.cm-opt select { background: #1e1036; color: #fff; border: 1px solid #6d28d9; border-radius: 3px; font: inherit; font-size: 11px; padding: 2px 4px; max-width: 58%; }
+.cm-opt input[type=checkbox] { width: 16px; height: 16px; accent-color: #8b5cf6; }
+.cm-opt input[type=range] { flex: 1; accent-color: #8b5cf6; }
+.cm-opt b { min-width: 16px; text-align: right; }
+.cm-opt.dim { color: #6b5b8a; }
+.cm-opt em { font-style: normal; font-size: 10px; }
+.cm-note { font-size: 10px; color: #8b7bb0; }
+.settings select { background: #0f141c; color: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 5px; font: inherit; }
+.cm-title, #cm-tabs, #cm-panic { flex-shrink: 0; }
