@@ -59,6 +59,9 @@
     $('m-items-sub').textContent = `new items in ${Math.floor(left / 3600000)}h ${Math.floor(left / 60000) % 60}m`;
     const owned = (s.cosmetics.owned || []).filter(x => /^(outfit|gunskin|knife|killfx):/.test(x)).length;
     $('m-locker-sub').textContent = `${owned + 4} items`;
+    renderGoals();
+    const AS = NA.Sellers.active(), ast = NA.Sellers.status(AS.id);
+    $('m-shop').querySelector('.t-sub').innerHTML = `${esc(AS.name)}${ast !== 'ok' ? ` · <b class="sst ${ast}">${NA.Sellers.STATUS_LABEL[ast]}</b>` : ''}`;
     const fromElsewhere = UI.current !== 'scr-menu';
     UI.show('scr-menu');
     UI.fillMenuArt();
@@ -68,6 +71,29 @@
       for (let i = 0; i < 4; i++) A.whoosh(0.08 + i * 0.07);
     }
   };
+  // ---------------------------------------------------------------- menu: streak, next upgrade, tier, jobs, away earnings
+  function renderGoals() {
+    const Lp = NA.Loop, out = [], stk = Lp.streak();
+    if (stk >= 1) out.push(`<div class="gl streak"><b>🔥 ${stk} WIN STREAK</b><span>next win +${Math.round(Lp.streakBonus(stk + 1) * 100)}%</span></div>`);
+    const ng = Lp.nextGoal();
+    if (ng) out.push(`<button class="gl ng ${ng.pct >= 1 ? 'ready' : ''}" data-goal="shop"><small>NEXT UPGRADE</small><b>${esc(ng.name)}${ng.max > 1 ? ' · L' + ng.lvl : ''}</b><i class="gbar"><u style="width:${Math.round(ng.pct * 100)}%"></u></i><span>${ng.pct >= 1 ? 'READY TO BUY ›' : `${U.fmt(ng.have)} / ${U.fmt(ng.cost)}`}</span></button>`);
+    const tg = Lp.tierGoal();
+    if (tg) out.push(`<button class="gl tg" data-goal="play"><small>TIER ${tg.tier} UNLOCK</small><b>${tg.wins}/${tg.need} wins in ${esc(tg.from)}</b><i class="gbar"><u style="width:${Math.round(tg.wins / tg.need * 100)}%"></u></i></button>`);
+    const jobs = Lp.jobs(), top = jobs[0];
+    if (top) { const need = NA.Loop.JOBS.find(j => j.id === top.id).n; out.push(`<button class="gl jb" data-goal="ranks" style="--sa:${top.seller.acc}"><small>SELLER JOBS · ${jobs.length} OPEN</small><b>${esc(top.label)}</b><span>${Math.min(top.n, need)}/${need} · +${U.fmt(top.reward)}</span></button>`); }
+    $('menu-goals').innerHTML = out.join('');
+    const aw = Lp.pendingAway(), card = $('away-card');
+    card.classList.toggle('hidden', !aw);
+    if (aw) card.innerHTML = `<div class="aw-in"><small>WHILE YOU WERE AWAY · ${Lp.fmtAway(aw.ms)}</small><b>${U.fmt(aw.amt)}</b><span>Your affiliate code got used ${aw.uses} times. Nobody asked where the credits came from.</span><button class="aw-go" id="away-claim">CLAIM</button></div>`;
+  }
+  UI.renderGoals = renderGoals;
+  function jobsHtml() {
+    const jobs = NA.Loop.jobs();
+    return `<div class="rk-jobs"><h4>Seller jobs <small>${NA.Loop.jobsDone()} done · new one appears when you finish one</small></h4>` + jobs.map(j => {
+      const need = NA.Loop.JOBS.find(x => x.id === j.id).n;
+      return `<div class="rj" style="--sa:${j.seller.acc}"><i></i><span><small>${esc(j.seller.name)}</small>${esc(j.label)}</span><b>${Math.min(j.n, need)}/${need}</b><em>${U.fmt(j.reward)}${j.sub ? ` +${j.sub} VW` : ''}</em></div>`;
+    }).join('') + '</div>';
+  }
   function botsLabel(t) {
     if (t.mode === 'duel') return '1v1';
     if (t.mode === 'tdm') return `${t.allies.length + 1}v${t.enemies.length}`;
@@ -88,7 +114,9 @@
     $('mode-ranked').querySelector('small').textContent = R.unlocked() ? `${D.RANKED.ac} · ×${D.RANKED.payMult} pay` : `Unlocks at Tier ${D.RANKED.unlockTier}`;
     $('ranked-panel').classList.toggle('hidden', !ranked);
     const df = G.diff();
-    $('diff-row').innerHTML = '<span class="diff-l">Difficulty</span>' + D.DIFFICULTY.map(x => `<button class="diff ${x.id === df.id ? 'on' : ''}" data-diff="${x.id}" style="--dc:${x.color}">${x.name}<small>×${x.pay} pay</small></button>`).join('') + `<span class="diff-tag">${esc(df.tag)}</span>`;
+    const timed = !ranked && !events && s.settings.matchType === 'timed';
+    $('diff-row').innerHTML = '<span class="diff-l">Difficulty</span>' + D.DIFFICULTY.map(x => `<button class="diff ${x.id === df.id ? 'on' : ''}" data-diff="${x.id}" style="--dc:${x.color}">${x.name}<small>×${x.pay} pay</small></button>`).join('') + `<span class="diff-tag">${esc(df.tag)}</span>`
+      + (!ranked && !events ? `<span class="mt-seg"><span class="diff-l">Match</span><button class="${timed ? '' : 'on'}" data-mtype="score">KILL TARGET<small>first to N kills</small></button><button class="${timed ? 'on' : ''}" data-mtype="timed">TIMED<small>most kills at the buzzer</small></button></span>` : '');
     if (ranked) UI.renderRankedPanel();
     if (events) { $('tier-list').innerHTML = NA.Events.cards(tourneyCard); UI.show('scr-play'); return; }
     for (const t of D.TIERS) {
@@ -100,7 +128,7 @@
       html.push(`<button class="tier ${open ? 'open' : 'locked'} m-${t.map}" data-tier="${t.id}">
         <span class="tart${NA.Showroom.mapArt(t.map) ? ' on' : ''}" data-map="${t.map}" style="${NA.Showroom.mapArt(t.map) ? `background-image:url(${NA.Showroom.mapArt(t.map)})` : ''}"></span>
         <div class="swatch"></div><div class="tnum">TIER ${t.id} · ${t.rank}</div><div class="tname">${t.name}</div>
-        <div class="tmeta">${t.modeLabel} · ${botsLabel(t)} · first to ${t.scoreToWin}${t.loot ? ' · loot + shields' : ''}</div>
+        <div class="tmeta">${timed ? 'Timed ' + t.modeLabel.toLowerCase() : t.modeLabel} · ${botsLabel(t)} · ${timed ? `most kills in ${t.mode === 'duel' ? '3' : '5'}:00` : 'first to ' + t.scoreToWin}${t.loot ? ' · loot + shields' : ''}</div>
         <div class="tmaps">${(t.maps || [t.map]).map(D.mapTitle).join(' · ')}</div>
         <div class="tpay">Win ${U.fmt(t.base * (ranked ? D.RANKED.payMult : 1) * df.pay)} + ${U.fmt(t.kill * (ranked ? D.RANKED.payMult : 1) * df.pay)}/kill</div><div class="tprog">${prog}</div></button>`);
     }
@@ -123,7 +151,8 @@
     parts.push(`<div class="rk-row"><span class="rk-ac">🛡 ${esc(wp.name)} · ${esc(wp.mode)}</span>
       <span>Bypass: <b class="${status === 'DETECTED' ? 'bad' : 'good'}">${status}</b></span>
       <span>Rank: <b>${R.rankName(rs.rr)}</b> ${rs.rr} RR</span><span>Offences: ${rs.offenses}</span>
-      <span>Detection rate ×${R.matchMult(2).toFixed(2)}</span></div>
+      <span>Detection rate ×${(R.matchMult(2) * NA.Sellers.preview().detMult).toFixed(2)}</span>
+      <span>Loader: <b class="${NA.Sellers.status(NA.Sellers.activeId()) === 'ok' ? 'good' : 'bad'}">${esc(NA.Sellers.active().name)} · ${NA.Sellers.STATUS_LABEL[NA.Sellers.status(NA.Sellers.activeId())]}</b></span></div>
       <div class="rk-wp"><span>Strictness <i class="rk-meter"><u style="width:${Math.round(wp.heat / 2.4 * 100)}%"></u></i></span>
       <span>${wp.scan ? `Scans every ~${wp.scan}s` : 'No timed scans'}</span><span>Starts at ${wp.start}% detection</span>
       ${nextWp !== wp ? `<span class="muted">Next rank: ${esc(nextWp.name)} (×${(nextWp.heat / wp.heat).toFixed(2)} stricter)</span>` : '<span class="muted">This is as strict as it gets.</span>'}</div>`);
@@ -264,7 +293,7 @@
     const t = G.match.tier, p = G.player, s = NA.Save.data;
     $('pm-map').textContent = D.mapTitle(t.map);
     $('lobby-title').textContent = t.name;
-    $('lobby-sub').textContent = `${t.modeLabel} · ${G.bots.length + 1} players · first to ${t.scoreToWin}${G.ranked ? ` · ${NA.Ranked.profile().name}` : ''}`;
+    $('lobby-sub').textContent = `${t.modeLabel} · ${G.bots.length + 1} players · ${t.timed ? `most kills in ${Math.round(t.timeLimit / 60)}:00` : 'first to ' + t.scoreToWin}${G.ranked ? ` · ${NA.Ranked.profile().name}` : ''}`;
     let i = 0;
     const card = (name, me, side) => {
       const ping = me ? 0 : U.randInt(14, 95);
@@ -286,6 +315,11 @@
       el.innerHTML = shown.map(e => card(e.name, e === p)).join('') + (all.length > 15 ? `<div class="pc"><b>+${all.length - 15} more</b></div>` : '');
     }
     $('pm-tip').textContent = U.pick(TIPS);
+    const PL = G.loadout;
+    if (PL) {
+      const PX = PL.seller;
+      $('pm-loader').innerHTML = `<span class="lk">LOADER</span><b style="color:${PX.acc}">${esc(PX.name)}</b><span class="sst ${PL.status}">● ${NA.Sellers.STATUS_LABEL[PL.status]}</span><span class="lm">${PL.status === 'updating' ? 'offline this match' : `${NA.Sellers.allowed(PL).size} running · ${PL.stock.size}/${PX.catalog.length} in stock`}</span>`;
+    }
     $('lobby-count').textContent = '4';
     const arc = $('pm-arc');
     arc.style.transition = 'none'; arc.style.strokeDashoffset = '0'; void arc.offsetWidth; arc.style.transition = '';
@@ -330,6 +364,9 @@
     $('res-stats').textContent = `Accuracy ${r.acc}% · Headshots ${p.headshots} · Peak suspicion ${r.peakSus}` + (r.ranked ? ` · Peak Warden detection ${r.ranked.peak}%` : '');
     $('res-pay').innerHTML = r.pay.lines.map(l => `<div class="pl"><span>${esc(l[0])}</span><span>+${U.fmt(l[1])}</span></div>`).join('');
     countUp($('res-total'), r.pay.total);
+    const sn = r.sellerNews || [], rsl = $('res-seller');
+    rsl.classList.toggle('hidden', !sn.length);
+    rsl.innerHTML = sn.map(n => `<div class="sn ${n.k}">${esc(n.t)}</div>`).join('');
     const un = $('res-unlock');
     un.classList.add('hidden'); un.classList.remove('soon');
     const rk = r.ranked, RS = NA.Save.data.ranked;
@@ -422,9 +459,63 @@
     else if (UI.shopFrom === 'scr-comms') NA.Comms.open();
     else UI.showMenu();
   };
+  const HEROES = {
+    skillissue: '<b>SKILLISSUE.SHOP</b><span>we sell skill &bull; all products 100% UNDETECTED &bull; no refunds</span>',
+    freehax: '<b>FREEHAX.EXE</b><span>100% FREE &bull; NO VIRUS &bull; NEW FEATURES EVERY 3 MIN &bull; YOU ARE VISITOR #1,000,000</span>',
+    ghost: '<b>ghost.cc</b><span>quiet features for quiet players</span>',
+    void: '<b>VOIDWARE</b><span>premium &bull; invite only &bull; est. 2019</span>',
+  };
+  function loaderBar() {
+    const SLR = NA.Sellers, L = SLR.preview(), X = L.seller;
+    return `<div class="ldr-bar" style="--sa:${X.acc}"><span class="lb-k">LOADER</span><b>${esc(X.name)}</b><span class="sst ${L.status}">● ${SLR.STATUS_LABEL[L.status]}</span>`
+      + `<span class="lb-m">${L.status === 'updating' ? 'offline next match' : `${L.stock.size}/${X.catalog.length} in stock`} · restock <b data-restock>${SLR.fmtRestock()}</b></span>`
+      + `<span class="lb-s">${SLR.LIST.map(x => `<i class="${SLR.status(x.id)}">${esc(x.short)}</i>`).join('')}</span></div>`;
+  }
+  function sellerPage(X) {
+    const SLR = NA.Sellers, s = NA.Save.data, st = SLR.status(X.id), own = SLR.owns(X.id), active = SLR.activeId() === X.id, unl = SLR.unlocked(X.id);
+    const stock = SLR.stock(X.id), left = SLR.statusLeft(X.id);
+    let btn;
+    if (!unl) btn = `<button class="buy cant" disabled>Unlocks at Tier ${X.tier}</button>`;
+    else if (X.sub) btn = (own && !active ? `<button class="buy" data-sload="${X.id}">LOAD</button>` : '') + `<button class="buy ${s.credits < X.price ? 'cant' : ''}" data-sbuy="${X.id}">${own ? '+' + X.sub + ' MATCHES' : 'SUBSCRIBE · ' + X.sub + ' MATCHES'} · ${U.fmt(X.price)}</button>`;
+    else if (!own) btn = `<button class="buy ${s.credits < X.price ? 'cant' : ''}" data-sbuy="${X.id}">${X.price ? 'BUY LICENSE · ' + U.fmt(X.price) : 'DOWNLOAD FREE'}</button>`;
+    else if (!active) btn = `<button class="buy" data-sload="${X.id}">LOAD ${esc(X.short.toUpperCase())}</button>`;
+    else btn = '<button class="buy max" disabled>✔ LOADED</button>';
+    const chips = X.catalog.map(id => {
+      const c = D.CHEAT[id], lv = NA.Save.level(id), inS = stock.has(id);
+      return `<span class="sk ${inS ? 'in' : 'out'} ${lv ? 'own' : ''}">${esc(c.name)}${lv ? `<em>L${Math.min(lv, X.cap)}</em>` : ''}</span>`;
+    }).join('');
+    const riskTxt = X.det < 1 ? `${Math.round((1 - X.det) * 100)}% quieter than skillissue.shop` : X.det > 1 ? `${X.det}× louder than skillissue.shop` : 'the baseline';
+    return `<div class="sp sp-${X.id}" style="--sa:${X.acc}">
+      <div class="sp-top"><div class="sp-tag">${esc(X.tag)}</div><div class="sst ${st}">● ${SLR.STATUS_LABEL[st]}${st !== 'ok' && left ? ` · ${left} match${left === 1 ? '' : 'es'}` : ''}</div></div>
+      <div class="sp-grid">
+        <div class="sp-card"><h5>Detection risk</h5><div class="sp-risk"><i style="width:${Math.min(100, X.det * 50)}%;background:${X.det < 0.6 ? '#4ade80' : X.det <= 1 ? '#fbbf24' : '#f87171'}"></i></div><small>${riskTxt}</small></div>
+        <div class="sp-card"><h5>Limits</h5><small>${X.cap < 99 ? 'Level ' + X.cap + ' max' : 'No level cap'}<br>${X.slots < 99 ? X.slots + ' features on at once' : 'No feature limit'}</small></div>
+        <div class="sp-card"><h5>Perks</h5><ul>${X.perks.map(q => `<li>${esc(q)}</li>`).join('')}</ul></div>
+        <div class="sp-card bad"><h5>The catch</h5><ul>${X.quirks.map(q => `<li>${esc(q)}</li>`).join('')}</ul></div>
+      </div>
+      <div class="sp-stock"><h5>IN STOCK NOW <span>restock in <b data-restock>${SLR.fmtRestock()}</b></span></h5><div class="sk-grid">${chips}</div></div>
+      <div class="sp-buy">${X.sub && own ? `<span class="sp-sub">${s.sellers.subLeft} matches left</span>` : ''}${btn}</div>
+    </div>`;
+  }
+  function renderShopChrome(site) {
+    const SLR = NA.Sellers, X = SLR.BY[site];
+    $('shop-tabs').innerHTML = SLR.LIST.map(x => `<button data-site="${x.id}" class="${x.id === site ? 'on' : ''}" style="--sa:${x.acc}"><i class="fav"></i><span>${esc(x.site)}</span>${SLR.activeId() === x.id ? '<em>LOADED</em>' : ''}<b class="dot ${SLR.status(x.id)}"></b></button>`).join('');
+    $('shop-addr').innerHTML = (X.secure ? '<span class="sec">&#128274;</span> ' : '<span class="nsec">&#9888; Not secure</span> ') + (X.id === 'freehax' ? 'http://' : 'https://') + X.site;
+    $('shop-hero').innerHTML = HEROES[site];
+    $('scr-shop').dataset.site = site;
+  }
   UI.renderShop = function () {
     const s = NA.Save.data, html = [];
     $('shop-credits').textContent = U.fmt(s.credits);
+    const site = NA.Sellers.BY[UI.shopSite] ? UI.shopSite : 'skillissue';
+    renderShopChrome(site);
+    html.push(loaderBar());
+    if (site !== 'skillissue') {
+      html.push(sellerPage(NA.Sellers.BY[site]));
+      $('shop-list').innerHTML = html.join('');
+      renderDMs();
+      return;
+    }
     if (!s.flags.firstBuy) html.push('<div class="teaser"><b>FIRST ONE\'S HALF OFF.</b> Prices below already include it. One time only.</div>');
     for (const cat of D.CATEGORIES) {
       const items = D.CHEATS.filter(c => c.cat === cat);
@@ -469,10 +560,22 @@
     html.push('</div>');
     html.push(`<div class="teaser">Restocking next update: ${D.TEASERS.join(' · ')}</div>`);
     $('shop-list').innerHTML = html.join('');
-    const dms = s.sellerDMs;
+    renderDMs();
+  };
+  function renderDMs() {
+    const dms = NA.Save.data.sellerDMs;
     $('shop-dms').innerHTML = dms.length ? dms.map(d => `<div class="dm ${d.read ? '' : 'new'}">${esc(d.text)}</div>`).join('') : '<div class="dm-empty">no messages yet</div>';
     $('shop-dms').scrollTop = 1e6;
-  };
+  }
+  // stock countdowns tick, and the shop redraws when a new drop lands
+  let lastSlot = 0;
+  setInterval(() => {
+    if (!NA.Sellers || !NA.Save.data) return;
+    const els = document.querySelectorAll('[data-restock]');
+    if (els.length) { const t = NA.Sellers.fmtRestock(); els.forEach(e => { e.textContent = t; }); }
+    const sl = NA.Sellers.slot();
+    if (sl !== lastSlot) { const first = !lastSlot; lastSlot = sl; if (!first && UI.current === 'scr-shop') UI.renderShop(); }
+  }, 1000);
   UI.refreshDMBadge = function () {
     const n = NA.Save.data.sellerDMs.filter(d => !d.read).length;
     for (const id of ['shop-badge', 'res-badge']) {
@@ -485,21 +588,53 @@
   };
 
   // ---------------------------------------------------------------- profile + settings
+  // ---------------------------------------------------------------- first-run name screen
+  function nameSugg() {
+    const used = new Set([$('name-input').value]);
+    const list = [0, 1, 2].map(() => { const x = G.genName(used); used.add(x); return x; });
+    $('name-sugg').innerHTML = list.map(x => `<button data-nm="${esc(x)}">${esc(x)}</button>`).join('');
+  }
+  function namePreview() {
+    const raw = $('name-input').value.trim(), clean = raw.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 18);
+    $('nm-preview').textContent = clean || 'newplayer';
+    const rule = $('name-rule'), short = clean.length < 3, changed = clean !== raw;
+    rule.textContent = short ? '3 to 18 characters: letters, numbers, _ . and -' : changed ? `Spaces and symbols get dropped: "${clean}"` : 'Looks good. Nobody will suspect a thing.';
+    rule.className = 'nm-rule' + (short && raw ? ' bad' : !short && !changed ? ' ok' : '');
+  }
+  UI.showName = function () {
+    $('name-input').value = G.genName(new Set());
+    nameSugg(); namePreview();
+    UI.show('scr-name');
+  };
   UI.showProfile = function () {
     const s = NA.Save.data, st = s.stats;
     const acc = st.shotsFired ? (100 * st.shotsHit / st.shotsFired).toFixed(1) : '0.0';
     const kd = st.deaths ? (st.kills / st.deaths).toFixed(2) : st.kills.toFixed(2);
     const card = (v, l, wide) => `<div class="stat ${wide ? 'wide' : ''}"><b>${v}</b><span>${l}</span></div>`;
     const ach = { first_buy: "First One's Half Off", skill_issue: 'Skill Issue', placebo: 'Placebo', flawless: 'Flawless', arsenal: 'Arsenal', champion: 'FRAGLINE Open Champion', kicked: 'Democracy', ragequits: 'Lobby Cleaner', snitch: 'Hall Monitor', jury: 'Court of Public Opinion', scammed: 'Scammed', banned: 'Detected', banwave: 'Caught in the Wave' };
-    $('prof-body').innerHTML = [
-      card(esc(s.username), 'Username'), card(rankLabel(), 'Rank'),
-      card(NA.Save.accountAge() + ' days', 'Account age'), card(U.fmt(s.lifetimeCredits), 'Lifetime credits'),
-      card(`${st.wins} / ${st.matches}`, 'Wins / matches'), card(kd, 'K/D'), card(acc + '%', 'Accuracy'),
-      card(U.num(st.headshots), 'Headshots'), card(`${s.tourney.won} / ${s.tourney.played}`, 'Tournament titles / entries'), card(U.num(st.reports), 'Reports against you (action taken: 0)'),
-      card(s.practiceStartedAt ? practiceLeft() : 'not started', 'Practice (Legit) time left'),
-      card(s.achievements.length ? s.achievements.map(a => esc(ach[a] || a)).join(' · ') : 'none yet', 'Achievements', true),
-      '<div class="stat wide"><canvas id="acc-chart" width="700" height="90" style="width:100%;height:70px"></canvas><span>Accuracy per match</span></div>',
-    ].join('');
+    const P = NA.Prog, rk = NA.Ranked.unlocked() && s.ranked.matches ? P.myRank() : null;
+    const rc = rk ? P.COLORS[Math.min(P.COLORS.length - 1, Math.floor(rk.idx / 3))] || '#9ca3af' : '#9ca3af';
+    const art = NA.Showroom.thumb ? NA.Showroom.thumb('outfit', NA.Cosmetics.equipped('outfit')) : '';
+    const wr = st.matches ? Math.round(100 * st.wins / st.matches) : 0, hs = st.kills ? Math.round(100 * st.headshots / st.kills) : 0;
+    const tile = (v, l, sub) => `<div class="pf-t"><b>${v}</b><span>${l}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
+    const ids = Object.keys(ach), got = new Set(s.achievements);
+    $('prof-body').innerHTML = `<div class="pf">
+      <div class="pf-hero">
+        <div class="pf-av" ${art ? `style="background-image:url(${art})"` : ''}></div>
+        <div class="pf-id"><small>FRAGLINE ACCOUNT</small><h3>${esc(s.username)}</h3>
+          <div class="pf-chips"><span class="pf-rk" style="--rc:${rc}">${esc(rankLabel())}</span><span>${NA.Save.accountAge()} days old</span><span>Tier ${s.highestTier}</span>${s.prestige ? `<span>Prestige ${s.prestige}</span>` : ''}</div></div>
+        <div class="pf-big"><b>${U.fmt(s.lifetimeCredits)}</b><span>lifetime credits</span></div>
+      </div>
+      <div class="pf-tiles">
+        ${tile(`${st.wins}<i>/${st.matches}</i>`, 'Wins', `${wr}% win rate`)}${tile(kd, 'K/D', `${U.num(st.kills)} kills`)}${tile(acc + '%', 'Accuracy', 'aimbot helps')}
+        ${tile(U.num(st.headshots), 'Headshots', `${hs}% of kills`)}${tile(st.bestStreak || 0, 'Best win streak', st.streak ? `on ${st.streak} now` : '')}${tile(`${s.tourney.won}<i>/${s.tourney.played}</i>`, 'Tournament titles')}
+        ${tile(U.num(st.reports), 'Reports against you', 'action taken: 0')}${tile(s.practiceStartedAt ? practiceLeft() : '—', 'Practice (Legit)', s.practiceStartedAt ? 'time left' : 'not started')}
+      </div>
+      <div class="pf-row">
+        <div class="pf-card"><h5>Accuracy per match</h5><canvas id="acc-chart" width="700" height="140" style="width:100%;height:84px"></canvas></div>
+        <div class="pf-card"><h5>Achievements <span>${got.size}/${ids.length}</span></h5><div class="pf-ach">${ids.map(a => `<span class="${got.has(a) ? 'got' : ''}">${got.has(a) ? '★ ' : ''}${esc(ach[a])}</span>`).join('')}</div></div>
+      </div>
+    </div>`;
     UI.show('scr-profile');
     const cv = $('acc-chart'), g = cv.getContext('2d'), h = st.accHistory;
     g.clearRect(0, 0, cv.width, cv.height);
@@ -519,6 +654,7 @@
   UI.showRanks = function () {
     $('ranks-credits').textContent = U.fmt(NA.Save.data.credits);
     NA.Prog.render();
+    $('rk-daily').insertAdjacentHTML('beforeend', jobsHtml());
     UI.show('scr-ranks');
   };
   UI.showSettings = function (from) {
@@ -532,6 +668,8 @@
     $('set-pad').textContent = UI.padName ? 'Controller: ' + UI.padName : 'Controller: none connected (pair one in iOS Settings → Bluetooth)';
     UI.renderCrosshairPick();
     UI.resetArm = false; $('set-reset').textContent = 'Reset all progress';
+    fillRange($('set-sens')); fillRange($('set-vol'));
+    $('set-ver').textContent = `NO ANTICHEAT v${NA.VERSION} · a single-player game. Every "player" is a bot and every cheat is an in-game upgrade.`;
     UI.show('scr-settings');
   };
 
@@ -554,10 +692,11 @@
   // Each option: [key, kind, minLevel, choices]. kind: chk | sel | rng
   // ---------------------------------------------------------------- client look: theme, watermark, module list
   const THEMES = { purple: '#a855f7', crimson: '#f43f5e', mint: '#34d399', ocean: '#38bdf8', gold: '#fbbf24', rainbow: null };
-  const CL = () => Object.assign({ theme: 'purple', watermark: true, arraylist: true, targetHud: true, boxStyle: 'full', chamsStyle: 'solid', tracer: 'bottom', hitSound: 'classic' }, NA.Save.data.client || {});
-  UI.accent = (offset) => { const t = CL().theme; return THEMES[t] || `hsl(${(performance.now() / 12 + (offset || 0)) % 360},90%,62%)`; };
+  const CL = () => Object.assign({ theme: 'auto', watermark: true, arraylist: true, targetHud: true, boxStyle: 'full', chamsStyle: 'solid', tracer: 'bottom', hitSound: 'classic' }, NA.Save.data.client || {});
+  const themeColor = t => (THEMES[t] || NA.Sellers.current().seller.acc);
+  UI.accent = (offset) => { const t = CL().theme; return t === 'rainbow' ? `hsl(${(performance.now() / 12 + (offset || 0)) % 360},90%,62%)` : themeColor(t); };
   const CLIENT_ROWS = [
-    ['theme', ['purple', 'crimson', 'mint', 'ocean', 'gold', 'rainbow'], 'Theme'],
+    ['theme', ['auto', 'purple', 'crimson', 'mint', 'ocean', 'gold', 'rainbow'], 'Theme'],
     ['boxStyle', ['full', 'corners', '3d'], 'ESP box'],
     ['chamsStyle', ['solid', 'pulse', 'rainbow'], 'Chams'],
     ['tracer', ['bottom', 'center', 'top'], 'Tracers from'],
@@ -582,25 +721,30 @@
   function activeModules() {
     const s = NA.Save.data, T = NA.I18N.t, out = [];
     if (G.panic) return out;
+    const L = G.loadout, allowed = L ? NA.Sellers.allowed(L) : null;
     for (const c of D.CHEATS) {
       if (!c.toggle) continue;
       const st = s.cheats[c.id];
       if (!st || !st.level || st.enabled === false) continue;
+      if (allowed && !allowed.has(c.id)) continue;
       let name = T('c_' + c.id), tag = '';
       if (c.id === 'aimbot') { const o = G.opt('aimbot'); tag = (o.type === 'silent' ? 'Silent' : 'Memory') + ' · ' + o.bone; }
-      else if (st.level > 1) tag = 'L' + Math.min(st.use || st.level, st.level);
+      else if (st.level > 1) tag = 'L' + Math.min(st.use || st.level, st.level, L ? L.cap : 99);
       out.push([name, tag, PRIO.indexOf(c.id) < 0 ? 99 : PRIO.indexOf(c.id)]);
     }
     return out.sort((a, b) => a[2] - b[2]);
   }
   let lastMods = '', lastWm = '', lastTheme = '', lastTh = '';
   UI.applyTheme = function () {
-    const t = CL().theme;
-    if (t === lastTheme) return;
-    lastTheme = t;
-    const root = document.documentElement;
-    root.style.setProperty('--acc', THEMES[t] || '#a855f7');
-    root.classList.toggle('rgb', t === 'rainbow');
+    const t = CL().theme, cur = NA.Sellers.current(), key = t + '|' + cur.id;
+    if (key !== lastTheme) {
+      lastTheme = key;
+      const root = document.documentElement;
+      root.style.setProperty('--acc', t === 'rainbow' ? '#a855f7' : themeColor(t));
+      root.classList.toggle('rgb', t === 'rainbow');
+    }
+    const cm = $('cheatmenu');
+    if (cm.dataset.sel !== cur.id) cm.dataset.sel = cur.id;
   };
   function clientHud() {
     UI.applyTheme();
@@ -609,7 +753,8 @@
     const showWm = cl.watermark && mods.length && !hide;
     wm.classList.toggle('hidden', !showWm);
     if (showWm) {
-      const txt = `<i class="lg"></i><b>skillissue</b><span>.shop</span><i>|</i>${esc(NA.Save.data.username || 'guest')}<i>|</i>${Math.round(UI.lastFps || 60)} fps<i>|</i>${18 + (Math.floor(performance.now() / 4000) % 9)} ms`;
+      const WX = NA.Sellers.current().seller;
+      const txt = `<i class="lg"></i><b>${esc(WX.wm[0])}</b><span>${esc(WX.wm[1])}</span><i>|</i>${esc(NA.Save.data.username || 'guest')}<i>|</i>${Math.round(UI.lastFps || 60)} fps<i>|</i>${18 + (Math.floor(performance.now() / 4000) % 9)} ms`;
       if (txt !== lastWm) { lastWm = txt; wm.innerHTML = txt; }
     }
     const sig = (cl.arraylist && !hide) ? mods.map(m => m[0] + ':' + m[1]).join('|') : '';
@@ -644,12 +789,33 @@
     lootesp: [['minRarity', 'sel', 2, [0, 1, 2, 3, 4]], ['weapons', 'chk', 1], ['shields', 'chk', 3], ['meds', 'chk', 3]],
   };
   UI.cmTab = 'aim';
+  function loaderBanner(L) {
+    const X = L.seller, SLR = NA.Sellers, out = [];
+    const left = SLR.statusLeft(X.id), ml = n => `${n} more match${n === 1 ? '' : 'es'}`;
+    if (L.status === 'updating') return `<div class="cm-ban det"><b>${esc(X.name)} is UPDATING</b><span>Warden patched it. Nothing loads this match.</span></div>`;
+    if (L.status === 'detected') out.push(`<div class="cm-ban det"><b>DETECTED BY WARDEN</b><span>Everything you run is 2.5× louder${left ? ' for ' + ml(left) : ''}. Switch loaders or play quiet.</span></div>`);
+    if (L.crashT > 0) out.push(`<div class="cm-ban det"><b>${esc(X.name)} crashed</b><span>Restarting…</span></div>`);
+    const lim = [];
+    if (X.slots < 99) lim.push(`${SLR.slotsUsed(L)}/${X.slots} features on`);
+    if (X.cap < 99) lim.push(`level ${X.cap} max`);
+    if (X.sub) lim.push(`${NA.Save.data.sellers.subLeft} matches left`, 'scan dodge on');
+    if (X.id === 'ghost') lim.push('legit features only');
+    if (G.mods && G.mods.streamProof) lim.push(NA.I18N.t('hidden'));
+    if (lim.length) out.push(`<div class="cm-ban info"><span>${lim.join(' · ')}</span></div>`);
+    return out.join('');
+  }
+  UI.sellerCrash = function (on, quiet) {
+    $('fh-crash').classList.toggle('hidden', !on);
+    if (!on && !quiet) UI.toast('FREEHAX.EXE restarted. Cheats back on');
+    if (!$('cheatmenu').classList.contains('hidden')) UI.renderCheatMenu();
+  };
   UI.renderCheatMenu = function () {
     const s = NA.Save.data, T = NA.I18N.t, rows = [];
     const tabs = ['aim', 'visuals', 'misc', 'exploits', 'advanced', 'config'];
     $('cm-tabs').innerHTML = tabs.map(t => `<button data-tab="${t}" class="${UI.cmTab === t ? 'on' : ''}"><svg viewBox="0 0 24 24">${TAB_ICONS[t] || ''}</svg><span>${T(t)}</span></button>`).join('');
     UI.applyTheme();
-    $('cm-head').innerHTML = `<i class="lg"></i><b>skillissue</b><span class="dom">.shop</span> <span class="ver">v2.0</span> <span class="ok">● ${T('undetected')}</span>` + (G.mods && G.mods.streamProof ? ` <span class="ver">● ${T('hidden')}</span>` : '');
+    const L = NA.Sellers.current(), X = L.seller, SLR = NA.Sellers;
+    $('cm-head').innerHTML = `<i class="lg"></i><b>${esc(X.wm[0])}</b><span class="dom">${esc(X.wm[1])}</span> <span class="ver">${esc(X.ver)}</span> <span class="sst ${L.status}">● ${L.status === 'ok' ? T('undetected') : SLR.STATUS_LABEL[L.status]}</span>`;
     if (UI.cmTab === 'advanced') {
       $('cm-list').innerHTML = NA.Cfg.renderAdvanced();
       fillRanges();
@@ -664,19 +830,25 @@
       rows.push('<div class="cm-sec">CLIENT</div>');
       for (const [key, ch, label] of CLIENT_ROWS) {
         if (ch === 'chk') rows.push(`<label class="cm-opt"><span>${label}</span><input type="checkbox" class="sw" data-client="${key}" ${cl[key] ? 'checked' : ''}></label>`);
-        else rows.push(`<div class="cm-opt"><span>${label}</span><select data-client="${key}">${ch.map(v => `<option value="${v}" ${cl[key] === v ? 'selected' : ''}>${v === '3d' ? '3D box' : v === 'full' ? 'Full box' : v[0].toUpperCase() + v.slice(1)}</option>`).join('')}</select></div>`);
+        else rows.push(`<div class="cm-opt"><span>${label}</span><select data-client="${key}">${ch.map(v => `<option value="${v}" ${cl[key] === v ? 'selected' : ''}>${v === '3d' ? '3D box' : v === 'full' ? 'Full box' : v === 'auto' ? 'Seller colours' : v[0].toUpperCase() + v.slice(1)}</option>`).join('')}</select></div>`);
       }
+      rows.push('<div class="cm-sec">LOADER</div><div class="cm-ldr">' + SLR.LIST.map(x => {
+        const st = SLR.status(x.id), own = SLR.owns(x.id);
+        return `<div class="ld ${x.id === L.id ? 'on' : ''} ${own ? '' : 'no'}" style="--sa:${x.acc}"><b>${esc(x.name)}</b><span class="sst ${st}">${SLR.STATUS_LABEL[st]}</span><small>${x.id === L.id ? 'LOADED' : own ? 'owned' : x.free ? 'free download' : 'not owned'}</small></div>`;
+      }).join('') + '</div><div class="cm-note">Switch loaders in the Cheats shop between matches. Stock changes every 3 minutes.</div>');
       rows.push('<div class="cm-sec">QUICK CONFIGS</div><div class="cm-presets">' + [['legit', 'Closet Legit'], ['semi', 'Semi Rage'], ['rage', 'Full Rage'], ['rgb', 'RGB Visuals']].map(([id, n]) => `<button data-preset="${id}">${n}</button>`).join('') + '</div>');
     }
+    if (UI.cmTab !== 'config') rows.push(loaderBanner(L));
     for (const c of D.CHEATS) {
       if (!c.toggle || c.tab !== UI.cmTab) continue;
       const st = s.cheats[c.id], name = T('c_' + c.id);
       if (!st || !st.level) { rows.push(`<div class="cm-locked">[locked] ${esc(name)}: ${T('locked')}</div>`); continue; }
-      const use = Math.min(st.use || st.level, st.level);
-      const lvl = st.level > 1 ? `<div class="lvl">${T('level')} <input type="range" min="1" max="${st.level}" step="1" value="${use}" data-lvl="${c.id}"><span>${use}/${st.level}</span></div>` : '';
-      rows.push(`<div class="cm-row"><input type="checkbox" id="cm-${c.id}" data-cm="${c.id}" ${st.enabled !== false ? 'checked' : ''}><label for="cm-${c.id}">${esc(name)}</label>${lvl}</div>`);
+      const use = Math.min(st.use || st.level, st.level), cap = Math.min(st.level, L.cap);
+      const why = SLR.why(c.id, L), off = !!why && why !== 'SLOT LIMIT';
+      const lvl = st.level > 1 ? `<div class="lvl">${T('level')} <input type="range" min="1" max="${st.level}" step="1" value="${use}" data-lvl="${c.id}"><span>${Math.min(use, cap)}/${st.level}${cap < st.level ? ` <em class="cap">cap ${cap}</em>` : ''}</span></div>` : '';
+      rows.push(`<div class="cm-row ${off ? 'na' : ''}"><input type="checkbox" id="cm-${c.id}" data-cm="${c.id}" ${st.enabled !== false ? 'checked' : ''} ${off ? 'disabled' : ''}><label for="cm-${c.id}">${esc(name)}${why ? `<em class="why ${off ? '' : 'slot'}">${why}</em>` : ''}</label>${lvl}</div>`);
       const opts = CM_OPTS[c.id];
-      if (!opts || st.enabled === false) continue;
+      if (!opts || st.enabled === false || off) continue;
       const o = G.opt(c.id), out = [];
       for (const [key, kind, min, ch] of opts) {
         const gated = use < min || (c.id === 'aimbot' && key === 'type' && use < 3);
@@ -787,13 +959,15 @@
     const p = G.player, mt = G.match, t = mt.tier, m = G.mods;
     // top-centre: team scores (or the leader in free-for-all)
     let sl;
-    if (t.mode === 'tdm') sl = `<div class="tm a"><span>BLUE</span><b>${mt.score.A}</b></div><div class="to">TO ${t.scoreToWin}</div><div class="tm b"><b>${mt.score.B}</b><span>RED</span></div>`;
-    else if (t.mode === 'duel') { const k = G.bots[0]; sl = `<div class="tm me"><span>YOU</span><b>${p.kills}</b></div><div class="to">TO ${t.scoreToWin}</div><div class="tm b"><b>${k.kills}</b><span>${esc(k.name)}</span></div>`; }
+    const ct = Math.ceil(mt.time), clock = `<i class="clk${mt.overtime ? ' ot' : ''}">${mt.overtime ? 'OT ' : ''}${Math.floor(ct / 60)}:${String(ct % 60).padStart(2, '0')}</i>`;
+    const goal = t.timed ? clock : 'TO ' + t.scoreToWin, of = t.timed ? ' · ' + clock : ' / ' + t.scoreToWin;
+    if (t.mode === 'tdm') sl = `<div class="tm a"><span>BLUE</span><b>${mt.score.A}</b></div><div class="to">${goal}</div><div class="tm b"><b>${mt.score.B}</b><span>RED</span></div>`;
+    else if (t.mode === 'duel') { const k = G.bots[0]; sl = `<div class="tm me"><span>YOU</span><b>${p.kills}</b></div><div class="to">${goal}</div><div class="tm b"><b>${k.kills}</b><span>${esc(k.name)}</span></div>`; }
     else if (G.bots.length) {
       const lead = G.bots.reduce((a, b) => (b.kills > a.kills ? b : a), G.bots[0]);
       const place = 1 + G.bots.filter(b => b.kills > p.kills).length;
-      sl = p.kills >= lead.kills ? `<div class="lead">YOU LEAD <b>${p.kills}</b> / ${t.scoreToWin}</div>` : `<div class="lead">#${place} · LEADER ${esc(lead.name)} <b>${lead.kills}</b> / ${t.scoreToWin}</div>`;
-    } else sl = `<div class="lead">FIRST TO <b>${t.scoreToWin}</b></div>`;
+      sl = p.kills >= lead.kills ? `<div class="lead">YOU LEAD <b>${p.kills}</b>${of}</div>` : `<div class="lead">#${place} · LEADER ${esc(lead.name)} <b>${lead.kills}</b>${of}</div>`;
+    } else sl = t.timed ? `<div class="lead">MOST KILLS${of}</div>` : `<div class="lead">FIRST TO <b>${t.scoreToWin}</b></div>`;
     if (sl !== lastScore) { $('scoreline').innerHTML = sl; lastScore = sl; }
     const tm = Math.ceil(mt.time);
     $('timer').textContent = `${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}`;
@@ -1383,7 +1557,7 @@
         going = false;
         $('scr-title').classList.remove('go');
         document.querySelector('.title-v5').classList.remove('go');
-        if (!NA.Save.data.username) { $('name-input').value = 'newplayer_' + U.randInt(1000, 9999); UI.show('scr-name'); }
+        if (!NA.Save.data.username) { UI.showName(); }
         else UI.showMenu();
       }, 620);
     });
@@ -1391,7 +1565,7 @@
     $('scr-title').addEventListener('click', e => { if (!e.target.closest('#title-go')) $('title-go').click(); });
     // after the loader's INJECT: straight to name entry (first time) or the lobby
     UI.afterInject = () => {
-      if (!NA.Save.data.username) { $('name-input').value = 'newplayer_' + U.randInt(1000, 9999); UI.show('scr-name'); }
+      if (!NA.Save.data.username) { UI.showName(); }
       else UI.showMenu();
     };
     // hotbar: tap a slot to switch weapons, the melee slot swings the knife
@@ -1429,6 +1603,11 @@
     };
     spinZone($('lobby-char'), () => { A.unlock(); A.click(); NA.Store.open('locker'); });
     spinZone($('store-char'), null);
+    $('title-ver').textContent = 'v' + NA.VERSION;
+    $('name-input').addEventListener('input', namePreview);
+    $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('name-input').blur(); $('name-go').click(); } });
+    click('name-dice', () => { A.click(); $('name-input').value = G.genName(new Set()); namePreview(); nameSugg(); });
+    $('name-sugg').addEventListener('click', e => { const b = e.target.closest('[data-nm]'); if (b) { A.click(); $('name-input').value = b.dataset.nm; namePreview(); } });
     click('name-go', () => {
       let n = $('name-input').value.trim().replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 18);
       if (n.length < 3) n = 'newplayer_' + U.randInt(1000, 9999);
@@ -1438,6 +1617,22 @@
       UI.showMenu();
     });
     click('m-play', () => UI.showPlay());
+    $('menu-goals').addEventListener('click', e => {
+      const b = e.target.closest('[data-goal]');
+      if (!b) return;
+      A.click();
+      const g = b.dataset.goal;
+      if (g === 'shop') { UI.shopSite = 'skillissue'; UI.showShop('scr-menu'); } else if (g === 'play') UI.showPlay(); else UI.showRanks();
+    });
+    $('away-card').addEventListener('click', e => {
+      if (!e.target.closest('#away-claim')) return;
+      const amt = NA.Loop.claimAway();
+      if (!amt) return;
+      A.buy(); A.win && A.win();
+      UI.toast(`+${U.fmt(amt)} claimed`);
+      $('menu-credits').textContent = U.fmt(NA.Save.data.credits);
+      renderGoals();
+    });
     click('m-shop', () => UI.showShop('scr-menu'));
     click('m-ranks', () => UI.showRanks());
     click('m-comms', () => { if (NA.Comms) NA.Comms.open(); });
@@ -1507,11 +1702,25 @@
         else { A.deny(); gb.classList.remove('shake'); void gb.offsetWidth; gb.classList.add('shake'); }
         return;
       }
+      const sb = e.target.closest('[data-sbuy]'), sl = e.target.closest('[data-sload]');
+      if (sb) {
+        const X = NA.Sellers.BY[sb.dataset.sbuy], r = NA.Sellers.buy(X.id);
+        if (r.ok) { A.buy(); UI.toast(`${X.name} loaded`); UI.renderShop(); UI.refreshDMBadge(); }
+        else { A.deny(); sb.classList.remove('shake'); void sb.offsetWidth; sb.classList.add('shake'); }
+        return;
+      }
+      if (sl) { const X = NA.Sellers.BY[sl.dataset.sload]; if (NA.Sellers.load(X.id)) { A.equip ? A.equip() : A.click(); UI.toast(`${X.name} loaded for your next match`); UI.renderShop(); } return; }
       const b = e.target.closest('[data-buy]');
       if (!b) return;
       const id = b.dataset.buy;
       if (G.buy(id)) { UI.toast('Bought ' + D.CHEAT[id].name); UI.renderShop(); }
       else { A.deny(); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); }
+    });
+    $('shop-tabs').addEventListener('click', e => {
+      const b = e.target.closest('[data-site]');
+      if (!b) return;
+      UI.shopSite = b.dataset.site; A.click(); UI.renderShop();
+      const sc = document.querySelector('#scr-shop .shop-main'); if (sc) sc.scrollTop = 0;
     });
     click('res-shop', () => UI.showShop('scr-results'));
     click('res-again', () => {
@@ -1529,6 +1738,8 @@
     });
     click('pause-resume', () => UI.resume());
     $('diff-row').addEventListener('click', e => {
+      const mtb = e.target.closest('[data-mtype]');
+      if (mtb) { A.click(); NA.Save.data.settings.matchType = mtb.dataset.mtype; NA.Save.save(); UI.showPlay(); return; }
       const b = e.target.closest('[data-diff]');
       if (!b) return;
       A.click();
@@ -1560,8 +1771,8 @@
     click('pause-settings', () => UI.showSettings('scr-pause'));
     click('pause-leave', () => G.leaveMatch());
     click('set-back', () => { if (UI.settingsFrom === 'scr-pause' && G.state === 'playing') UI.show('scr-pause'); else UI.showMenu(); });
-    $('set-sens').addEventListener('input', e => { NA.Save.data.settings.sens = +e.target.value; $('set-sens-v').textContent = (+e.target.value).toFixed(2); NA.Save.save(); });
-    $('set-vol').addEventListener('input', e => { NA.Save.data.settings.volume = +e.target.value; A.setVolume(+e.target.value); $('set-vol-v').textContent = Math.round(e.target.value * 100) + '%'; NA.Save.save(); });
+    $('set-sens').addEventListener('input', e => { fillRange(e.target); NA.Save.data.settings.sens = +e.target.value; $('set-sens-v').textContent = (+e.target.value).toFixed(2); NA.Save.save(); });
+    $('set-vol').addEventListener('input', e => { fillRange(e.target); NA.Save.data.settings.volume = +e.target.value; A.setVolume(+e.target.value); $('set-vol-v').textContent = Math.round(e.target.value * 100) + '%'; NA.Save.save(); });
     $('set-auto').addEventListener('change', e => { NA.Save.data.settings.autoQueue = e.target.checked; NA.Save.save(); });
     $('set-fps').addEventListener('change', e => { NA.Save.data.settings.showFps = e.target.checked; NA.Save.save(); });
     click('set-reset', () => {
@@ -1669,6 +1880,14 @@
       }
       const id = t.dataset.cm;
       if (!id) return;
+      if (t.checked) {
+        const L = NA.Sellers.current();
+        if (L.slots < 99 && NA.Sellers.allowed(L).size >= L.slots) {
+          t.checked = false; A.deny();
+          UI.toast(`${L.seller.name} free version: ${L.slots} features at once. Turn one off first.`);
+          return;
+        }
+      }
       NA.Save.data.cheats[id].enabled = t.checked;
       NA.Save.save(); G.computeMods();
       UI.renderCheatMenu();

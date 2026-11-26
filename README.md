@@ -15,9 +15,33 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v1.0)
+## What's in this build (v1.1)
 
-**New in v1.0: the cheat-client look**
+**New in v1.1: rival sellers**
+- **Four cheat sellers**, each with its own website (browser tabs in the Cheats shop), its own cheat menu and its own risk:
+  - **skillissue.shop**: the one you start with. Every feature, normal detection
+  - **FREEHAX.EXE**: free. Only 2 features on at once, level 2 max, twice as easy to detect, crashes mid-match and mines 5% of your match credits. Its menu looks like Windows 98
+  - **ghost.cc** (Tier 3, 1,500): legit-looking features only (no aimbot, speed or exploits), level 3 max, about a third of the detection. The safest pick for Ranked
+  - **VOIDWARE** (Tier 5, 6,000 per 10 matches): every feature, about half the detection, and it turns on PANIC for you before every Warden scan
+- **Your cheat levels are yours.** The loader you pick decides which cheats run, how high their levels go and how detectable they are
+- **Rotating stock**: every 3 minutes each seller's stock changes (some features go out of stock; FREEHAX offers 4 random ones). The stock you have when a match starts is locked in for that match
+- **Warden patches**: every few matches Warden patches one seller. It's DETECTED for 2 matches (2.5× louder in Ranked and casual), then UPDATING for 1 (nothing loads), then back. The sellers DM you about it, and Comms posts the patch notes
+- The watermark, module list, menu colours and the pre-match screen show which loader is injected
+
+**Timed matches**
+- New **Match: Kill target / Timed** switch on the Play screen. Timed matches have no kill cap: most kills (or team score) when the clock hits zero wins, 3:00 for the duel and 5:00 for everything else. A tie at the buzzer goes to a one-minute **overtime** where the next kill wins. Timed wins count towards unlocking tiers. Ranked, events and the tournament keep their normal rules
+
+**Reasons to play one more**
+- **Win streaks**: +10% payout per win in a row after the first (up to +50%). Lobbies notice long streaks
+- **While you were away**: credits from your affiliate code build up while the game is closed (up to 8 hours, more with the Affiliate upgrade). Claim them on the menu
+- **Goals on the main menu**: your win streak, the next upgrade you can afford (with a progress bar), progress to the next tier and your top seller job
+- **Seller jobs**: three short jobs at a time from the sellers (for example "Win on ghost.cc with suspicion under 40" or "Get 12 kills with FREEHAX.EXE loaded"). They pay credits, and VOIDWARE jobs add subscription matches. Listed on the Ranks screen
+
+**Redesigned menus**
+- New first-run **name screen** with your character, a live name tag, a random-name button and suggestions
+- **Settings** in grouped cards with switches and proper sliders; **Profile** with your character, rank, stat tiles, accuracy chart and every achievement (earned ones lit up); solid cards on the Ranks screen
+
+**v1.0: the cheat-client look**
 - **Restyled cheat menu**: icon sidebar, toggle switches, filled sliders, a glowing header with the client logo, version and an UNDETECTED badge
 - **Themes**: purple, crimson, mint, ocean, gold or animated rainbow. The theme colours the menu, the watermark, the module list, the target HUD and the aimbot FOV circle
 - **Watermark** in the top-left corner while cheats are on (`skillissue.shop | name | fps | ms`)

@@ -7,7 +7,7 @@
   const SCREENS = { 'scr-title': 'title', 'scr-name': 'title', 'scr-menu': 'menu', 'scr-items': 'items' };
   const LAYOUT = {
     title: { cx: 0.66, dist: 6.6, ty: 1.12, tx: 0 },
-    menu: { cx: 0.71, dist: 5.9, ty: 1.12, tx: 0 },
+    menu: { cx: 0.62, dist: 5.9, ty: 1.12, tx: 0 },
     items: { cx: 0.25, dist: 5.6, ty: 1.12, tx: 0 },
     gun: { cx: 0.25, dist: 3.7, ty: 1.15, tx: 0.05 },
   };

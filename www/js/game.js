@@ -31,11 +31,12 @@
     G.computeMods();
   };
   G.computeMods = function () {
-    const s = NA.Save.data;
+    const s = NA.Save.data, L = G.loadout, allowed = L ? NA.Sellers.allowed(L) : null;
     const on = id => {
       const c = s.cheats[id];
       if (!c || !c.level || G.panic || G.legit || c.enabled === false) return 0;
-      return Math.max(1, Math.min(c.level, c.use || c.level));
+      if (allowed && !allowed.has(id)) return 0;
+      return Math.max(1, Math.min(c.level, c.use || c.level, L ? L.cap : 99));
     };
     const ab = on('aimbot'), tb = on('triggerbot'), wb = on('wallbang'), fz = on('freeze'), le = on('lootesp');
     let aimbot = null;
@@ -366,6 +367,13 @@
     const opts = pool.filter(m => m !== G.lastMap);
     return U.pick(opts.length ? opts : pool);
   };
+  // timed version of a tier: no kill cap, the clock decides (overtime if it's tied)
+  G.timedTier = t => Object.assign({}, t, { timed: true, scoreToWin: Infinity, timeLimit: t.mode === 'duel' ? 180 : 300, modeLabel: 'Timed ' + t.modeLabel.charAt(0).toLowerCase() + t.modeLabel.slice(1) });
+  G.timedLead = function () {
+    const mt = G.match, t = mt.tier;
+    if (t.mode === 'tdm') return mt.score.A - mt.score.B;
+    return G.player.kills - G.bots.reduce((m, b) => Math.max(m, b.kills), 0);
+  };
   G.startMatch = function (tierOrId, opts) {
     let tier = typeof tierOrId === 'object' ? tierOrId : D.TIERS.find(t => t.id === tierOrId);
     if (tier.maps) tier = Object.assign({}, tier, { map: (opts && opts.map) || G.pickMap(tier) });
@@ -375,6 +383,8 @@
     G.ranked = !!opts.ranked && tier.tourney === undefined;
     G.legit = G.ranked && !!opts.legit;
     G.loader = opts.loader === undefined ? 2 : opts.loader;
+    const wantTimed = opts.timed !== undefined ? opts.timed : NA.Save.data.settings.matchType === 'timed';
+    if (wantTimed && !G.ranked && tier.tourney === undefined && !tier.chaos && !tier.lootMode && !tier.timed) tier = G.timedTier(tier);
     W.build(NA.R.scene, tier.map);
     clearBots();
     clearLoot();
@@ -392,6 +402,7 @@
       used.add(name);
       addBot(name, tier.mode === 'ffa' ? 'F' + i : 'B', tier);
     });
+    NA.Sellers.lock();
     G.computeMods();
     G.match = {
       tier, time: tier.timeLimit, score: { A: 0, B: 0 }, sus: G.act() === 1 ? 0 : 10, susPeak: 0, susIdle: 0,
@@ -406,13 +417,21 @@
     const noto = NA.Comms ? NA.Comms.notoriety() : 0;
     if (noto && !tier.chaos) { G.match.sus = Math.min(60, G.match.sus + noto * 0.3); if (G.ranked && !G.legit) G.match.det = Math.min(60, G.match.det + noto * 0.1); }
     if (tier.chaos && NA.Events) NA.Events.startChaos(G.match);
+    // a long win streak gets noticed
+    const stk = NA.Save.data.stats.streak || 0;
+    if (stk >= 3 && countsForStreak(tier)) {
+      G.match.sus = Math.min(60, G.match.sus + Math.min(10, 2 * (stk - 2)));
+      const sb = G.randomEnemy();
+      if (sb) C.post(sb.name, U.pick([`this guy is on a ${stk} game win streak`, `${stk} wins in a row? sure buddy`, `bro hasnt lost in ${stk} games. reporting in advance`]), 'bot', { delay: 2600 });
+    }
     if (G.ranked) {
-      G.match.detMult = NA.Ranked.matchMult(G.loader);
+      G.match.detMult = NA.Ranked.matchMult(G.loader) * G.loadout.detMult;
       const wp = NA.Ranked.profile();
       G.match.wp = wp;
       G.match.scanT = wp.scan ? wp.scan * U.rand(0.6, 1) : 0;
       if (!G.legit) G.match.det = Math.max(G.match.det, wp.start);
       if (!G.legit && G.loader <= 1) G.match.det = Math.max(G.match.det, G.loader === 0 ? 45 : 25);
+      if (!G.legit && G.loadout.status === 'detected') G.match.det = Math.min(70, G.match.det + 15);
       G.match.detPeak = G.match.det;
     }
     spawnPlayer();
@@ -482,6 +501,7 @@
     clearLoot();
   };
 
+  const countsForStreak = t => t.tourney === undefined && !t.chaos && !t.lootMode;
   function computePayout(won, kicked) {
     const t = G.match.tier, p = G.player;
     const lines = [];
@@ -501,6 +521,8 @@
     const df = G.match.diff;
     if (df.pay !== 1) { lines.push([`${df.name} difficulty ×${df.pay}`, Math.round(total * df.pay) - total]); total = Math.round(total * df.pay); }
     if (G.ranked) { lines.push([`Ranked ×${D.RANKED.payMult}`, Math.round(total * (D.RANKED.payMult - 1))]); total = Math.round(total * D.RANKED.payMult); }
+    const stk = (NA.Save.data.stats.streak || 0) + 1, sb = NA.Loop.streakBonus(stk);
+    if (won && !kicked && countsForStreak(t) && sb > 0) { const b = Math.round(total * sb); lines.push([`Win streak ×${stk} (+${Math.round(sb * 100)}%)`, b]); total += b; }
     return { lines, total };
   }
 
@@ -573,13 +595,15 @@
       C.beat(D.STORY.firstEnd);
       if (!s.flags.sellerIntro) { s.flags.sellerIntro = true; D.STORY.sellerIntro.forEach(l => C.dm(l)); }
     }
+    const sellerNews = NA.Loop.afterMatch({ won: won && !kicked, counts: countsForStreak(t), seller: G.loadout ? G.loadout.id : 'skillissue', kills: p.kills, heads: p.headshots, ranked: G.ranked, timed: !!t.timed, susPeak: mt.susPeak })
+      .concat(NA.Sellers.afterMatch({ won, pay: ranked && ranked.confiscated ? 0 : pay.total, tourney: t.tourney !== undefined }));
     if (comingSoon) {
       D.STORY.comingSoon.forEach(l => C.dm(l));
       C.system('Pro League: Coming Soon™');
     }
     NA.Save.save();
     if (won) A.win(); else A.lose();
-    NA.UI.showResults({ won, kicked, pay, acc, unlocked, comingSoon, tourney, ranked, rows: scoreboard(), peakSus: Math.round(mt.susPeak) });
+    NA.UI.showResults({ won, kicked, pay, acc, unlocked, comingSoon, tourney, ranked, sellerNews, rows: scoreboard(), peakSus: Math.round(mt.susPeak) });
   }
 
   function scoreboard() {
@@ -595,6 +619,7 @@
   function checkWin() {
     const t = G.match.tier;
     if (G.state !== 'playing') return;
+    if (t.timed) { if (G.match.overtime) { const r = G.timedLead(); if (r !== 0) endMatch(r > 0); } return; }
     if (t.mode === 'tdm') {
       if (G.match.score.A >= t.scoreToWin) endMatch(true);
       else if (G.match.score.B >= t.scoreToWin) endMatch(false);
@@ -605,6 +630,16 @@
   }
   function endByTime() {
     const t = G.match.tier;
+    if (t.timed) {
+      const r = G.timedLead();
+      if (r === 0 && !G.match.overtime) {
+        G.match.overtime = true; G.match.time = 60;
+        NA.UI.centerMsg('OVERTIME: next kill wins', 2600); A.deny();
+        return;
+      }
+      endMatch(r > 0);
+      return;
+    }
     if (t.mode === 'tdm') endMatch(G.match.score.A > G.match.score.B);
     else endMatch(G.bots.every(b => b.kills < G.player.kills));
   }
@@ -613,6 +648,7 @@
   G.addSus = function (amt) {
     const mt = G.match;
     if (!mt || G.state !== 'playing' || mt.tier.chaos) return;
+    if (amt > 0 && G.loadout) amt *= G.loadout.susMult;
     if (amt > 0 && G.mods.kdSpoof) amt *= 0.8;
     if (amt > 0 && G.mods.streamProof) amt *= 0.7;
     mt.sus = U.clamp(mt.sus + amt, 0, 100);
@@ -631,12 +667,12 @@
     // timed Warden scans (Gold and up): a warning, then three seconds where every cheat counts triple
     if (wp.scan && !G.legit) {
       mt.scanT -= dt;
-      if (mt.scanT <= 3 && mt.scanT > 0 && !mt.scanWarned) { mt.scanWarned = true; NA.UI.centerMsg('⚠ WARDEN SCAN IN 3… hit PANIC', 2400); A.deny(); }
+      if (mt.scanT <= 3 && mt.scanT > 0 && !mt.scanWarned) { mt.scanWarned = true; if (!NA.Sellers.scanWarn()) { NA.UI.centerMsg('⚠ WARDEN SCAN IN 3… hit PANIC', 2400); A.deny(); } }
       if (mt.scanT <= 0) {
         if (!mt.scanning) { mt.scanning = 3; NA.UI.centerMsg('WARDEN SCANNING', 2800); }
         mt.scanning -= dt;
         if (heat > 0) heat = heat * 3 + 2.5;
-        if (mt.scanning <= 0) { mt.scanning = 0; mt.scanWarned = false; mt.scanT = wp.scan * U.rand(0.8, 1.2); }
+        if (mt.scanning <= 0) { mt.scanning = 0; mt.scanWarned = false; mt.scanT = wp.scan * U.rand(0.8, 1.2); NA.Sellers.scanOver(); }
       }
     }
     const decay = (G.panic || G.legit) ? 6 : D.RANKED.decay * wp.decay;
@@ -1706,6 +1742,7 @@
     updateLoot(dt, now);
     if (G.ranked && G.state === 'playing') updateDetection(dt);
     if (G.state === 'playing') updateCheaters(dt);
+    if (G.state === 'playing') NA.Sellers.tick(dt);
     if (G.mods.adv.safeMode && G.state === 'playing' && !mt.tier.chaos) {
       const hot = mt.sus >= 70 || (G.ranked && mt.det >= 65), cool = mt.sus < 40 && (!G.ranked || mt.det < 30);
       if (!G.panic && hot) { G.safePanic = true; G.setPanic(true); NA.UI.centerMsg('SAFE MODE: cheats paused until things cool down', 2200); }

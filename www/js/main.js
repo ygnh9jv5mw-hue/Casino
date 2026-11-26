@@ -15,6 +15,7 @@
   ];
   function boot() {
     NA.Save.load();
+    if (NA.Loop) NA.Loop.checkAway();
     NA.Audio.setVolume(NA.Save.data.settings.volume);
     const intro = document.getElementById('intro');
     // split the logo wordmark into letters so they can drop in one by one after injecting

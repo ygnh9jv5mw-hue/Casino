@@ -61,6 +61,7 @@
 <!-- ======================= HUD ======================= -->
 <div id="hud" class="hidden">
   <div id="targethud" class="hidden"></div>
+  <div id="fh-crash" class="hidden"><div class="fh-t">FREEHAX.EXE<i>×</i></div><div class="fh-b"><b>FREEHAX.EXE has stopped working</b><span>Windows is checking for a solution to the problem…</span><div class="fh-bar"><i></i></div></div></div>
   <div id="hud-tl">
     <div id="watermark" class="hidden"></div>
     <div id="squad"></div>
@@ -138,17 +139,20 @@
     <p class="tagline">you can't aim. good thing nobody's checking.</p>
     <button class="tap-start" id="title-go"><span>TAP TO START</span></button>
   </div>
-  <div class="title-foot"><span>FRAGLINE client</span><span class="title-ver">v0.9</span></div>
+  <div class="title-foot"><span>FRAGLINE client</span><span class="title-ver" id="title-ver">v1.1</span></div>
 </section>
 
 <section id="scr-name" class="screen hidden">
-  <div class="panel narrow">
-    <div class="client-logo">FRAGLINE</div>
-    <h2>Create your account</h2>
-    <p class="muted">Pick a username. Everyone in the lobby will see it.</p>
-    <input id="name-input" maxlength="18" autocomplete="off" spellcheck="false">
-    <button class="btn primary" id="name-go">CREATE ACCOUNT</button>
+  <div class="nm-panel">
+    <div class="nm-eyebrow"><i></i>FRAGLINE · NEW ACCOUNT</div>
+    <h2 class="nm-h">CHOOSE YOUR <span>NAME</span></h2>
+    <p class="nm-sub">It goes in the killfeed. And in the reports.</p>
+    <div class="nm-field"><input id="name-input" maxlength="18" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="username"><button class="nm-dice" id="name-dice" aria-label="Random name"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><circle cx="16" cy="8" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/><circle cx="16" cy="16" r="1.6" fill="currentColor"/></svg></button></div>
+    <div class="nm-sugg" id="name-sugg"></div>
+    <div class="nm-rule" id="name-rule">3 to 18 characters: letters, numbers, _ . and -</div>
+    <button class="nm-go" id="name-go"><span>CREATE ACCOUNT</span></button>
   </div>
+  <div class="nm-tag"><i></i><div><b id="nm-preview">newplayer</b><small>IRON 3 · NEW ACCOUNT</small></div></div>
 </section>
 
 <section id="scr-menu" class="screen hidden">
@@ -173,6 +177,8 @@
       </div>
     </div>
     <div class="lobby-char" id="lobby-char"><div class="nameplate"><b id="menu-user2"></b><small id="menu-outfit"></small></div><div class="char-hint">drag to spin &middot; tap for locker</div></div>
+    <div class="goals" id="menu-goals"></div>
+    <div class="away-card hidden" id="away-card"></div>
     <div class="ticker"><span id="menu-ticker"></span></div>
   </div>
 </section>
@@ -216,7 +222,7 @@
   <div class="prematch">
     <div class="pm-head">
       <div class="pm-map" id="pm-map"></div>
-      <div class="pm-chips"><b id="lobby-title"></b><span id="lobby-sub"></span></div>
+      <div class="pm-chips"><b id="lobby-title"></b><span id="lobby-sub"></span><div class="pm-loader" id="pm-loader"></div></div>
     </div>
     <div class="pm-teams" id="lobby-players"></div>
     <div class="pm-foot">
@@ -240,6 +246,7 @@
       <div id="res-pay"></div>
       <div class="pay-total"><span>Total</span><b id="res-total"></b></div>
       <div id="res-unlock" class="hidden"></div>
+      <div id="res-seller" class="hidden"></div>
       <div class="res-buttons">
         <button class="btn shopbtn" id="res-shop">SHOP<i class="badge hidden" id="res-badge"></i></button>
         <button class="btn primary" id="res-again">PLAY AGAIN</button>
@@ -253,14 +260,15 @@
 
 <section id="scr-shop" class="screen hidden">
   <div class="browser">
+    <div class="b-tabs" id="shop-tabs"></div>
     <div class="browser-bar">
       <button class="btn ghost" data-back-shop="1">&larr;</button>
-      <div class="addr"><span class="nsec">&#9888; Not secure</span> https://skillissue.shop</div>
+      <div class="addr" id="shop-addr"><span class="nsec">&#9888; Not secure</span> https://skillissue.shop</div>
       <div class="shop-credits" id="shop-credits"></div>
     </div>
     <div class="browser-body">
       <div class="shop-main">
-        <div class="shop-hero"><b>SKILLISSUE.SHOP</b><span>we sell skill &bull; all products 100% UNDETECTED &bull; no refunds</span></div>
+        <div class="shop-hero" id="shop-hero"><b>SKILLISSUE.SHOP</b><span>we sell skill &bull; all products 100% UNDETECTED &bull; no refunds</span></div>
         <div id="shop-list"></div>
       </div>
       <aside class="shop-dms"><div class="dm-head">DMs &middot; @undetected</div><div id="shop-dms"></div></aside>
@@ -278,19 +286,28 @@
 <section id="scr-settings" class="screen hidden">
   <div class="menu">
     <header class="topbar"><button class="btn ghost" id="set-back">&larr; Back</button><div class="who"><b>Settings</b></div><div></div></header>
-    <div class="settings">
-      <label>Look sensitivity <input type="range" id="set-sens" min="0.3" max="2.5" step="0.05"><span id="set-sens-v"></span></label>
-      <label>Volume <input type="range" id="set-vol" min="0" max="1" step="0.05"><span id="set-vol-v"></span></label>
-      <label class="check"><input type="checkbox" id="set-auto"> Auto-Queue starts the next match (when owned)</label>
-      <label class="check"><input type="checkbox" id="set-fps"> Show FPS</label>
-      <label>Graphics <select id="set-gfx"><option value="high">High (shadows)</option><option value="low">Low (faster)</option></select></label>
-      <label>Cheat menu language <select id="set-lang"></select></label>
-      <div class="set-x"><span>Crosshair</span><div id="set-xstyle" class="chips"></div></div>
-      <div class="set-x"><span>Crosshair color</span><div id="set-xcolor" class="chips"></div></div>
-      <p class="muted small">More crosshairs unlock as you rank up in Ranked.</p>
-      <p class="muted small" id="set-pad">Controller: none</p>
-      <button class="btn danger" id="set-reset">Reset all progress</button>
-      <p class="muted small">NO ANTICHEAT v0.4 &middot; a single-player game. Every "player" is a bot and every cheat is an in-game upgrade.</p>
+    <div class="sx">
+      <section class="sx-card"><h4>Controls</h4>
+        <div class="sx-row"><span>Look sensitivity</span><input type="range" id="set-sens" min="0.3" max="2.5" step="0.05"><b id="set-sens-v"></b></div>
+        <label class="sx-row"><span>Show FPS</span><input type="checkbox" class="sx-sw" id="set-fps"></label>
+        <p class="sx-note" id="set-pad">Controller: none</p>
+      </section>
+      <section class="sx-card"><h4>Sound &amp; graphics</h4>
+        <div class="sx-row"><span>Volume</span><input type="range" id="set-vol" min="0" max="1" step="0.05"><b id="set-vol-v"></b></div>
+        <div class="sx-row"><span>Graphics</span><select id="set-gfx"><option value="high">High (shadows)</option><option value="low">Low (faster)</option></select></div>
+      </section>
+      <section class="sx-card"><h4>Gameplay</h4>
+        <label class="sx-row"><span>Auto-Queue<small>starts the next match (when owned)</small></span><input type="checkbox" class="sx-sw" id="set-auto"></label>
+        <div class="sx-row"><span>Cheat menu language</span><select id="set-lang"></select></div>
+      </section>
+      <section class="sx-card wide"><h4>Crosshair</h4>
+        <div class="sx-xh"><div id="set-xstyle" class="chips"></div><div id="set-xcolor" class="chips"></div></div>
+        <p class="sx-note">More crosshairs unlock as you rank up in Ranked.</p>
+      </section>
+      <section class="sx-card wide sx-danger"><h4>Account</h4>
+        <div class="sx-row"><span>Reset all progress<small>wipes credits, cheats, ranks and cosmetics</small></span><button class="btn danger" id="set-reset">Reset all progress</button></div>
+        <p class="sx-note" id="set-ver">NO ANTICHEAT &middot; a single-player game. Every "player" is a bot and every cheat is an in-game upgrade.</p>
+      </section>
     </div>
   </div>
 </section>
@@ -407,6 +424,8 @@
 <script src="js/progression.js"></script>
 <script src="js/events.js"></script>
 <script src="js/configs.js"></script>
+<script src="js/sellers.js"></script>
+<script src="js/loop.js"></script>
 <script src="js/comms.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
