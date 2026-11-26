@@ -84,6 +84,7 @@
       if (!c.toggle) continue;
       const st = s.cheats[c.id], want = cfg.cheats[c.id];
       if (!st || !st.level) { if (want && want.enabled !== false) missing.push(c.name); continue; }
+      if (!want && cfg.keep) continue; // visual packs leave the rest of your setup alone
       if (want && want.enabled !== false) {
         st.enabled = true;
         st.use = Math.max(1, Math.min(st.level, want.use || st.level));
@@ -91,6 +92,7 @@
       } else st.enabled = false;
     }
     if (cfg.adv) s.adv = Object.assign({}, K.ADV_DEFAULTS, cfg.adv);
+    if (cfg.client) s.client = Object.assign({}, s.client || {}, cfg.client);
     NA.Save.save();
     NA.Game.computeMods();
     return missing;
@@ -126,6 +128,19 @@
       cfg: { cheats: { aimbot: { use: 5, opt: { type: 'silent', bone: 'head', smooth: 1, predict: true } }, triggerbot: { use: 3 }, wallhack: { use: 5, opt: ALL_ESP }, speedhack: { use: 4 },
         rapidfire: { use: 4 }, infammo: { use: 1 }, wallbang: { use: 3 }, freeze: { use: 2 }, radar: { use: 1 }, nospread: { use: 5 }, norecoil: { use: 3 } },
         adv: { reaction: 0, curve: 'linear', hitChance: 100, humanizer: 0, visCheck: false, aimKey: 'always', trigMode: 'burst', safeMode: false } } },
+    { id: 'rainbow', name: 'Rainbow Visuals Pack', author: 'esp_artist', stars: 4.9, dl: '88.4k', price: 450, tier: 2, tag: 'RGB everything. Corner boxes, rainbow chams, centre tracers.',
+      reviews: ['"my screen looks like a gaming keyboard" ★★★★★', '"cant see the game anymore but it looks sick" ★★★★', '"10/10 drip" ★★★★★'],
+      cfg: { keep: true, cheats: { wallhack: { use: 5, opt: ALL_ESP }, lootesp: { use: 2 } }, adv: { espColor: 'rainbow' },
+        client: { theme: 'rainbow', boxStyle: 'corners', chamsStyle: 'rainbow', tracer: 'center', watermark: true, arraylist: true, hitSound: 'pop' } } },
+    { id: 'clean', name: 'Clean Minimal', author: 'minimalist.cfg', stars: 4.7, dl: '23.0k', price: 300, tier: 2, tag: 'Mint corners, health bars, nothing else. Looks clean in clips.',
+      reviews: ['"finally a config that does not look like a christmas tree" ★★★★★', '"quiet and deadly" ★★★★'],
+      cfg: { cheats: { wallhack: { use: 2, opt: { box: true, health: true, shield: true, name: false, distance: false, weapon: false, skeleton: false, snaplines: false, chams: false } }, aimassist: { use: 2 } },
+        client: { theme: 'mint', boxStyle: 'corners', chamsStyle: 'solid', tracer: 'bottom', arraylist: false, watermark: true, hitSound: 'classic' } } },
+    { id: 'neon', name: 'Neon HvH', author: 'hvh_legend', stars: 4.3, dl: '41.7k', price: 1100, tier: 5, tag: '3D boxes, pulsing chams, ding on every hit. Casual only. Obviously.',
+      reviews: ['"the ding is addictive" ★★★★★', '"banned before the first ding" ★★★', '"rage but make it pretty" ★★★★★'],
+      cfg: { cheats: { aimbot: { use: 5, opt: { type: 'silent', bone: 'head', smooth: 1, predict: true, fovCircle: true } }, triggerbot: { use: 3 }, wallhack: { use: 5, opt: ALL_ESP }, nospread: { use: 5 }, norecoil: { use: 3 }, rapidfire: { use: 3 } },
+        adv: { reaction: 0, curve: 'linear', hitChance: 100, humanizer: 0, visCheck: false, aimKey: 'always', espColor: 'classic' },
+        client: { theme: 'crimson', boxStyle: '3d', chamsStyle: 'pulse', tracer: 'top', watermark: true, arraylist: true, hitSound: 'ding' } } },
     { id: 'scam1', name: 'FREE UNDETECTED CFG 2026 (legit 100%)', author: 'kernel_kid_real', stars: 5.0, dl: '3', price: 1500, tier: 3, scam: 'trash', tag: '100% undetected. Limited time. Trust me bro.',
       reviews: ['"amazing" ★★★★★', '"amazing" ★★★★★', '"amazing" ★★★★★'],
       cfg: { cheats: { speedhack: { use: 4 }, rapidfire: { use: 4 } }, adv: { visCheck: false, safeMode: false, humanizer: 0 } } },

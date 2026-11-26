@@ -552,6 +552,90 @@
     document.body.classList.remove('cm-open');
   };
   // Each option: [key, kind, minLevel, choices]. kind: chk | sel | rng
+  // ---------------------------------------------------------------- client look: theme, watermark, module list
+  const THEMES = { purple: '#a855f7', crimson: '#f43f5e', mint: '#34d399', ocean: '#38bdf8', gold: '#fbbf24', rainbow: null };
+  const CL = () => Object.assign({ theme: 'purple', watermark: true, arraylist: true, targetHud: true, boxStyle: 'full', chamsStyle: 'solid', tracer: 'bottom', hitSound: 'classic' }, NA.Save.data.client || {});
+  UI.accent = (offset) => { const t = CL().theme; return THEMES[t] || `hsl(${(performance.now() / 12 + (offset || 0)) % 360},90%,62%)`; };
+  const CLIENT_ROWS = [
+    ['theme', ['purple', 'crimson', 'mint', 'ocean', 'gold', 'rainbow'], 'Theme'],
+    ['boxStyle', ['full', 'corners', '3d'], 'ESP box'],
+    ['chamsStyle', ['solid', 'pulse', 'rainbow'], 'Chams'],
+    ['tracer', ['bottom', 'center', 'top'], 'Tracers from'],
+    ['hitSound', ['classic', 'pop', 'ding', 'bonk', 'off'], 'Hit sound'],
+    ['watermark', 'chk', 'Watermark'],
+    ['arraylist', 'chk', 'Module list'],
+    ['targetHud', 'chk', 'Target HUD'],
+  ];
+  const TAB_ICONS = {
+    aim: '<circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" stroke-width="2.2"/>',
+    visuals: '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/>',
+    misc: '<path d="M4 7h9M19 7h1M4 17h3M13 17h7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="10" cy="17" r="2.6" fill="none" stroke="currentColor" stroke-width="2.2"/>',
+    exploits: '<path d="M13 2L4 14h7l-1 8 9-12h-7z" fill="currentColor"/>',
+    advanced: '<rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" stroke="currentColor" stroke-width="2"/>',
+    config: '<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>',
+  };
+  // sliders show a filled track up to the thumb
+  function fillRange(t) { const mn = +t.min || 0, mx = +t.max || 100; t.style.setProperty('--v', ((+t.value - mn) / ((mx - mn) || 1) * 100) + '%'); }
+  const fillRanges = () => document.querySelectorAll('#cm-list input[type=range]').forEach(fillRange);
+  const PRIO = ['aimbot', 'wallhack', 'triggerbot', 'wallbang', 'speedhack', 'rapidfire', 'freeze', 'radar', 'lootesp', 'nospread', 'norecoil', 'aimassist', 'infammo', 'steady'];
+  const byLen = (a, b) => (b[0] + b[1]).length - (a[0] + a[1]).length;
+  function activeModules() {
+    const s = NA.Save.data, T = NA.I18N.t, out = [];
+    if (G.panic) return out;
+    for (const c of D.CHEATS) {
+      if (!c.toggle) continue;
+      const st = s.cheats[c.id];
+      if (!st || !st.level || st.enabled === false) continue;
+      let name = T('c_' + c.id), tag = '';
+      if (c.id === 'aimbot') { const o = G.opt('aimbot'); tag = (o.type === 'silent' ? 'Silent' : 'Memory') + ' · ' + o.bone; }
+      else if (st.level > 1) tag = 'L' + Math.min(st.use || st.level, st.level);
+      out.push([name, tag, PRIO.indexOf(c.id) < 0 ? 99 : PRIO.indexOf(c.id)]);
+    }
+    return out.sort((a, b) => a[2] - b[2]);
+  }
+  let lastMods = '', lastWm = '', lastTheme = '', lastTh = '';
+  UI.applyTheme = function () {
+    const t = CL().theme;
+    if (t === lastTheme) return;
+    lastTheme = t;
+    const root = document.documentElement;
+    root.style.setProperty('--acc', THEMES[t] || '#a855f7');
+    root.classList.toggle('rgb', t === 'rainbow');
+  };
+  function clientHud() {
+    UI.applyTheme();
+    const cl = CL(), mods = activeModules(), hide = G.mods && G.mods.streamProof;
+    const wm = $('watermark');
+    const showWm = cl.watermark && mods.length && !hide;
+    wm.classList.toggle('hidden', !showWm);
+    if (showWm) {
+      const txt = `<i class="lg"></i><b>skillissue</b><span>.shop</span><i>|</i>${esc(NA.Save.data.username || 'guest')}<i>|</i>${Math.round(UI.lastFps || 60)} fps<i>|</i>${18 + (Math.floor(performance.now() / 4000) % 9)} ms`;
+      if (txt !== lastWm) { lastWm = txt; wm.innerHTML = txt; }
+    }
+    const sig = (cl.arraylist && !hide) ? mods.map(m => m[0] + ':' + m[1]).join('|') : '';
+    if (sig !== lastMods) {
+      lastMods = sig;
+      const MAX = 6, shown = (mods.length > MAX ? mods.slice(0, MAX - 1) : mods.slice()).sort(byLen);
+      $('arraylist').innerHTML = sig ? shown.map((m, i) => `<div class="al" style="--d:${(i * 0.22).toFixed(2)}s">${esc(m[0])}${m[1] ? `<small>${esc(m[1])}</small>` : ''}</div>`).join('')
+        + (shown.length < mods.length ? `<div class="al more" style="--d:${(shown.length * 0.22).toFixed(2)}s">+${mods.length - shown.length} more</div>` : '') : '';
+    }
+    // target HUD: whoever the aimbot is locked onto
+    const th = $('targethud'), tb = G.aimTarget;
+    const showTh = cl.targetHud && !hide && !G.panic && tb && tb.alive && G.player && G.player.alive;
+    th.classList.toggle('hidden', !showTh);
+    if (showTh) {
+      const hpK = Math.max(0, tb.hp / tb.maxHp), shK = tb.maxShield ? Math.max(0, tb.shield / tb.maxShield) : 0;
+      const dist = Math.round(G.player.pos.distanceTo(tb.pos));
+      const key = tb.name + '|' + Math.round(hpK * 100) + '|' + Math.round(shK * 100) + '|' + dist + '|' + tb.weapon;
+      if (key !== lastTh) {
+        lastTh = key;
+        th.innerHTML = `<div class="th-av">${esc((tb.name || '?')[0].toUpperCase())}</div><div class="th-m"><div class="th-n">${esc(tb.name)}<em>${dist}m</em></div>`
+          + `<div class="th-b"><i style="width:${(hpK * 100).toFixed(0)}%"></i></div>${tb.maxShield ? `<div class="th-b s"><i style="width:${(shK * 100).toFixed(0)}%"></i></div>` : ''}`
+          + `<div class="th-w">${esc(D.WEAPONS[tb.weapon] ? D.WEAPONS[tb.weapon].name : '')} · ${Math.ceil(tb.hp)} HP</div></div>`;
+      }
+    } else lastTh = '';
+  }
+  UI.clientTick = clientHud;
   const CM_OPTS = {
     aimbot: [['type', 'sel', 1, ['memory', 'silent']], ['bone', 'sel', 1, ['head', 'neck', 'pelvis', 'random']], ['smooth', 'rng', 1, [1, 10]], ['predict', 'chk', 2], ['fovCircle', 'chk', 1]],
     triggerbot: [['headOnly', 'chk', 1]],
@@ -563,10 +647,12 @@
   UI.renderCheatMenu = function () {
     const s = NA.Save.data, T = NA.I18N.t, rows = [];
     const tabs = ['aim', 'visuals', 'misc', 'exploits', 'advanced', 'config'];
-    $('cm-tabs').innerHTML = tabs.map(t => `<button data-tab="${t}" class="${UI.cmTab === t ? 'on' : ''}">${T(t)}</button>`).join('');
-    $('cm-head').textContent = `skillissue v2.0 | ${T('undetected')} | ${T('hide')}` + (G.mods && G.mods.streamProof ? ` | ● ${T('hidden')}` : '');
+    $('cm-tabs').innerHTML = tabs.map(t => `<button data-tab="${t}" class="${UI.cmTab === t ? 'on' : ''}"><svg viewBox="0 0 24 24">${TAB_ICONS[t] || ''}</svg><span>${T(t)}</span></button>`).join('');
+    UI.applyTheme();
+    $('cm-head').innerHTML = `<i class="lg"></i><b>skillissue</b><span class="dom">.shop</span> <span class="ver">v2.0</span> <span class="ok">● ${T('undetected')}</span>` + (G.mods && G.mods.streamProof ? ` <span class="ver">● ${T('hidden')}</span>` : '');
     if (UI.cmTab === 'advanced') {
       $('cm-list').innerHTML = NA.Cfg.renderAdvanced();
+      fillRanges();
       $('cm-panic').classList.toggle('on', G.panic);
       $('cm-panic').textContent = G.panic ? T('panicOn') : T('panic');
       return;
@@ -574,6 +660,13 @@
     if (UI.cmTab === 'config') {
       rows.push(`<div class="cm-opt"><span>${T('language')}</span><select data-lang="1">${NA.I18N.LANGS.map(l => `<option value="${l[0]}" ${l[0] === s.settings.lang ? 'selected' : ''}>${l[1]}</option>`).join('')}</select></div>`);
       rows.push(`<div class="cm-note">config: default.cfg · ${G.bots.length} entities · ping ${U.randInt(18, 40)} ms</div>`);
+      const cl = CL();
+      rows.push('<div class="cm-sec">CLIENT</div>');
+      for (const [key, ch, label] of CLIENT_ROWS) {
+        if (ch === 'chk') rows.push(`<label class="cm-opt"><span>${label}</span><input type="checkbox" class="sw" data-client="${key}" ${cl[key] ? 'checked' : ''}></label>`);
+        else rows.push(`<div class="cm-opt"><span>${label}</span><select data-client="${key}">${ch.map(v => `<option value="${v}" ${cl[key] === v ? 'selected' : ''}>${v === '3d' ? '3D box' : v === 'full' ? 'Full box' : v[0].toUpperCase() + v.slice(1)}</option>`).join('')}</select></div>`);
+      }
+      rows.push('<div class="cm-sec">QUICK CONFIGS</div><div class="cm-presets">' + [['legit', 'Closet Legit'], ['semi', 'Semi Rage'], ['rage', 'Full Rage'], ['rgb', 'RGB Visuals']].map(([id, n]) => `<button data-preset="${id}">${n}</button>`).join('') + '</div>');
     }
     for (const c of D.CHEATS) {
       if (!c.toggle || c.tab !== UI.cmTab) continue;
@@ -597,6 +690,7 @@
       rows.push(`<div class="cm-sub">${out.join('')}</div>`);
     }
     $('cm-list').innerHTML = rows.join('') || '<div class="cm-locked">—</div>';
+    fillRanges();
     $('cm-panic').classList.toggle('on', G.panic);
     $('cm-panic').textContent = G.panic ? T('panicOn') : T('panic');
   };
@@ -673,7 +767,7 @@
     el.innerHTML = `${head ? 'HEADSHOT · ' : ''}ELIMINATED<span class="kp-n">${esc(name || '')}</span><span class="kp-c">+${U.fmt(t.kill * (head ? 1.5 : 1) * G.mods.payoutMult)}</span>`;
     el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
   };
-  UI.fps = v => { const el = $('fps'); el.classList.toggle('hidden', !NA.Save.data.settings.showFps); el.textContent = Math.round(v) + ' fps'; };
+  UI.fps = v => { UI.lastFps = v; const el = $('fps'); el.classList.toggle('hidden', !NA.Save.data.settings.showFps); el.textContent = Math.round(v) + ' fps'; };
   const tc = team => (team === 'A' ? 'tA' : team === 'B' ? 'tB' : team === 'P' ? 'tP' : 'tF');
   let lastScore = '', lastFeed = '', lastSquad = null, lastHot = '';
   // blocky side-on gun silhouettes for the hotbar
@@ -705,6 +799,7 @@
     $('timer').textContent = `${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}`;
     $('timer').classList.toggle('low', tm <= 30);
     $('st-players').textContent = G.bots.length + 1;
+    clientHud();
     $('st-kills').textContent = p.kills;
     // squad list (team modes): name + health/shield of each teammate
     let sq = '';
@@ -810,17 +905,24 @@
     if (m.lootEsp) drawLootESP(g, w, h);
     if (m.esp) drawESP(g, w, h);
     drawAllyTags(g, w, h);
+    const chm = NA.Avatar.chamsMat(), cs = CL().chamsStyle;
+    if (cs === 'rainbow') chm.color.setHSL((now / 2400) % 1, 0.95, 0.55);
+    else chm.color.setHex(0xff2a6d);
+    chm.opacity = cs === 'pulse' ? 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(now / 160)) : 0.6;
     const odt = Math.min(0.1, (now - (UI.lastOv || now)) / 1000); UI.lastOv = now;
     drawDmg(g, w, h, odt);
     drawCompass(g, w, (G.match.tier.mode === 'ffa' ? 38 : 42) + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--st')) || 0));
     if (p.alive) {
       if (m.aimbot && m.aimbot.fovCircle && m.aimbot.fov < 180) {
         const r = Math.tan(m.aimbot.fov / 2 * U.DEG) / Math.tan(NA.R.camera.fov * U.DEG / 2) * h / 2;
-        if (r < Math.max(w, h)) { g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; g.beginPath(); g.arc(w / 2, h / 2, r, 0, Math.PI * 2); g.stroke(); }
+        if (r < Math.max(w, h)) {
+          g.save(); g.globalAlpha = 0.6; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 3; g.beginPath(); g.arc(w / 2, h / 2, r, 0, Math.PI * 2); g.stroke();
+          g.globalAlpha = 0.75; g.strokeStyle = UI.accent(); g.lineWidth = 1.2; g.stroke(); g.restore();
+        }
       }
       if (G.silentTarget) {
         const st = G.silentTarget, s = project(st.x, st.y, st.z, w, h);
-        if (s) { g.strokeStyle = '#ff3b5c'; g.lineWidth = 1.5; g.beginPath(); g.arc(s.x, s.y, 5, 0, Math.PI * 2); g.stroke(); }
+        if (s) { g.strokeStyle = UI.accent(); g.lineWidth = 1.5; g.beginPath(); g.arc(s.x, s.y, 5, 0, Math.PI * 2); g.stroke(); }
       }
       drawCrosshair(g, w, h, now);
     }
@@ -905,7 +1007,7 @@
   const JOINTS = { head: [0, 1.66, 0], neck: [0, 1.44, 0], pelvis: [0, 0.8, 0], ls: [-0.38, 1.4, 0], rs: [0.38, 1.4, 0], lh: [-0.2, 1.3, -0.55], rh: [0.38, 1.38, -0.6], lf: [-0.125, 0.03, 0], rf: [0.125, 0.03, 0] };
   const BONES = [['head', 'neck'], ['neck', 'pelvis'], ['neck', 'ls'], ['ls', 'lh'], ['neck', 'rs'], ['rs', 'rh'], ['pelvis', 'lf'], ['pelvis', 'rf']];
   function drawESP(g, w, h) {
-    const lvl = G.mods.esp, o = G.mods.espOpt, p = G.player;
+    const lvl = G.mods.esp, o = G.mods.espOpt, p = G.player, cl = CL();
     const has = (k, min) => lvl >= min && o[k];
     g.font = '600 10px -apple-system, system-ui, sans-serif';
     g.textAlign = 'center';
@@ -927,8 +1029,29 @@
       const vc = sch === 'ice' ? ['#7dd3fc', '#3b82f6'] : sch === 'mono' ? ['#ffffff', '#94a3b8'] : sch === 'rainbow' ? [`hsl(${(performance.now() / 10 + idx * 40) % 360},90%,60%)`, `hsl(${(performance.now() / 10 + idx * 40) % 360},90%,45%)`] : ['#ffd23f', '#ff2f5b'];
       const col = b.frozenT > 0 ? '#9be7ff' : bot ? '#22d3ee' : b.visToPlayer ? vc[0] : vc[1];
       if (has('box', 1) || !has('skeleton', 4)) {
-        g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 3; g.strokeRect(minX, minY, bw, bh);
-        g.strokeStyle = col; g.lineWidth = 1.5; g.strokeRect(minX, minY, bw, bh);
+        const bs = cl.boxStyle;
+        if (bs === 'corners') {
+          const lx = bw * 0.28, ly = bh * 0.22;
+          const corners = () => { g.beginPath();
+            g.moveTo(minX, minY + ly); g.lineTo(minX, minY); g.lineTo(minX + lx, minY);
+            g.moveTo(maxX - lx, minY); g.lineTo(maxX, minY); g.lineTo(maxX, minY + ly);
+            g.moveTo(maxX, maxY - ly); g.lineTo(maxX, maxY); g.lineTo(maxX - lx, maxY);
+            g.moveTo(minX + lx, maxY); g.lineTo(minX, maxY); g.lineTo(minX, maxY - ly); g.stroke(); };
+          g.strokeStyle = 'rgba(0,0,0,0.7)'; g.lineWidth = 3.5; corners();
+          g.strokeStyle = col; g.lineWidth = 1.8; corners();
+        } else if (bs === '3d') {
+          const cy = Math.cos(b.yaw), sy = Math.sin(b.yaw), P = [];
+          for (const [ox, oz] of [[-0.42, -0.3], [0.42, -0.3], [0.42, 0.3], [-0.42, 0.3]]) for (const oy of [0, 1.9]) P.push(project(b.pos.x + ox * cy + oz * sy, b.pos.y + oy, b.pos.z - ox * sy + oz * cy, w, h));
+          if (P.every(Boolean)) {
+            const E = [[0, 2], [2, 4], [4, 6], [6, 0], [1, 3], [3, 5], [5, 7], [7, 1], [0, 1], [2, 3], [4, 5], [6, 7]];
+            const draw = () => { g.beginPath(); for (const [i0, i1] of E) { g.moveTo(P[i0].x, P[i0].y); g.lineTo(P[i1].x, P[i1].y); } g.stroke(); };
+            g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 3; draw();
+            g.strokeStyle = col; g.lineWidth = 1.4; draw();
+          }
+        } else {
+          g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 3; g.strokeRect(minX, minY, bw, bh);
+          g.strokeStyle = col; g.lineWidth = 1.5; g.strokeRect(minX, minY, bw, bh);
+        }
       }
       let bx = minX - 6;
       if (has('health', 2)) {
@@ -967,8 +1090,9 @@
         g.stroke();
       }
       if (has('snaplines', 5)) {
-        g.strokeStyle = 'rgba(253,224,71,0.8)'; g.lineWidth = 1.2; g.beginPath();
-        g.moveTo(w / 2, h); g.lineTo(cx, maxY); g.stroke();
+        const tr = cl.tracer, oy = tr === 'top' ? 0 : tr === 'center' ? h / 2 : h;
+        g.strokeStyle = cl.theme === 'rainbow' ? UI.accent(idx * 40) : 'rgba(253,224,71,0.85)'; g.lineWidth = 1.2; g.beginPath();
+        g.moveTo(w / 2, oy); g.lineTo(cx, tr === 'top' ? minY : maxY); g.stroke();
       }
     });
   }
@@ -1500,8 +1624,29 @@
     });
     $('cm-close').addEventListener('click', () => UI.closeCheatMenu());
     $('cm-panic').addEventListener('click', () => { G.setPanic(!G.panic); UI.renderCheatMenu(); });
-    $('cm-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { UI.cmTab = b.dataset.tab; A.click(); UI.renderCheatMenu(); } });
+    $('cm-tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { UI.cmTab = b.dataset.tab; A.click(); UI.renderCheatMenu(); $('cm-list').scrollTop = 0; } });
+    const PRESETS = {
+      legit: { cheats: { aimbot: { use: 1, opt: { type: 'memory', bone: 'neck', smooth: 8, fovCircle: false } }, aimassist: { use: 2 }, steady: { use: 2 }, wallhack: { use: 2, opt: { box: true, health: true, name: false, skeleton: false, snaplines: false, chams: false } } }, adv: { reaction: 220, curve: 'human', humanizer: 8, hitChance: 70, visCheck: true, aimKey: 'firing', safeMode: true }, client: { boxStyle: 'corners', chamsStyle: 'solid', arraylist: false } },
+      semi: { cheats: { aimbot: { use: 3, opt: { type: 'memory', bone: 'head', smooth: 3, predict: true, fovCircle: true } }, triggerbot: { use: 2 }, norecoil: { use: 2 }, nospread: { use: 3 }, wallhack: { use: 4, opt: { box: true, health: true, shield: true, name: true, distance: true, skeleton: true } } }, adv: { reaction: 100, curve: 'smooth', humanizer: 4, hitChance: 90, visCheck: true, aimKey: 'always' }, client: { boxStyle: 'full', chamsStyle: 'pulse', arraylist: true } },
+      rage: { cheats: { aimbot: { use: 5, opt: { type: 'silent', bone: 'head', smooth: 1, predict: true, fovCircle: true } }, triggerbot: { use: 3 }, wallhack: { use: 5 }, norecoil: { use: 3 }, nospread: { use: 5 }, rapidfire: { use: 4 }, speedhack: { use: 3 }, wallbang: { use: 3 } }, adv: { reaction: 0, curve: 'linear', humanizer: 0, hitChance: 100, visCheck: false, aimKey: 'always', safeMode: false }, client: { boxStyle: '3d', chamsStyle: 'pulse', theme: 'crimson', hitSound: 'ding' } },
+      rgb: { keep: true, cheats: { wallhack: { use: 5, opt: { box: true, health: true, shield: true, name: true, distance: true, skeleton: true, snaplines: true, chams: true } }, lootesp: { use: 2 } }, adv: { espColor: 'rainbow' }, client: { theme: 'rainbow', boxStyle: 'corners', chamsStyle: 'rainbow', tracer: 'center', watermark: true, arraylist: true, hitSound: 'pop' } },
+    };
     $('cm-list').addEventListener('click', e => {
+      const pb = e.target.closest('[data-preset]');
+      if (pb) {
+        const p = PRESETS[pb.dataset.preset], s = NA.Save.data;
+        // only touches cheats in the preset; everything else stays as it was
+        const cfg = { cheats: {}, adv: Object.assign({}, NA.Cfg.adv(), p.adv), client: p.client };
+        for (const c of D.CHEATS) {
+          if (!c.toggle) continue;
+          const cur = s.cheats[c.id];
+          cfg.cheats[c.id] = p.cheats[c.id] || (p.keep && cur ? { enabled: cur.enabled !== false && !!cur.level, use: cur.use, opt: cur.opt } : { enabled: false });
+        }
+        const missing = NA.Cfg.apply(cfg);
+        UI.toast(`Loaded ${pb.textContent}${missing && missing.length ? ` (missing: ${missing.slice(0, 3).join(', ')})` : ''}`);
+        clientHud(); UI.renderCheatMenu();
+        return;
+      }
       const sv = e.target.closest('[data-psave]'), ld = e.target.closest('[data-pload]');
       if (sv) { NA.Cfg.saveProfile(sv.dataset.psave); A.click(); UI.toast(`Saved profile: ${sv.dataset.psave}`); UI.renderCheatMenu(); }
       if (ld) { const miss = NA.Cfg.loadProfile(ld.dataset.pload); A.buy(); UI.toast(`Loaded ${ld.dataset.pload}` + (miss && miss.length ? ` (missing: ${miss.join(', ')})` : '')); UI.renderCheatMenu(); }
@@ -1510,6 +1655,11 @@
       const t = e.target;
       if (t.dataset.adv) { NA.Cfg.onAdvChange(t); if (t.type !== 'range') UI.renderCheatMenu(); return; }
       if (t.dataset.lang) { NA.Save.data.settings.lang = t.value; NA.Save.save(); UI.renderCheatMenu(); return; }
+      if (t.dataset.client) {
+        const s = NA.Save.data; s.client = Object.assign({}, CL(), { [t.dataset.client]: t.type === 'checkbox' ? t.checked : t.value });
+        NA.Save.save(); if (t.dataset.client === 'hitSound') A.hit();
+        clientHud(); UI.renderCheatMenu(); return;
+      }
       if (t.dataset.opt) {
         const [id, key] = t.dataset.opt.split('.');
         const v = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : (key === 'minRarity' ? +t.value : t.value);
@@ -1525,6 +1675,7 @@
     });
     $('cm-list').addEventListener('input', e => {
       const t = e.target;
+      if (t.type === 'range') fillRange(t);
       if (t.dataset.adv && t.type === 'range') { NA.Cfg.onAdvChange(t); return; }
       if (t.dataset.opt && t.type === 'range') {
         const [id, key] = t.dataset.opt.split('.');

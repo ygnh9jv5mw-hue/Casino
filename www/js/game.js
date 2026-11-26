@@ -746,7 +746,7 @@
     b.lastAttackT = performance.now();
     if (attacker === G.player) {
       NA.UI.hitmarker(head, hadShield);
-      if (head) A.headshot(G.player.streak); else A.hit();
+      A.hit(head);
       NA.haptic('LIGHT');
       const fz = G.mods.freeze;
       if (fz && b.hp > 0 && performance.now() > b.freezeCD) {

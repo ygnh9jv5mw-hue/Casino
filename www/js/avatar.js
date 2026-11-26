@@ -29,6 +29,7 @@
     return OUTLINE;
   }
   AV.outlineMat = outlineMat;
+  AV.chamsMat = () => chamsMat();
   function chamsMat() { return CHAMS || (CHAMS = new THREE.MeshBasicMaterial({ color: 0xff2a6d, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false })); }
   function iceMat() { return ICE || (ICE = new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.5, depthWrite: false })); }
   AV.gunMat = () => GUNMAT || (GUNMAT = AV.toon());

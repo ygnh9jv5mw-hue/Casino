@@ -15,9 +15,20 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v0.9)
+## What's in this build (v1.0)
 
-**New in v0.9**
+**New in v1.0: the cheat-client look**
+- **Restyled cheat menu**: icon sidebar, toggle switches, filled sliders, a glowing header with the client logo, version and an UNDETECTED badge
+- **Themes**: purple, crimson, mint, ocean, gold or animated rainbow. The theme colours the menu, the watermark, the module list, the target HUD and the aimbot FOV circle
+- **Watermark** in the top-left corner while cheats are on (`skillissue.shop | name | fps | ms`)
+- **Module list** top-right: every active cheat with its level or mode, in the theme colour (a rainbow wave on the rainbow theme)
+- **Target HUD** under the crosshair: name, distance, health, shield and gun of whoever the aimbot is locked onto
+- **ESP styles**: full box, corner box or 3D box; chams solid, pulsing or rainbow; tracers from the bottom, centre or top of the screen
+- **Hit sounds**: classic, pop, ding, bonk or off (headshots play higher)
+- **Quick configs** in the Config tab: Closet Legit, Semi Rage, Full Rage and RGB Visuals (visuals only, keeps the rest of your setup). They only turn on cheats you own
+- **Three new Config Market packs**: Rainbow Visuals Pack, Clean Minimal and Neon HvH, which set the client look as well as the cheats
+
+**v0.9**
 - **Warden AC scales with your rank**: from Warden Lite (Iron) to Warden INFINITY (Legend). Higher ranks add more detection per cheat, slower cool-down, a head start on detection, timed Warden scans (Gold and up, every 60 s down to 20 s, with a 3-second warning so you can hit PANIC), and a harder injector minigame. The Ranked panel shows the current Warden, its strictness, scan timer and how much stricter the next rank is
 - **Pictures in the menus**: every map is rendered by the game into a picture (with players posed in it) and cached. The PLAY tile shows your lobby's map, tier cards show their maps, Item Shop shows today's items, Locker your skin, Cheats a wallhack view, Ranks your rank emblem, Comms a clip thumbnail, Profile your character
 

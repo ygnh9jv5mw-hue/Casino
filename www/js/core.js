@@ -104,6 +104,7 @@
     profiles: {},
     configsOwned: [],
     adv: {},
+    client: { theme: 'purple', watermark: true, arraylist: true, targetHud: true, boxStyle: 'full', chamsStyle: 'solid', tracer: 'bottom', hitSound: 'classic' },
     comms: { last: 0, msgs: {}, posts: [], rep: 0, notoriety: 0, notorietyAt: 0, unread: 0 },
     ranked: { rr: 0, peakRR: 0, offenses: 0, banUntil: 0, perma: false, ban: null, appeal: null, acVersion: [3, 0, 0], bypassDetected: false, patchReadyAt: 0,
       sinceUpdate: 0, nextUpdate: 4, alts: 0, bans: 0, appealsWon: 0, matches: 0 },
@@ -115,7 +116,7 @@
     try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { d = null; }
     if (!d || typeof d !== 'object') d = def;
     for (const k of Object.keys(def)) if (d[k] === undefined) d[k] = def[k];
-    for (const k of ['stats', 'settings', 'ranked', 'cosmetics', 'season', 'daily', 'reports', 'comms']) {
+    for (const k of ['stats', 'settings', 'ranked', 'cosmetics', 'season', 'daily', 'reports', 'comms', 'client']) {
       for (const kk of Object.keys(def[k])) if (d[k][kk] === undefined) d[k][kk] = def[k][kk];
     }
     if (d.highestTier >= 2 && !d.guns.ar7) { d.guns.ar7 = true; if (!d.loadout.primary) d.loadout.primary = 'ar7'; }
@@ -193,7 +194,15 @@
     else if (kind === 'pistol') { A.noiseBurst('lowpass', 2000, 0.16, 0.6 * att); A.tone(130, 0.12, 'sine', 0.5 * att, 0, 45); }
     else { A.noiseBurst('lowpass', 1300, 0.12, 0.35 * att); A.tone(110, 0.1, 'sine', 0.25 * att, 0, 45); }
   };
-  A.hit = () => A.tone(1700, 0.05, 'square', 0.08);
+  A.hit = head => {
+    const st = (NA.Save.data && NA.Save.data.client && NA.Save.data.client.hitSound) || 'classic', k = head ? 1.5 : 1;
+    if (st === 'off') return;
+    if (st === 'bonk') { A.tone(220 * k, 0.09, 'square', 0.09, 0, 110 * k); return; }
+    if (st === 'ding') { A.tone(1568 * k, 0.25, 'triangle', 0.07); A.tone(2093 * k, 0.2, 'sine', 0.04, 0.01); return; }
+    if (st === 'pop') { A.noiseBurst('bandpass', 2400 * k, 0.04, 0.2); A.tone(900 * k, 0.04, 'sine', 0.06); return; }
+    if (head) A.headshot((NA.Game && NA.Game.player && NA.Game.player.streak) || 0); else A.tone(1700, 0.05, 'square', 0.08);
+  };
+
   A.headshot = streak => { A.tone(1300 + streak * 70, 0.08, 'sine', 0.25); A.tone(1950 + streak * 100, 0.12, 'sine', 0.18, 0.05); };
   A.kill = () => { A.tone(240, 0.14, 'triangle', 0.3, 0, 120); A.noiseBurst('bandpass', 900, 0.08, 0.15); };
   A.hurt = () => A.tone(180, 0.12, 'sawtooth', 0.12, 0, 90);
