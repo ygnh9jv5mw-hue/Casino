@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#06070d">
+<title>Kaido Nights</title>
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<section id="scr-title" class="screen">
+  <div class="title-wrap" data-panel>
+    <div class="t-kanji">街道</div>
+    <h1 class="t-logo">KAIDO<span>NIGHTS</span></h1>
+    <p class="t-sub">roads after dark</p>
+    <button class="btn-go pulse" id="title-go">TAP TO START</button>
+  </div>
+  <div class="t-ver" id="t-ver"></div>
+</section>
+
+<section id="scr-intro" class="screen hidden">
+  <div class="story" id="story" data-panel></div>
+</section>
+
+<section id="scr-hub" class="screen hidden">
+  <div class="hub-top">
+    <div class="brand">KAIDO<b>NIGHTS</b></div>
+    <div class="wallet"><span class="cr" id="hub-cr"></span><span class="rep" id="hub-rep"></span></div>
+  </div>
+  <div class="hub-menu" data-panel>
+    <button class="hub-btn big" id="h-takeover"><small>TAKEOVER</small><b id="h-take-title">Rust Rats</b><span id="h-take-sub">The Docks</span><div class="h-prog" id="h-progress"></div></button>
+    <div class="hub-row">
+      <button class="hub-btn" id="h-roam"><small>FREE ROAM</small><b>Drift for cash</b></button>
+      <button class="hub-btn" id="h-garage"><small>GARAGE</small><b>Upgrades &amp; paint</b></button>
+    </div>
+    <div class="hub-row">
+      <button class="hub-btn" id="h-meet"><small>NIGHT MEET</small><b>Show off &amp; challenges</b></button>
+      <button class="hub-btn slim" id="h-settings"><small>SETTINGS</small><b>Controls</b></button>
+    </div>
+  </div>
+  <div class="hub-car"><b id="hub-carname"></b><span id="hub-carera"></span><em>drag to spin</em></div>
+</section>
+
+<section id="scr-map" class="screen hidden">
+  <div class="topbar"><button class="back" data-back>‹</button><h2>Takeover</h2><span class="wallet-s" id="map-cr"></span></div>
+  <div class="city" id="city"></div>
+</section>
+
+<section id="scr-battle" class="screen hidden"><div class="vs" id="vs" data-panel></div></section>
+
+<section id="scr-roam" class="screen hidden">
+  <div class="topbar"><button class="back" data-back>‹</button><h2>Free roam</h2></div>
+  <div class="roam-list" id="roam-list"></div>
+</section>
+
+<section id="scr-garage" class="screen hidden">
+  <div class="topbar"><button class="back" data-back>‹</button><h2>Garage</h2><span class="wallet-s" id="gar-cr"></span></div>
+  <div class="gar" data-panel>
+    <div class="gar-tabs" id="gar-tabs"><button data-tab="parts" class="on">Upgrades</button><button data-tab="paint">Paint</button><button data-tab="cars">Cars</button></div>
+    <div class="gar-body" id="gar-body"></div>
+  </div>
+  <div class="gar-stats" id="gar-stats"></div>
+</section>
+
+<section id="scr-meet" class="screen hidden">
+  <div class="topbar"><button class="back" data-back>‹</button><h2>Night meet</h2><span class="wallet-s" id="meet-cr"></span></div>
+  <div class="meet" id="meet-body" data-panel></div>
+</section>
+
+<section id="scr-settings" class="screen hidden">
+  <div class="topbar"><button class="back" data-back>‹</button><h2>Settings</h2></div>
+  <div class="set" id="set-body"></div>
+</section>
+
+<section id="hud" class="hidden">
+  <canvas id="minimap" width="150" height="150"></canvas>
+  <div class="hud-score"><small>SCORE</small><b id="h-total">0</b></div>
+  <div class="hud-battle hidden" id="h-battle">
+    <div class="hb-row"><span id="hb-name">LEADER</span><b id="hb-target">0</b></div>
+    <div class="hb-bar"><i id="hb-fill"></i></div>
+    <div class="hb-row small"><span id="hb-time">0:00</span><span id="hb-lap">0%</span></div>
+  </div>
+  <div class="drift" id="drift">
+    <div class="d-ring"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" class="bg"/><circle cx="22" cy="22" r="19" class="fg" id="d-ring"/></svg><b id="d-mult">x1</b></div>
+    <div class="d-pts"><b id="d-pts">0</b><span id="d-tag"></span></div>
+  </div>
+  <div class="feed" id="feed"></div>
+  <div class="center-msg" id="cmsg"></div>
+  <div class="speedo"><b id="h-speed">0</b><small>KM/H</small><span id="h-gear">1</span></div>
+  <div class="tut hidden" id="tut"></div>
+  <div id="fade"></div>
+  <div class="offc hidden" id="offc">OFF COURSE</div>
+  <div class="tandem hidden" id="tandem">TANDEM x1.5</div>
+  <button class="pause-btn" id="pause-btn" aria-label="Pause"></button>
+</section>
+
+<section id="touch" class="hidden">
+  <div class="t-half l"><span>‹</span></div>
+  <div class="t-half r"><span>›</span></div>
+  <div class="t-pad left"><button data-role="left" class="tb steer">‹</button><button data-role="right" class="tb steer">›</button></div>
+  <div class="t-pad right"><button data-role="hand" class="tb hb">E-BRAKE</button><button data-role="brake" class="tb br">BRAKE</button><button data-role="gas" class="tb gas">GAS</button></div>
+</section>
+
+<section id="scr-pause" class="overlay hidden"><div class="pause-box" id="pause-box"></div></section>
+<section id="scr-results" class="screen overlay hidden"><div class="res" id="res"></div></section>
+<div id="ad" class="hidden"><div class="ad-box"><small>AD PLACEHOLDER</small><b>Your ad here</b><p>AdMob (iPhone) and AdSense H5 Games Ads (web) plug in here once the ad accounts are set up.</p><span id="ad-count">3</span></div></div>
+<div id="toast"></div>
+<div id="rotate"><div class="rot-ic"></div><b>Turn your phone sideways</b><span>Kaido Nights plays in landscape.</span></div>
+
+<script src="js/vendor/three.min.js"></script>
+<script src="js/core.js"></script>
+<script src="js/data.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/world.js"></script>
+<script src="js/cars.js"></script>
+<script src="js/drift.js"></script>
+<script src="js/scenes.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ads.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

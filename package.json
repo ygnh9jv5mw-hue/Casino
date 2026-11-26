@@ -1,0 +1,18 @@
+{
+  "name": "kaido-nights",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kaido Nights: a night-city drifting game. Drift, upgrade, take over the city. iOS app via Capacitor.",
+  "scripts": {
+    "sync": "npx cap sync ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.6.0",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/local-notifications": "8.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}

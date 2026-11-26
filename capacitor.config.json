@@ -1,0 +1,10 @@
+{
+  "appId": "com.kaidonights.game",
+  "appName": "Kaido Nights",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#06070d",
+    "scrollEnabled": false
+  }
+}
