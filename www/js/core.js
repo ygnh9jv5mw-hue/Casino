@@ -1,6 +1,6 @@
 /* NO ANTICHEAT: helpers, save data and synthesized audio. */
 window.NA = window.NA || {};
-window.NA.VERSION = '1.1';
+window.NA.VERSION = '1.1.1';
 (function (NA) {
   'use strict';
 

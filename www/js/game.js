@@ -898,17 +898,20 @@
     lootCheck();
   }
 
+  // new players get a gentler hand: aim drift ramps up over the first three tiers (and Easy takes the edge off)
+  const EARLY_DRIFT = { 1: 0.5, 2: 0.65, 3: 0.82 };
+  G.driftMult = () => ((G.match && G.match.tier && EARLY_DRIFT[G.match.tier.id]) || 1) * (G.diff().id === 'easy' ? 0.8 : 1);
   function handicaps(dt, now) {
     const p = G.player, m = G.mods;
-    const t = now / 1000;
-    let amp = 5 * m.swayMult;
+    const t = now / 1000, dm = G.driftMult();
+    let amp = 5 * m.swayMult * dm;
     if (m.panic && (now - p.lastHurtT < 2000 || nearestEnemyDist() < 8)) amp *= 1.6;
     if (G.ads) amp *= 0.8;
     const lockMul = G.aimLock ? 0.1 : 1;
     p.nextTwitch -= dt;
     if (p.nextTwitch <= 0) {
-      p.nextTwitch = U.rand(2, 6);
-      const mag = U.rand(3, 8), ang = Math.random() * Math.PI * 2;
+      p.nextTwitch = U.rand(2, 6) / dm;
+      const mag = U.rand(3, 8) * dm, ang = Math.random() * Math.PI * 2;
       p.twY = Math.cos(ang) * mag; p.twP = Math.sin(ang) * mag; p.twT = 0;
     }
     let tw = 0;

@@ -15,7 +15,14 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v1.1)
+## What's in this build (v1.1.1)
+
+**New in v1.1.1: a gentler start**
+- Aim drift (the sway and the random twitches) now ramps up over the first three tiers: half strength on the Aim Map 1v1, 65% in Tier 2, 82% in Tier 3, full strength from Tier 4. Twitches are smaller and less frequent early on
+- **Easy** difficulty also cuts the drift by another 20%
+- Steady Hands still reduces drift on top of this, so it stays worth buying
+
+**v1.1**
 
 **New in v1.1: rival sellers**
 - **Four cheat sellers**, each with its own website (browser tabs in the Cheats shop), its own cheat menu and its own risk:

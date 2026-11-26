@@ -64,7 +64,7 @@ window.NA = window.NA || {};
   // ---------------------------------------------------------------- difficulty
   // Applies to every lobby. Harder bots pay more credits and more rank points.
   const DIFFICULTY = [
-    { id: 'easy', name: 'Easy', skill: -0.12, react: 1.3, rate: 0.75, pay: 0.6, rp: 0.5, rpLoss: 1, cheater: -0.04, shield: 0, color: '#4ade80', tag: 'Bots warm up first. Pays less.' },
+    { id: 'easy', name: 'Easy', skill: -0.12, react: 1.3, rate: 0.75, pay: 0.6, rp: 0.5, rpLoss: 1, cheater: -0.04, shield: 0, color: '#4ade80', tag: 'Bots warm up first and your aim drifts less. Pays less.' },
     { id: 'normal', name: 'Normal', skill: 0, react: 1, rate: 1, pay: 1, rp: 1, rpLoss: 1, cheater: 0, shield: 0, color: '#facc15', tag: 'The standard lobby.' },
     { id: 'hard', name: 'Hard', skill: 0.08, react: 0.85, rate: 1.1, pay: 1.6, rp: 1.4, rpLoss: 0.85, cheater: 0.04, shield: 0, color: '#fb923c', tag: 'Sweats only. Pays more.' },
     { id: 'nightmare', name: 'Nightmare', skill: 0.16, react: 0.7, rate: 1.2, pay: 2.5, rp: 1.8, rpLoss: 0.7, cheater: 0.08, shield: 25, color: '#f43f5e', tag: 'Every bot is cracked. Huge pay.' },
