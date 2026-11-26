@@ -408,7 +408,11 @@
     if (tier.chaos && NA.Events) NA.Events.startChaos(G.match);
     if (G.ranked) {
       G.match.detMult = NA.Ranked.matchMult(G.loader);
-      if (!G.legit && G.loader <= 1) G.match.det = G.loader === 0 ? 45 : 25;
+      const wp = NA.Ranked.profile();
+      G.match.wp = wp;
+      G.match.scanT = wp.scan ? wp.scan * U.rand(0.6, 1) : 0;
+      if (!G.legit) G.match.det = Math.max(G.match.det, wp.start);
+      if (!G.legit && G.loader <= 1) G.match.det = Math.max(G.match.det, G.loader === 0 ? 45 : 25);
       G.match.detPeak = G.match.det;
     }
     spawnPlayer();
@@ -425,7 +429,7 @@
     if (G.bots.length > shown.length) C.system(`…and ${G.bots.length - shown.length} more joined`);
     if (promo) C.system(`PROMOTION MATCH: win to reach ${NA.Prog.RANKS[NA.Prog.myRank().idx + 1]}. The lobby is tougher.`, { priority: true });
     if (G.ranked) {
-      C.system(`RANKED · protected by ${D.RANKED.ac} v${NA.Ranked.version()} (kernel mode)`);
+      { const wp = NA.Ranked.profile(); C.system(`RANKED · protected by ${wp.name} (${wp.mode})${wp.scan ? ` · scans every ~${wp.scan}s` : ''}`); }
       if (G.legit) C.system('Playing legit: cheats are unloaded for this match.');
       else if (NA.Save.data.ranked.bypassDetected) C.system('Warden signature database is up to date.');
     } else C.system(`Anticheat status: Coming Soon™ (posted {days} days ago)`);
@@ -622,9 +626,20 @@
     mt.det = Math.min(100, mt.det + amt * mt.detMult);
   };
   function updateDetection(dt) {
-    const mt = G.match;
-    const heat = NA.Ranked.heatRate(G.mods) * mt.detMult;
-    const decay = (G.panic || G.legit) ? 6 : D.RANKED.decay;
+    const mt = G.match, wp = mt.wp || NA.Ranked.profile();
+    let heat = NA.Ranked.heatRate(G.mods) * mt.detMult;
+    // timed Warden scans (Gold and up): a warning, then three seconds where every cheat counts triple
+    if (wp.scan && !G.legit) {
+      mt.scanT -= dt;
+      if (mt.scanT <= 3 && mt.scanT > 0 && !mt.scanWarned) { mt.scanWarned = true; NA.UI.centerMsg('⚠ WARDEN SCAN IN 3… hit PANIC', 2400); A.deny(); }
+      if (mt.scanT <= 0) {
+        if (!mt.scanning) { mt.scanning = 3; NA.UI.centerMsg('WARDEN SCANNING', 2800); }
+        mt.scanning -= dt;
+        if (heat > 0) heat = heat * 3 + 2.5;
+        if (mt.scanning <= 0) { mt.scanning = 0; mt.scanWarned = false; mt.scanT = wp.scan * U.rand(0.8, 1.2); }
+      }
+    }
+    const decay = (G.panic || G.legit) ? 6 : D.RANKED.decay * wp.decay;
     mt.det = U.clamp(mt.det + (heat - decay) * dt, 0, 100);
     if (mt.det > mt.detPeak) mt.detPeak = mt.det;
     if (mt.det >= 55 && !mt.flagged) {

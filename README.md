@@ -15,9 +15,13 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v0.8)
+## What's in this build (v0.9)
 
-**New in v0.8: battle-royale style HUD**
+**New in v0.9**
+- **Warden AC scales with your rank**: from Warden Lite (Iron) to Warden INFINITY (Legend). Higher ranks add more detection per cheat, slower cool-down, a head start on detection, timed Warden scans (Gold and up, every 60 s down to 20 s, with a 3-second warning so you can hit PANIC), and a harder injector minigame. The Ranked panel shows the current Warden, its strictness, scan timer and how much stricter the next rank is
+- **Pictures in the menus**: every map is rendered by the game into a picture (with players posed in it) and cached. The PLAY tile shows your lobby's map, tier cards show their maps, Item Shop shows today's items, Locker your skin, Cheats a wallhack view, Ranks your rank emblem, Comms a clip thumbnail, Profile your character
+
+**v0.8: battle-royale style HUD**
 - Minimap top-right with timer, players and eliminations under it; round menu, chat and CHEATS buttons beside it
 - Squad list top-left (teammates' health and shields), eliminations feed under it
 - Team score (or the leader in FFA) at the top with a compass strip

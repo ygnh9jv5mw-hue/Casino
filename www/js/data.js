@@ -77,6 +77,20 @@ window.NA = window.NA || {};
     heat: { aimassist: 0.08, steady: 0.05, nospread: 0.1, norecoil: 0.12, triggerbot: 0.35, aimbot: 0.45, radar: 0.2, wallhack: 0.15, lootesp: 0.12,
       speedhack: 0.8, rapidfire: 0.55, infammo: 0.9, kdspoof: 0, streamproof: 0, voterig: 0.4, wallbang: 1.1, freeze: 1.4 },
     decay: 0.9,          // per second, always
+    // Warden gets stricter the higher you climb: more heat per cheat, slower cool-down, a head start
+    // on detection, timed scans (Gold+), and a harder injector minigame. One entry per rank.
+    tiers: [
+      { name: 'Warden Lite', mode: 'user-mode', heat: 0.6, decay: 1.4, start: 0, scan: 0, zone: 1.25, speed: 0.85 },
+      { name: 'Warden v3', mode: 'user-mode', heat: 0.75, decay: 1.25, start: 0, scan: 0, zone: 1.15, speed: 0.9 },
+      { name: 'Warden v3.5', mode: 'user-mode', heat: 0.9, decay: 1.1, start: 0, scan: 0, zone: 1.05, speed: 0.95 },
+      { name: 'Warden v4', mode: 'kernel', heat: 1.05, decay: 1.0, start: 5, scan: 60, zone: 1, speed: 1 },
+      { name: 'Warden v4.2', mode: 'kernel', heat: 1.2, decay: 0.9, start: 8, scan: 50, zone: 0.92, speed: 1.06 },
+      { name: 'Warden v5', mode: 'kernel + AI', heat: 1.4, decay: 0.8, start: 12, scan: 42, zone: 0.85, speed: 1.12 },
+      { name: 'Warden v5.5', mode: 'kernel + AI', heat: 1.6, decay: 0.7, start: 16, scan: 36, zone: 0.78, speed: 1.18 },
+      { name: 'Warden v6', mode: 'hardware', heat: 1.85, decay: 0.6, start: 20, scan: 30, zone: 0.72, speed: 1.25 },
+      { name: 'Warden v6 Pro', mode: 'hardware', heat: 2.1, decay: 0.5, start: 25, scan: 25, zone: 0.66, speed: 1.32 },
+      { name: 'Warden INFINITY', mode: 'it watches you sleep', heat: 2.4, decay: 0.42, start: 30, scan: 20, zone: 0.6, speed: 1.4 },
+    ],
     // the ban ladder: offence 1, 2, 3, 4+ (minutes; 0 = permanent)
     ladder: [
       { mins: 5, fine: 0, rrReset: false, label: '5-minute ranked ban' },

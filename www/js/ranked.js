@@ -47,8 +47,10 @@
     }
     return h;
   };
+  // the Warden profile for your current rank
+  R.profile = () => RK().tiers[Math.min(9, NA.Prog.myRank().idx)];
   R.matchMult = function (loader) {
-    let m = R.gearMult();
+    let m = R.gearMult() * R.profile().heat;
     if (loader === 3) m *= 0.75;
     if (S().bypassDetected) m *= 2.5;
     return m;

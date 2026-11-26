@@ -551,16 +551,11 @@
     m.computeBoundingSphere();
     return m;
   }
-  W.build = function (scene, mapId) {
-    if (W.current && W.current.id === mapId) return W.current;
-    if (W.current) {
-      scene.remove(W.current.group);
-      W.current.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
-    }
-    const def = NA.DATA.MAPS[mapId];
+  // Build a map's meshes (merged per material) plus its decoration. Used for the live map and
+  // for the menu's map pictures, which must not disturb the live one.
+  function buildMeshes(mapId, def) {
     const group = new THREE.Group();
     const colliders = [];
-    // One mesh per material instead of one per box: big maps stay around 30 draw calls.
     const byMat = new Map();
     const push = b => {
       if (b.m === 'none') return;
@@ -588,11 +583,29 @@
       group.add(mesh);
     }
     for (const m of extra.meshes) group.add(m);
+    return { group, colliders };
+  }
+  W.build = function (scene, mapId) {
+    if (W.current && W.current.id === mapId) return W.current;
+    if (W.current) {
+      scene.remove(W.current.group);
+      W.current.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    }
+    const def = NA.DATA.MAPS[mapId];
+    const { group, colliders } = buildMeshes(mapId, def);
     scene.add(group);
     W.current = { id: mapId, def, group, colliders, nav: buildNav(def, colliders) };
     if (NA.Decor && NA.R && NA.R.hemi) NA.Decor.apply(scene, mapId, def);
     else { scene.background = new THREE.Color(def.sky); scene.fog = new THREE.Fog(def.sky, def.fog[0], def.fog[1]); }
     return W.current;
+  };
+  // A throwaway copy of a map for pictures. Keeps the live map's decoration animations intact.
+  W.previewGroup = function (mapId) {
+    const def = NA.DATA.MAPS[mapId];
+    const keep = NA.Decor ? NA.Decor.anim : null;
+    const out = buildMeshes(mapId, def);
+    if (NA.Decor) NA.Decor.anim = keep;
+    return out;
   };
 
   // ---------------------------------------------------------------- collision

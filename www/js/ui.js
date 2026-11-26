@@ -61,6 +61,7 @@
     $('m-locker-sub').textContent = `${owned + 4} items`;
     const fromElsewhere = UI.current !== 'scr-menu';
     UI.show('scr-menu');
+    UI.fillMenuArt();
     if (fromElsewhere) {
       const lob = document.querySelector('.lobby');
       lob.classList.remove('enter'); void lob.offsetWidth; lob.classList.add('enter');
@@ -97,6 +98,7 @@
       else if (t.id < D.MAX_PLAYABLE_TIER && s.highestTier <= t.id) prog = `${Math.min(wins, t.winsToUnlock)}/${t.winsToUnlock} wins to unlock Tier ${t.id + 1}`;
       else prog = `Wins: ${wins}`;
       html.push(`<button class="tier ${open ? 'open' : 'locked'} m-${t.map}" data-tier="${t.id}">
+        <span class="tart${NA.Showroom.mapArt(t.map) ? ' on' : ''}" data-map="${t.map}" style="${NA.Showroom.mapArt(t.map) ? `background-image:url(${NA.Showroom.mapArt(t.map)})` : ''}"></span>
         <div class="swatch"></div><div class="tnum">TIER ${t.id} · ${t.rank}</div><div class="tname">${t.name}</div>
         <div class="tmeta">${t.modeLabel} · ${botsLabel(t)} · first to ${t.scoreToWin}${t.loot ? ' · loot + shields' : ''}</div>
         <div class="tmaps">${(t.maps || [t.map]).map(D.mapTitle).join(' · ')}</div>
@@ -117,10 +119,14 @@
     if (verdict) UI.toast(verdict === 'won' ? 'Appeal accepted: ban lifted' : 'Appeal denied');
     const status = R.bypassStatus();
     const parts = [];
-    parts.push(`<div class="rk-row"><span class="rk-ac">🛡 ${D.RANKED.ac} v${R.version()}</span>
+    const wp = R.profile(), nextWp = D.RANKED.tiers[Math.min(9, NA.Prog.myRank().idx + 1)];
+    parts.push(`<div class="rk-row"><span class="rk-ac">🛡 ${esc(wp.name)} · ${esc(wp.mode)}</span>
       <span>Bypass: <b class="${status === 'DETECTED' ? 'bad' : 'good'}">${status}</b></span>
       <span>Rank: <b>${R.rankName(rs.rr)}</b> ${rs.rr} RR</span><span>Offences: ${rs.offenses}</span>
-      <span>Detection rate ×${R.matchMult(2).toFixed(2)}</span></div>`);
+      <span>Detection rate ×${R.matchMult(2).toFixed(2)}</span></div>
+      <div class="rk-wp"><span>Strictness <i class="rk-meter"><u style="width:${Math.round(wp.heat / 2.4 * 100)}%"></u></i></span>
+      <span>${wp.scan ? `Scans every ~${wp.scan}s` : 'No timed scans'}</span><span>Starts at ${wp.start}% detection</span>
+      ${nextWp !== wp ? `<span class="muted">Next rank: ${esc(nextWp.name)} (×${(nextWp.heat / wp.heat).toFixed(2)} stricter)</span>` : '<span class="muted">This is as strict as it gets.</span>'}</div>`);
     if (status === 'DETECTED') {
       parts.push(`<div class="rk-warn">Warden updated and your bypass is detected (detection ×2.5). Free patch in ${R.fmtLeft(rs.patchReadyAt - Date.now())}.
         <button class="btn tiny" data-rk="patch">PRIORITY PATCH ${U.fmt(R.patchCost())}</button></div>`);
@@ -151,7 +157,8 @@
   // Loader minigame: stop the needle in the green zone three times.
   UI.openLoader = function (tierId) {
     const L = UI.loader = { tierId, stage: 0, hits: 0, t: 0, dir: 1, pos: 0, zone: 0, w: 0, log: [] };
-    const newZone = () => { L.w = [0.22, 0.16, 0.11][L.stage]; L.zone = U.rand(0.1, 0.9 - L.w); L.speed = [0.9, 1.15, 1.45][L.stage]; };
+    const wp = NA.Ranked.profile();
+    const newZone = () => { L.w = [0.22, 0.16, 0.11][L.stage] * wp.zone; L.zone = U.rand(0.1, 0.9 - L.w); L.speed = [0.9, 1.15, 1.45][L.stage] * wp.speed; };
     newZone();
     L.newZone = newZone;
     $('ld-log').innerHTML = `<div>&gt; skillissue loader v2.0</div><div>&gt; target: FRAGLINE.exe · ${esc(D.RANKED.ac)} v${NA.Ranked.version()} (${NA.Ranked.bypassStatus().toLowerCase()})</div><div>&gt; stage 1/3: map driver… press INJECT in the green zone</div>`;
@@ -218,6 +225,30 @@
       <div class="tprog">${open ? `Titles: ${s.tourney.won} · entered ${s.tourney.played}` : `Locked: reach Tier ${T.unlockTier}`}</div></button>`;
   }
 
+  // ---------------------------------------------------------------- menu pictures
+  // Map shots are rendered by the 3D engine (and cached); item tiles use the shop thumbnails.
+  const setBg = (el, url) => { if (el && url) { el.style.backgroundImage = `url(${url})`; el.classList.add('on'); } };
+  UI.fillMenuArt = function () {
+    const SR = NA.Showroom, CSx = NA.Cosmetics, s = NA.Save.data;
+    if (!SR.scene) return;
+    const tier = D.TIERS.find(t => t.id === Math.min(s.highestTier || 1, D.MAX_PLAYABLE_TIER)) || D.TIERS[0];
+    const pm = tier.map;
+    $('art-play').dataset.map = pm;
+    setBg($('art-play'), SR.mapArt(pm));
+    const f = CSx.featured().items.filter(x => x.kind === 'outfit' || x.kind === 'knife' || x.kind === 'gunskin').slice(0, 2);
+    $('art-items').innerHTML = f.map(x => `<img src="${SR.thumb(x.kind, x.id)}" alt="">`).join('');
+    const skin = CSx.equipped('gunskin'), knife = CSx.equipped('knife');
+    $('art-locker').innerHTML = `<img src="${SR.thumb(skin !== 'factory' ? 'gunskin' : 'knife', skin !== 'factory' ? skin : knife)}" alt="">`;
+    $('art-profile').innerHTML = `<img class="head" src="${SR.thumb('outfit', CSx.equipped('outfit'))}" alt="">`;
+    SR.resetTileArt('ranks');
+    for (const k of ['cheats', 'ranks', 'comms']) SR.tileArt(k).then(url => setBg($('art-' + k), url));
+  };
+  if (NA.Showroom) NA.Showroom.onArt = (id) => {
+    const SR = NA.Showroom;
+    document.querySelectorAll(`[data-map="${id}"]`).forEach(el => setBg(el, SR.mapArt(id)));
+    if (id === 'arena') { SR.resetTileArt('comms'); SR.tileArt('comms').then(url => setBg($('art-comms'), url)); }
+  };
+
   // Pre-match: map name, mode, both teams (or everyone in FFA), countdown ring and a tip.
   const TIPS = [
     'Open the cheat menu with the ⚡ CHEATS button.',
@@ -233,7 +264,7 @@
     const t = G.match.tier, p = G.player, s = NA.Save.data;
     $('pm-map').textContent = D.mapTitle(t.map);
     $('lobby-title').textContent = t.name;
-    $('lobby-sub').textContent = `${t.modeLabel} · ${G.bots.length + 1} players · first to ${t.scoreToWin}`;
+    $('lobby-sub').textContent = `${t.modeLabel} · ${G.bots.length + 1} players · first to ${t.scoreToWin}${G.ranked ? ` · ${NA.Ranked.profile().name}` : ''}`;
     let i = 0;
     const card = (name, me, side) => {
       const ping = me ? 0 : U.randInt(14, 95);

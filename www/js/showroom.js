@@ -358,5 +358,149 @@
     return c.toDataURL('image/png');
   }
 
+  // ---------------------------------------------------------------- map pictures for the menus
+  // Each map is built off-screen with its own lighting, a few players are posed in front of the
+  // camera, and the frame is saved as a JPEG (cached between launches).
+  const ART_VER = 'na_art_v9_';
+  const SHOTS = {
+    aim_map: [[-15, 5, 8.5], [4, 0.8, -2]], warehouse: [[-17, 5.2, 17], [2, 1.4, -3]], courtyard: [[-26, 8, 24], [0, 4, -12]],
+    shipyard: [[-36, 11, 30], [0, 5, -20]], office: [[-29, 3.1, -21], [2, 1, 2]], metro: [[-46, 4.4, -14], [0, 1.6, 3]],
+    island: [[-58, 20, 52], [24, 4, -26]], servers: [[-26, 4.1, 17], [2, 1.6, -4]], lancafe: [[-18.4, 2.85, 12.4], [4, 1.1, -3]],
+    arena: [[-31, 6.5, 21], [0, 4, 0]],
+  };
+  const artMem = {};
+  let AS = null, artQueue = [], artBusy = false;
+  function artStage() {
+    if (AS) return AS;
+    const scene = new THREE.Scene();
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8), sun = new THREE.DirectionalLight(0xffffff, 0.8);
+    scene.add(hemi, sun, sun.target);
+    const cam = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 400);
+    const rt = new THREE.WebGLRenderTarget(400, 225);
+    AS = { scene, hemi, sun, cam, rt, buf: new Uint8Array(400 * 225 * 4), canvas: document.createElement('canvas') };
+    AS.canvas.width = 400; AS.canvas.height = 225;
+    return AS;
+  }
+  function skyTex(zen, hor) {
+    return canvasTex(4, 128, (g) => { const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#' + new THREE.Color(zen).getHexString()); gr.addColorStop(0.75, '#' + new THREE.Color(hor).getHexString()); gr.addColorStop(1, '#' + new THREE.Color(hor).getHexString()); g.fillStyle = gr; g.fillRect(0, 0, 4, 128); });
+  }
+  function renderMapArt(id) {
+    const R = NA.R.renderer, S = artStage(), L = NA.Decor.light(id), def = NA.DATA.MAPS[id];
+    S.hemi.color.setHex(L.hemiS); S.hemi.groundColor.setHex(L.hemiG); S.hemi.intensity = L.hemiI;
+    S.sun.color.setHex(L.sunC); S.sun.intensity = L.sunI; S.sun.position.set(L.sun[0], L.sun[1], L.sun[2]).multiplyScalar(50);
+    const sky = L.indoor ? null : skyTex(L.zen, L.hor);
+    S.scene.background = sky || new THREE.Color(L.fogC || L.hor);
+    S.scene.fog = new THREE.Fog(L.fogC || L.hor, L.fog[0] * 1.4, L.fog[1] * 1.6);
+    const { group, colliders } = NA.World.previewGroup(id);
+    S.scene.add(group);
+    const shot = SHOTS[id] || [[-def.size[0] * 0.4, 8, def.size[1] * 0.4], [0, 1, 0]];
+    S.cam.position.set(shot[0][0], shot[0][1], shot[0][2]);
+    S.cam.lookAt(shot[1][0], shot[1][1], shot[1][2]);
+    // pose a few players in front of the camera, avoiding anything solid
+    const avs = [], dir = new THREE.Vector3(shot[1][0] - shot[0][0], 0, shot[1][2] - shot[0][2]).normalize(), side = new THREE.Vector3(-dir.z, 0, dir.x);
+    const blocked = (x, z) => colliders.some(c => c.maxY > 0.4 && c.minY < 2 && x + 0.5 > c.minX && x - 0.5 < c.maxX && z + 0.5 > c.minZ && z - 0.5 < c.maxZ);
+    const cols = [0x2563eb, 0xdc2626, 0x16a34a, 0xf59e0b, 0x7c3aed];
+    [[7.5, -1.8], [9.5, 1.6], [12.5, -0.2], [15, 3]].forEach(([dist, off], i) => {
+      for (const tweak of [0, 1.2, -1.2, 2.4]) {
+        const x = shot[0][0] + dir.x * dist + side.x * (off + tweak), z = shot[0][2] + dir.z * dist + side.z * (off + tweak);
+        if (Math.abs(x) > def.size[0] / 2 - 1 || Math.abs(z) > def.size[1] / 2 - 1 || blocked(x, z)) continue;
+        const outfit = i === 0 ? CS().outfit() : AV().botOutfit(cols[i % cols.length], '');
+        const av = AV().build(outfit, { cls: ['rifle', 'smg', 'sniper', 'shotgun'][i % 4] });
+        av.chams.visible = false;
+        av.root.position.set(x, 0, z);
+        av.root.rotation.y = Math.atan2(shot[0][0] - x, shot[0][2] - z) + Math.PI + (i % 2 ? 0.5 : -0.4);
+        AV().animate(av, { pose: 'ready' }, 0.016);
+        S.scene.add(av.root); avs.push(av);
+        break;
+      }
+    });
+    S.scene.updateMatrixWorld(true);
+    const oc = R.getClearColor(new THREE.Color()), oa = R.getClearAlpha();
+    R.setRenderTarget(S.rt);
+    R.setClearColor(0x000000, 1);
+    R.clear();
+    R.render(S.scene, S.cam);
+    R.readRenderTargetPixels(S.rt, 0, 0, 400, 225, S.buf);
+    R.setRenderTarget(null);
+    R.setClearColor(oc, oa);
+    S.scene.remove(group);
+    group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    for (const av of avs) { S.scene.remove(av.root); AV().dispose(av); }
+    if (sky) sky.dispose();
+    const g = S.canvas.getContext('2d'), img = g.createImageData(400, 225);
+    for (let y = 0; y < 225; y++) img.data.set(S.buf.subarray((224 - y) * 400 * 4, (225 - y) * 400 * 4), y * 400 * 4);
+    g.putImageData(img, 0, 0);
+    return S.canvas.toDataURL('image/jpeg', 0.84);
+  }
+  // returns the picture if it is ready, otherwise queues it and calls SR.onArt when done
+  SR.mapArt = function (id) {
+    if (artMem[id]) return artMem[id];
+    try { const c = localStorage.getItem(ART_VER + id); if (c) { artMem[id] = c; return c; } } catch (e) { /* storage blocked */ }
+    if (artQueue.indexOf(id) < 0) artQueue.push(id);
+    pumpArt();
+    return null;
+  };
+  function pumpArt() {
+    if (artBusy || !artQueue.length) return;
+    artBusy = true;
+    setTimeout(() => {
+      // never while playing: rendering a whole map would hitch the frame rate
+      if (NA.Game.state === 'playing' || NA.Game.state === 'lobby') { artBusy = false; setTimeout(pumpArt, 1500); return; }
+      const id = artQueue.shift();
+      try {
+        const url = renderMapArt(id);
+        artMem[id] = url;
+        try { localStorage.setItem(ART_VER + id, url); } catch (e) { /* full */ }
+        if (SR.onArt) SR.onArt(id, url);
+      } catch (e) { console.warn('map art failed', id, e); }
+      artBusy = false;
+      if (artQueue.length) setTimeout(pumpArt, 220);
+    }, 60);
+  }
+  // ---------------------------------------------------------------- tile pictures (drawn)
+  // Promise-based: the cheats and comms pictures draw other rendered images into themselves.
+  const tileMem = {};
+  const loadImg = url => new Promise(res => { if (!url) { res(null); return; } const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = url; });
+  SR.tileArt = async function (kind) {
+    if (tileMem[kind]) return tileMem[kind];
+    const c = document.createElement('canvas'); c.width = 240; c.height = 135;
+    const g = c.getContext('2d');
+    if (kind === 'cheats') {
+      // a "wallhack" view: a player behind a wall with an ESP box, health bar and snapline
+      const gr = g.createLinearGradient(0, 0, 0, 135); gr.addColorStop(0, '#2e1065'); gr.addColorStop(1, '#0b0718'); g.fillStyle = gr; g.fillRect(0, 0, 240, 135);
+      g.fillStyle = 'rgba(255,255,255,0.05)'; for (let x = 0; x < 240; x += 16) g.fillRect(x, 0, 1, 135); for (let y = 0; y < 135; y += 16) g.fillRect(0, y, 240, 1);
+      const im = await loadImg(SR.thumb('outfit', 'tactical'));
+      if (im) { g.globalAlpha = 0.9; g.drawImage(im, 118, 4, 98, 131); g.globalAlpha = 1; }
+      g.strokeStyle = '#f43f5e'; g.lineWidth = 2.5; g.strokeRect(140, 16, 56, 112);
+      g.fillStyle = '#22c55e'; g.fillRect(132, 16, 4, 112); g.fillStyle = '#fda4af'; g.font = 'bold 11px sans-serif'; g.fillText('BOT_Kevin · 12m', 128, 11);
+      g.strokeStyle = 'rgba(244,63,94,0.85)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(110, 135); g.lineTo(168, 40); g.stroke();
+      g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.arc(168, 34, 6, 0, 7); g.stroke();
+    } else if (kind === 'ranks') {
+      const r = NA.Prog.myRank(), col = r.color || '#94a3b8';
+      g.fillStyle = '#0b0f17'; g.fillRect(0, 0, 240, 135);
+      const gr = g.createRadialGradient(170, 66, 4, 170, 66, 120); gr.addColorStop(0, col); gr.addColorStop(1, 'rgba(11,15,23,0)'); g.fillStyle = gr; g.globalAlpha = 0.6; g.fillRect(0, 0, 240, 135); g.globalAlpha = 1;
+      g.save(); g.translate(170, 62);
+      g.fillStyle = col; g.strokeStyle = '#fff'; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(0, -50); g.lineTo(40, -32); g.lineTo(40, 10); g.quadraticCurveTo(40, 44, 0, 58); g.quadraticCurveTo(-40, 44, -40, 10); g.lineTo(-40, -32); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.92)';
+      const n = r.idx >= 9 ? 3 : Math.max(1, 4 - (r.div || 3));
+      for (let i = 0; i < n; i++) { const y = 14 - i * 14; g.beginPath(); g.moveTo(-22, y); g.lineTo(0, y - 14); g.lineTo(22, y); g.lineTo(22, y + 8); g.lineTo(0, y - 6); g.lineTo(-22, y + 8); g.closePath(); g.fill(); }
+      g.restore();
+    } else if (kind === 'comms') {
+      const gr = g.createLinearGradient(0, 0, 240, 135); gr.addColorStop(0, '#312e81'); gr.addColorStop(1, '#0b1020'); g.fillStyle = gr; g.fillRect(0, 0, 240, 135);
+      const art = SR.mapArt('arena');
+      const im = await loadImg(art);
+      if (im) g.drawImage(im, 0, 0, 240, 135);
+      g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(0, 0, 240, 135);
+      g.fillStyle = 'rgba(255,255,255,0.92)'; g.beginPath(); g.arc(170, 66, 24, 0, 7); g.fill();
+      g.fillStyle = '#4f46e5'; g.beginPath(); g.moveTo(162, 54); g.lineTo(162, 78); g.lineTo(183, 66); g.fill();
+      g.fillStyle = '#ef4444'; g.fillRect(120, 10, 40, 16); g.fillStyle = '#fff'; g.font = 'bold 11px sans-serif'; g.fillText('CLIP', 127, 22);
+      if (!im) return c.toDataURL('image/jpeg', 0.85);
+    }
+    tileMem[kind] = c.toDataURL(kind === 'cheats' ? 'image/png' : 'image/jpeg', 0.86);
+    return tileMem[kind];
+  };
+  SR.resetTileArt = k => { delete tileMem[k]; };
+
   NA.Showroom = SR;
 })(window.NA);
