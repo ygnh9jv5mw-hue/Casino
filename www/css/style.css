@@ -256,7 +256,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .t-half span { position: absolute; bottom: calc(26px + var(--sb)); font: 900 54px var(--f); color: rgba(255, 255, 255, 0.16); transition: color 0.1s, text-shadow 0.1s; }
 .t-half.l span { left: calc(36px + var(--sl)); } .t-half.r span { right: calc(36px + var(--sr)); }
 #touch.l-on .t-half.l span, #touch.r-on .t-half.r span { color: var(--pink); text-shadow: 0 0 20px var(--pink); }
-#touch.m-thumb .t-half { display: block; }
+#touch.m-thumb .t-half, #touch.m-tilt.no-tilt .t-half { display: block; }
 .t-pad { display: none; position: absolute; bottom: calc(14px + var(--sb)); gap: 10px; }
 .t-pad.left { left: calc(16px + var(--sl)); } .t-pad.right { right: calc(16px + var(--sr)); align-items: flex-end; }
 #touch.m-arcade .t-pad, #touch.m-pro .t-pad { display: flex; }

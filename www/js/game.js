@@ -63,7 +63,8 @@
       const t = e.target.closest && e.target.closest('[data-role]');
       if (t) return t.dataset.role;
       const mode = KN.Save.data.settings.controls;
-      if (mode === 'thumb') return e.clientX < window.innerWidth / 2 ? 'left' : 'right';
+      // tilt with no motion events (blocked, or a desktop browser): steer with the screen halves instead
+      if (mode === 'thumb' || (mode === 'tilt' && !IN.tiltOK)) return e.clientX < window.innerWidth / 2 ? 'left' : 'right';
       if (mode === 'tilt') return 'hand';
       return null;
     };
@@ -75,7 +76,8 @@
     };
     layer.addEventListener('pointerdown', e => { KN.Audio.init(); IN.roles.set(e.pointerId, roleFor(e)); try { layer.setPointerCapture(e.pointerId); } catch (_) { /* old webviews */ } recompute(); e.preventDefault(); });
     layer.addEventListener('pointermove', e => {
-      if (!IN.roles.has(e.pointerId) || KN.Save.data.settings.controls !== 'thumb') return;
+      const mode = KN.Save.data.settings.controls, held = IN.roles.get(e.pointerId);
+      if ((held !== 'left' && held !== 'right') || !(mode === 'thumb' || (mode === 'tilt' && !IN.tiltOK))) return;
       IN.roles.set(e.pointerId, e.clientX < window.innerWidth / 2 ? 'left' : 'right'); recompute();
     });
     for (const t of ['pointerup', 'pointercancel']) layer.addEventListener(t, e => { IN.roles.delete(e.pointerId); recompute(); });

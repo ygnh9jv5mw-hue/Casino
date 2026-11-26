@@ -376,7 +376,7 @@
     const st = S().settings;
     UI.show('none');
     $('hud').className = 'c-' + st.controls + (mode === 'tutorial' ? ' tutorial' : '');
-    const t = $('touch'); t.className = 'm-' + st.controls;
+    const t = $('touch'); t.className = 'm-' + st.controls + (st.controls === 'tilt' && !KN.Game.input.tiltOK ? ' no-tilt' : '');
     $('h-battle').classList.toggle('hidden', mode !== 'battle');
     $('feed').innerHTML = ''; $('cmsg').textContent = ''; $('drift').classList.remove('on');
     $('offc').classList.add('hidden'); $('tandem').classList.add('hidden');
@@ -394,7 +394,7 @@
   };
   function setTut() {
     const step = TUT.steps[UI.tut.i];
-    const ctl = S().settings.controls;
+    const ctl = S().settings.controls === 'tilt' && !KN.Game.input.tiltOK ? 'thumb' : S().settings.controls;
     $('tut').innerHTML = (UI.tut.i === 0 ? TUT.first[ctl] || TUT.first.thumb : step.text) + `<small>${UI.tut.i + 1}/${TUT.steps.length}</small>`;
   }
   function tutAdvance(key) {
