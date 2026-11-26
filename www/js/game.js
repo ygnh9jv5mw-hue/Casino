@@ -359,8 +359,17 @@
   };
 
   // opts: { ranked, legit, loader (0..3 clean injections) }
+  // Tiers with a map pool play a random map from it (never the same one twice in a row).
+  G.pickMap = function (tier) {
+    const pool = (tier.maps || [tier.map]).filter(m => D.MAPS[m]);
+    if (pool.length < 2) return pool[0] || tier.map;
+    const opts = pool.filter(m => m !== G.lastMap);
+    return U.pick(opts.length ? opts : pool);
+  };
   G.startMatch = function (tierOrId, opts) {
-    const tier = typeof tierOrId === 'object' ? tierOrId : D.TIERS.find(t => t.id === tierOrId);
+    let tier = typeof tierOrId === 'object' ? tierOrId : D.TIERS.find(t => t.id === tierOrId);
+    if (tier.maps) tier = Object.assign({}, tier, { map: (opts && opts.map) || G.pickMap(tier) });
+    G.lastMap = tier.map;
     if (tier.tourney === undefined) G.tourney = null;
     opts = opts || {};
     G.ranked = !!opts.ranked && tier.tourney === undefined;

@@ -3,45 +3,39 @@
   'use strict';
   const U = NA.U;
 
-  // Boot runs in small steps behind the intro so the logo animation and loading bar can paint.
+  // Boot runs in small steps behind the loader so its log and progress bar can update.
+  // Each step prints themed lines to the loader console.
   const STEPS = [
-    ['booting FRAGLINE client', setupRenderer],
-    ['loading maps', () => NA.World.build(NA.R.scene, 'aim_map')],
-    ['teaching bots to miss', () => { NA.Game.initFX(); NA.Game.computeMods(); NA.Chat.init(); NA.UI.init(); NA.Comms.init(); }],
-    ['building the lobby', () => { NA.Showroom.init(); resize(); }],
-    ['compiling shaders', () => { const R = NA.R; R.renderer.compile(NA.Showroom.scene, NA.Showroom.camera); R.renderer.compile(R.scene, R.camera); }],
-    ['bribing the anticheat', () => {}],
-    ['ready', () => {}],
+    [setupRenderer, [['ok', 'connected to skillissue.shop · 12ms'], ['ok', 'license: LIFETIME (definitely paid for)']]],
+    [() => NA.World.build(NA.R.scene, 'aim_map'), [['info', 'HWID spoofed'], ['ok', 'found FRAGLINE.exe (pid 1337)'], ['ok', () => `loading ${Object.keys(NA.DATA.MAPS).length} maps`]]],
+    [() => { NA.Game.initFX(); NA.Game.computeMods(); NA.Chat.init(); NA.UI.init(); NA.Comms.init(); }, [['ok', 'teaching bots to miss'], ['info', 'scanning for anticheat… none found']]],
+    [() => { NA.Showroom.init(); resize(); }, [['ok', 'building lobby + item shop']]],
+    [() => { const R = NA.R; R.renderer.compile(NA.Showroom.scene, NA.Showroom.camera); R.renderer.compile(R.scene, R.camera); }, [['ok', 'compiling shaders (the slow part)']]],
+    [() => {}, [['warn', 'Warden AC: "coming soon™" · skipping'], ['done', 'ready to inject']]],
   ];
   function boot() {
     NA.Save.load();
     NA.Audio.setVolume(NA.Save.data.settings.volume);
-    const intro = document.getElementById('intro'), bar = document.getElementById('intro-bar'), step = document.getElementById('intro-step');
-    // split the intro wordmark into letters so they can drop in one by one
+    const intro = document.getElementById('intro');
+    // split the logo wordmark into letters so they can drop in one by one after injecting
     let n = 0;
-    intro.querySelectorAll('.word span').forEach(sp => { sp.innerHTML = sp.textContent.split('').map(ch => `<i class="ch" style="animation-delay:${1.15 + (n++) * 0.035}s">${ch}</i>`).join(''); });
-    intro.querySelector('.intro-center').classList.add('shake');
-    const t0 = performance.now(), minT = /[?&]fast=1/.test(location.search) ? 0 : 2900;
+    intro.querySelectorAll('.word span').forEach(sp => { sp.innerHTML = sp.textContent.split('').map(ch => `<i class="ch" style="animation-delay:${0.85 + (n++) * 0.035}s">${ch}</i>`).join(''); });
+    NA.Intro.start();
+    NA.Intro.expect(STEPS.reduce((s, st) => s + st[1].length, 0));
     let i = 0;
     const next = () => {
       if (i < STEPS.length) {
-        const [label, fn] = STEPS[i];
-        step.textContent = label;
-        try { fn(); } catch (e) { console.error('boot step failed: ' + label, e); }
+        const [fn, lines] = STEPS[i];
+        try { fn(); } catch (e) { console.error('boot step failed: ' + i, e); }
+        lines.forEach(([k, t]) => NA.Intro.log(k, typeof t === 'function' ? t() : t));
         i++;
-        bar.style.width = Math.round(i / STEPS.length * 100) + '%';
         if (i === 4) requestAnimationFrame(loop);
-        setTimeout(next, 170);
+        setTimeout(next, 90);
         return;
       }
-      const wait = Math.max(0, minT - (performance.now() - t0));
-      setTimeout(() => {
-        intro.classList.add('out');
-        NA.UI.onIntroDone && NA.UI.onIntroDone();
-        setTimeout(() => intro.remove(), 500);
-      }, wait);
+      NA.Intro.ready(injected => { if (injected && NA.UI.afterInject) NA.UI.afterInject(); });
     };
-    // let the first frame of the intro paint before doing heavy work
+    // let the loader paint before doing heavy work
     requestAnimationFrame(() => setTimeout(next, 40));
   }
   function setupRenderer() {

@@ -14,6 +14,9 @@
     shipyard:  { zen: 0x4f7fb5, hor: 0xd9e3ea, sun: [-0.5, 0.85, -0.35], sunC: 0xfff0d8, sunI: 0.70, hemiS: 0xc9d8e8, hemiG: 0x8a867e, hemiI: 0.87, fog: [50, 150] },
     office:    { zen: 0x4b86c9, hor: 0xdfe8f0, sun: [0.3, 1, 0.55], sunC: 0xfff6ea, sunI: 0.43, hemiS: 0xf2f5fa, hemiG: 0x8a8580, hemiI: 1.05, fog: [40, 120], indoor: true },
     metro:     { zen: 0x1a1f2a, hor: 0x3a4250, sun: [0.2, 1, 0.1], sunC: 0xdfe9ff, sunI: 0.35, hemiS: 0xe6eeff, hemiG: 0x5b5a62, hemiI: 0.82, fog: [30, 95], indoor: true },
+    servers:   { zen: 0x0b1220, hor: 0x16213a, sun: [0.25, 1, 0.15], sunC: 0xcfe4ff, sunI: 0.42, hemiS: 0xd6e6ff, hemiG: 0x3a4658, hemiI: 0.82, fog: [24, 80], indoor: true, fogC: 0x0e1626 },
+    lancafe:   { zen: 0x140f1e, hor: 0x241b33, sun: [0.3, 1, 0.2], sunC: 0xffe6d0, sunI: 0.42, hemiS: 0xf1e8ff, hemiG: 0x4b3f5c, hemiI: 0.84, fog: [22, 70], indoor: true, fogC: 0x1a1426 },
+    arena:     { zen: 0x070910, hor: 0x111522, sun: [0.15, 1, 0.25], sunC: 0xffffff, sunI: 0.55, hemiS: 0xdfe6ff, hemiG: 0x3a3550, hemiI: 0.8, fog: [40, 140], indoor: true, fogC: 0x0b0d16 },
     island:    { zen: 0x1677d4, hor: 0xb2e6ff, sun: [0.55, 1, -0.45], sunC: 0xfff3dc, sunI: 0.7, hemiS: 0xc7e6ff, hemiG: 0x9aa37a, hemiI: 0.8, fog: [70, 210] },
   };
   DC.light = id => LIGHT[id] || LIGHT.aim_map;
@@ -54,19 +57,21 @@
     scene.add(clouds);
     return { sky, clouds };
   }
-  function mergeGeos(geos) {
+  function mergeGeos(geos, withColor) {
     let nv = 0, ni = 0;
     for (const g of geos) { nv += g.attributes.position.count; ni += g.index.count; }
-    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), idx = new Uint32Array(ni);
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), idx = new Uint32Array(ni), col = withColor ? new Float32Array(nv * 3) : null;
     let vo = 0, io = 0;
     for (const g of geos) {
       pos.set(g.attributes.position.array, vo * 3); nor.set(g.attributes.normal.array, vo * 3);
+      if (col) col.set(g.attributes.color.array, vo * 3);
       const s = g.index.array; for (let i = 0; i < s.length; i++) idx[io + i] = s[i] + vo;
       vo += g.attributes.position.count; io += s.length; g.dispose();
     }
     const m = new THREE.BufferGeometry();
     m.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     m.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    if (col) m.setAttribute('color', new THREE.BufferAttribute(col, 3));
     m.setIndex(new THREE.BufferAttribute(idx, 1));
     return m;
   }
@@ -79,8 +84,8 @@
     u.zen.value.setHex(L.zen); u.hor.value.setHex(L.hor); u.sunDir.value.set(L.sun[0], L.sun[1], L.sun[2]).normalize(); u.sunC.value.setHex(L.sunC);
     u.indoor.value = L.indoor ? 1 : 0;
     DC.clouds.visible = !L.indoor;
-    scene.background = new THREE.Color(L.hor);
-    scene.fog = new THREE.Fog(L.hor, L.fog[0], L.fog[1]);
+    scene.background = new THREE.Color(L.fogC || L.hor);
+    scene.fog = new THREE.Fog(L.fogC || L.hor, L.fog[0], L.fog[1]);
     if (id === 'metro') scene.fog.color.setHex(0x2a303b);
     R.hemi.color.setHex(L.hemiS); R.hemi.groundColor.setHex(L.hemiG); R.hemi.intensity = L.hemiI;
     R.sun.color.setHex(L.sunC); R.sun.intensity = L.sunI;
@@ -355,6 +360,170 @@
       for (let k = 0; k < 4; k++) add('palmLeaf', x + Math.cos(k * 1.57) * 1.2, z + Math.sin(k * 1.57) * 1.2, 4.8, k % 2 ? 0.6 : 3, 0.2, k % 2 ? 3 : 0.6, { noCast: false });
     }
   };
+
+  // ---------------------------------------------------------------- server farm
+  // Warden AC's own datacenter: blinking racks, cable trays, a glowing core and a big status screen.
+  BUILD.servers = function (add, out, def) {
+    const [w, d] = def.size;
+    add('ceilingDark', 0, 0, 5, w + 1, 0.4, d + 1, { noCast: true });
+    for (const x of [-12, -4, 4, 12]) add('lampStrip', x, 0, 4.95, 0.25, 0.06, d - 6, { noCast: true });
+    const segs = NA.DATA.RACK_SEGS;
+    for (const x of [-15, -9, 9, 15]) {
+      for (const [z0, z1] of segs) for (const s of [-1, 1]) add('rackFront', x + s * 0.556, (z0 + z1) / 2, 0.05, 0.02, 2.2, z1 - z0 - 0.1, { noCast: true });
+      add('cableTray', x, 0, 3.0, 0.5, 0.08, d - 2, { noCast: true });
+      for (const z of [-20, 20]) add('cableTray', x, z, 2.3, 0.08, 0.7, 0.08, { noCast: true });
+    }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const s of [-1, 1]) add('rackFront', sx * 19.5 + s * 0.556, sz * 14, 0.05, 0.02, 2.2, 1.9, { noCast: true });
+    // the core: glowing seams, a beam to the ceiling and a spinning ring
+    for (const s of [-1, 1]) {
+      for (const o of [-1.2, 0, 1.2]) { add('glowBlue', o, s * 2.01, 0.3, 0.12, 3.8, 0.02, { noCast: true }); add('glowBlue', s * 2.01, o, 0.3, 0.02, 3.8, 0.12, { noCast: true }); }
+    }
+    add('glowBlue', 0, 0, 4.4, 4.1, 0.08, 4.1, { noCast: true });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.08, 6, 48), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+    ring.rotation.x = Math.PI / 2; ring.position.y = 4.65; ring.userData.noShadow = true;
+    out.meshes.push(ring);
+    DC.anim.push((dt, t) => { ring.rotation.z = t * 0.9; ring.scale.setScalar(1 + Math.sin(t * 2) * 0.04); });
+    // floor markings around the core
+    for (const s of [-1, 1]) { add('paintY', 0, s * 4.6, 0.004, 9.4, 0.01, 0.15, { noCast: true }); add('paintY', s * 4.6, 0, 0.004, 0.15, 0.01, 9.4, { noCast: true }); }
+    // status screens on the north and south walls, node signs over each spawn
+    add('screenWarden', 0, -d / 2 + 0.03, 2.45, 9, 2.4, 0.04, { noCast: true });
+    add('screenWarden', 0, d / 2 - 0.03, 2.45, 9, 2.4, 0.04, { noCast: true, ry: Math.PI });
+    add('signServer', -w / 2 + 0.05, 0, 2.6, 5, 1.25, 0.06, { noCast: true, ry: Math.PI / 2 });
+    add('signServer', w / 2 - 0.05, 0, 2.6, 5, 1.25, 0.06, { noCast: true, ry: -Math.PI / 2 });
+    // LEDs blink: swap between two random patterns
+    const mat = NA.World.material('rackFront'), t1 = mat.map, t2 = NA.World.altTexture('rackFront', 1);
+    let acc = 0;
+    DC.anim.push(dt => { acc += dt; if (acc > 0.45) { acc = 0; mat.map = mat.map === t1 ? t2 : t1; } });
+  };
+
+  // ---------------------------------------------------------------- LAN café
+  // RGB everything: monitors on every desk, neon signs, arcade cabinets, a snack bar.
+  BUILD.lancafe = function (add, out, def) {
+    const [w, d] = def.size;
+    add('ceilingDark', 0, 0, 3.6, w + 1, 0.3, d + 1, { noCast: true });
+    const neons = ['neonPink', 'neonCyan', 'neonPurple'];
+    for (const z of [-5, 5]) {
+      add(neons[z > 0 ? 0 : 1], 0, z, 3.55, 14, 0.05, 0.08, { noCast: true });
+      for (const x of [-4, 4]) {
+        for (const s of [-1, 1]) {
+          add(neons[(x > 0 ? 1 : 2)], x, z + s * 0.81, 0.74, 6, 0.03, 0.03, { noCast: true });
+          for (const o of [-2, 0, 2]) {
+            add('monitor', x + o, z + s * 0.3, 0.95, 0.9, 0.55, 0.05, { noCast: true });
+            add('screenGame', x + o, z + s * 0.33, 0.97, 0.84, 0.5, 0.01, { noCast: true, ry: s > 0 ? 0 : Math.PI });
+            add('monitor', x + o, z + s * 0.45, 0.78, 0.6, 0.03, 0.2, { noCast: true });
+            add('chair', x + o, z + s * 1.05, 0, 0.6, 0.5, 0.6, { noCast: true });
+            add('chair', x + o, z + s * 1.32, 0.5, 0.6, 0.75, 0.1, { noCast: true });
+          }
+        }
+      }
+    }
+    for (const z of [-11, -2, 7]) add('lampPanel', 0, z, 3.44, 1.6, 0.04, 0.8, { noCast: true });
+    // signs and posters
+    add('neonCafe', 0, d / 2 - 0.04, 2.3, 7, 1.75, 0.04, { noCast: true, ry: Math.PI });
+    add('neonShop', 0, -d / 2 + 0.04, 2.45, 6, 1.5, 0.04, { noCast: true });
+    for (const s of [-1, 1]) {
+      add(s < 0 ? 'posterShop' : 'posterKevin', s * (w / 2 - 0.03), 9, 1.2, 0.04, 1.8, 1.2, { noCast: true, ry: s < 0 ? Math.PI / 2 : -Math.PI / 2 });
+      add('screenGame', s * (w / 2 - 0.04), -3, 1.3, 0.04, 1.7, 3, { noCast: true, ry: s < 0 ? Math.PI / 2 : -Math.PI / 2 });
+      add(s < 0 ? 'posterKevin' : 'posterShop', s * 11.36, 11, 1.2, 0.04, 1.8, 1.2, { noCast: true, ry: s < 0 ? Math.PI / 2 : -Math.PI / 2 });
+      add(neons[s < 0 ? 1 : 0], s * (w / 2 - 0.03), 0, 3.3, 0.04, 0.06, d - 2, { noCast: true });
+    }
+    // arcade fronts, fridge fronts, vending fronts
+    for (const x of [-8, -5.5, -3, 3, 5.5, 8]) add('arcadeFront', x, 13.74, 0.02, 0.96, 1.86, 0.01, { noCast: true, ry: Math.PI });
+    for (const x of [-6.6, 6.6]) add('fridgeFront', x, -13.89, 0.03, 1.56, 2.04, 0.01, { noCast: true });
+    add('fridgeFront', -2.2, 0.94, 0.03, 1.16, 1.94, 0.01, { noCast: true, ry: Math.PI });
+    add('fridgeFront', 2.2, -0.94, 0.03, 1.16, 1.94, 0.01, { noCast: true });
+    // snacks on the bar
+    for (let i = 0; i < 6; i++) add(['neonPink', 'paintY', 'neonCyan'][i % 3], -3 + i * 1.2, -11.8, 1.1, 0.35, 0.3, 0.25, { noCast: true });
+    add('monitor', 3.4, -11.8, 1.1, 0.5, 0.35, 0.4, { noCast: true });
+  };
+
+  // ---------------------------------------------------------------- FRAGLINE Arena
+  // The Major: a packed crowd, a jumbotron over the stage, sweeping spotlights and a trophy.
+  BUILD.arena = function (add, out, def) {
+    const [w, d] = def.size;
+    add('ceilingDark', 0, 0, 17, 120, 0.5, 96, { noCast: true });
+    for (const z of [-12, 0, 12]) add('truss', 0, z, 12, 64, 0.5, 0.5, { noCast: true });
+    for (const x of [-18, 18]) add('truss', x, 0, 12, 0.5, 0.5, 40, { noCast: true });
+    // jumbotron
+    add('stage', 0, 0, 8.5, 8, 4, 8, { noCast: true });
+    for (const s of [-1, 1]) {
+      add('jumbo', 0, s * 4.02, 8.7, 7.6, 3.6, 0.02, { noCast: true, ry: s > 0 ? 0 : Math.PI });
+      add('jumbo', s * 4.02, 0, 8.7, 0.02, 3.6, 7.6, { noCast: true, ry: s > 0 ? Math.PI / 2 : -Math.PI / 2 });
+      add('truss', s * 3, 0, 12.5, 0.12, 4.5, 0.12, { noCast: true });
+    }
+    // trophy on the pedestal, monitors in the booths
+    const g = 'gold', ty = 2.0;
+    add(g, 0, -3.8, ty, 0.5, 0.15, 0.5); add(g, 0, -3.8, ty + 0.15, 0.14, 0.45, 0.14); add(g, 0, -3.8, ty + 0.6, 0.62, 0.55, 0.62);
+    add(g, -0.38, -3.8, ty + 0.68, 0.12, 0.34, 0.12); add(g, 0.38, -3.8, ty + 0.68, 0.12, 0.34, 0.12);
+    for (const s of [-1, 1]) for (const z of [-1.6, 0, 1.6]) {
+      add('monitor', s * 4.5, z, 1.8, 0.05, 0.5, 0.8, { noCast: true });
+      add('screenGame', s * 4.5 + s * 0.03, z, 1.82, 0.01, 0.46, 0.74, { noCast: true, ry: s > 0 ? -Math.PI / 2 : Math.PI / 2 });
+    }
+    // camera cranes
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      add('darkMetal', sx * 10, sz * 22, 0.6, 0.25, 2.6, 0.25);
+      add('darkMetal', sx * 10 - sx * 1.2, sz * 22 - sz * 1.2, 3.0, 0.2, 0.2, 4.2, { ry: sx * sz * Math.PI / 4, rx: 0.35 });
+      add('monitor', sx * 10 - sx * 2.6, sz * 22 - sz * 2.6, 3.4, 0.5, 0.4, 0.7, { ry: sx * sz * Math.PI / 4 });
+    }
+    // stands: six tiers along the long sides, three behind each spawn, team banners at the ends
+    const people = [];
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 6; i++) {
+        const top = (i + 1) * 0.9, z = s * (28.8 + i * 1.6);
+        add('standSeat', 0, z, -1, 80, top + 1, 1.6, { noCast: true });
+        for (let x = -38; x <= 38; x += 0.8) if (Math.random() < 0.82) people.push([x + (Math.random() - 0.5) * 0.2, top, z, s > 0 ? Math.PI : 0]);
+      }
+      for (let i = 0; i < 3; i++) {
+        const top = (i + 1) * 0.9, x = s * (38.6 + i * 1.6);
+        add('standSeat', x, 0, -1, 1.6, top + 1, 56, { noCast: true });
+        for (let z = -26; z <= 26; z += 0.8) if (Math.random() < 0.8) people.push([x, top, z + (Math.random() - 0.5) * 0.2, s > 0 ? -Math.PI / 2 : Math.PI / 2]);
+      }
+      add(s < 0 ? 'teamA' : 'teamB', s * 44.5, 0, 4.5, 0.1, 3.5, 14, { noCast: true, ry: s < 0 ? Math.PI / 2 : -Math.PI / 2 });
+      add(s < 0 ? 'paintBlue' : 'paintRed', s * 31.5, 0, 0.004, 7, 0.01, 50, { noCast: true });
+    }
+    crowd(people, out);
+    // sweeping spotlights
+    const cols = [0x38bdf8, 0xf472b6, 0xffffff, 0xa855f7, 0x38bdf8, 0xf472b6];
+    const tex = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 128; const g2 = c.getContext('2d'); const gr = g2.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g2.fillStyle = gr; g2.fillRect(0, 0, 4, 128); return new THREE.CanvasTexture(c); })();
+    cols.forEach((c, i) => {
+      const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 2.6, 13, 18, 1, true), new THREE.MeshBasicMaterial({ map: tex, color: c, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+      cone.geometry.translate(0, -6.5, 0);
+      const pivot = new THREE.Group();
+      pivot.position.set(-25 + i * 10, 11.7, i % 2 ? 12 : -12);
+      pivot.add(cone); pivot.userData.noShadow = true; cone.userData.noShadow = true;
+      out.meshes.push(pivot);
+      DC.anim.push((dt, t) => { pivot.rotation.z = Math.sin(t * 0.6 + i * 1.3) * 0.55; pivot.rotation.x = Math.cos(t * 0.45 + i) * 0.35; });
+    });
+  };
+  // a crowd of little blocky fans in team colours, in three groups that bob out of step
+  function crowd(people, out) {
+    const shirts = [0x2563eb, 0x1d4ed8, 0xdc2626, 0xb91c1c, 0x111827, 0xf8fafc, 0xfacc15, 0x16a34a, 0x7c3aed];
+    const skins = [0xf1c9a5, 0xe0ac7e, 0xc68642, 0x8d5524, 0xffdbac];
+    const groups = [[], [], []], c = new THREE.Color();
+    people.forEach((p, i) => groups[i % 3].push(p));
+    groups.forEach((list, gi) => {
+      const geos = [];
+      for (const [x, y, z, ry] of list) {
+        const shirt = shirts[(Math.random() * shirts.length) | 0], skin = skins[(Math.random() * skins.length) | 0];
+        const parts = [[0.5, 0.62, 0.32, 0, 0.31, 0, shirt], [0.34, 0.34, 0.34, 0, 0.8, 0, skin]];
+        if (Math.random() < 0.35) parts.push([0.12, 0.5, 0.12, -0.3, 0.85, 0, shirt], [0.12, 0.5, 0.12, 0.3, 0.85, 0, shirt]);
+        for (const [pw, ph, pd, px, py, pz, col] of parts) {
+          const g = new THREE.BoxGeometry(pw, ph, pd);
+          g.rotateY(ry); g.translate(x + px * Math.cos(ry), y + py, z - px * Math.sin(ry) + pz);
+          c.setHex(col);
+          const n = g.attributes.position.count, cols = new Float32Array(n * 3);
+          for (let k = 0; k < n; k++) { const sh = g.attributes.normal.getY(k) > 0.5 ? 1 : 0.8; cols[k * 3] = c.r * sh; cols[k * 3 + 1] = c.g * sh; cols[k * 3 + 2] = c.b * sh; }
+          g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+          geos.push(g);
+        }
+      }
+      const m = mergeGeos(geos, true);
+      const mesh = new THREE.Mesh(m, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      mesh.userData.noShadow = true;
+      out.meshes.push(mesh);
+      DC.anim.push((dt, t) => { mesh.position.y = Math.abs(Math.sin(t * 3.2 + gi * 2.1)) * 0.14; });
+    });
+  }
 
   // ---------------------------------------------------------------- water
   let WATER = null;

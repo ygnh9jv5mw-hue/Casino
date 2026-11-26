@@ -15,9 +15,18 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v0.5)
+## What's in this build (v0.6)
 
-**New in v0.5: the visual update**
+**New in v0.6**
+- **The intro is a cheat loader**: a skillissue.shop loader window logs you in, lists its "products" (NO ANTICHEAT: UNDETECTED), prints a console log while the game really loads, then waits for you to press **INJECT**. The logo slams in with the sound and you land in the lobby
+- **Three themed maps**:
+  - **Server Farm**: Warden AC's own datacenter. Rows of blinking server racks, cable trays, a glowing core in the middle, status screens saying detections today: 0
+  - **LAN Café**: NetCafe 24/7. PC rows with dividers you can peek over, RGB everywhere, arcade cabinets, a snack bar you can hide behind, neon signs
+  - **FRAGLINE Arena**: the Major. A stage with both team booths and the trophy, a jumbotron, sweeping spotlights and a packed, bouncing crowd
+- **Map rotation**: tiers now play a random map from a pool (never the same twice in a row). Tier names describe the lobby (2v2 Scrims, Small FFA, 5v5 Teams…) and each tier card lists its maps
+- The FRAGLINE Open tournament now goes LAN Café → Server Farm → FRAGLINE Arena; Loot Rush and Chaos FFA use the new maps too
+
+**v0.5: the visual update**
 - **Intro**: animated logo (shield, crosshair, slash) with a loading bar, then a title screen with a sound sting when you tap
 - **3D lobby**: your character stands on a lit stage behind the main menu (drag to spin it, tap it for the Locker); menu buttons slide and glow in
 - **New characters**: smoother blocky models with real clothes (hoodies, jackets, vests, helmets, caps, headphones…), toon shading, outlines, and proper running, jumping, aiming, hit-flinch and death animations
@@ -92,7 +101,9 @@ www/                 the game (plain HTML/CSS/JS, no build step)
   js/game.js         player, handicaps, cheats, bots, matches, effects
   js/ui.js           screens, HUD, wallhack overlay, shop, input
   js/world.js        maps, textures, collision, raycasts, bot pathfinding
+  js/maps2.js        Server Farm, LAN Café, FRAGLINE Arena
   js/decor.js        sky, lighting, shadows, map props and landmarks
+  js/intro.js        the cheat-loader boot screen
   js/avatar.js       blocky characters: one skinned mesh, toon shading, animations
   js/cosmetics.js    outfits, gun skins, knives, kill effects, daily shop
   js/showroom.js     the 3D lobby stage and shop thumbnails

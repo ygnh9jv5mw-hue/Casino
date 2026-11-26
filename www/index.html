@@ -16,18 +16,43 @@
 </head>
 <body data-screen="scr-title">
 <div id="intro">
+  <canvas id="ldr-rain"></canvas>
   <div class="intro-scan"></div>
-  <div class="intro-center">
+  <div class="ldr-win" id="ldr-win">
+    <div class="ldr-title">
+      <svg class="ldr-mark" viewBox="0 0 120 140" aria-hidden="true"><path class="sh" d="M60 6 L108 22 V64 C108 98 86 122 60 134 C34 122 12 98 12 64 V22 Z"/><g class="xh"><circle cx="60" cy="68" r="22"/><path d="M60 38v14M60 84v14M30 68h14M76 68h14"/><circle class="dot" cx="60" cy="68" r="3.2"/></g><path class="sl" d="M24 114 L96 24"/></svg>
+      <b>skillissue<span>.shop</span></b><small>loader v5.0.1</small>
+      <i class="ldr-winbtns"><u></u><u></u><u></u></i>
+    </div>
+    <div class="ldr-body">
+      <div class="ldr-login" id="ldr-login">
+        <div class="ldr-field"><label>USERNAME</label><div class="typed" id="ldr-user"></div></div>
+        <div class="ldr-field"><label>LICENSE KEY</label><div class="typed" id="ldr-key"></div></div>
+        <div class="ldr-btn" id="ldr-loginbtn">LOGIN</div>
+        <div class="ldr-note">by logging in you agree not to get caught</div>
+      </div>
+      <div class="ldr-main" id="ldr-main">
+        <div class="ldr-prods">
+          <div class="prod on"><div class="p-ic"><svg viewBox="0 0 120 140" aria-hidden="true"><path class="sh" d="M60 6 L108 22 V64 C108 98 86 122 60 134 C34 122 12 98 12 64 V22 Z"/><g class="xh"><circle cx="60" cy="68" r="22"/><path d="M60 38v14M60 84v14M30 68h14M76 68h14"/><circle class="dot" cx="60" cy="68" r="3.2"/></g><path class="sl" d="M24 114 L96 24"/></svg></div><div class="p-tx"><b>NO ANTICHEAT</b><small>FRAGLINE &middot; lifetime</small></div><span class="st ok">UNDETECTED</span></div>
+          <div class="prod"><div class="p-tx"><b>Warden Bypass</b><small>ranked only</small></div><span class="st warn">UPDATING</span></div>
+          <div class="prod"><div class="p-tx"><b>Kevin's Aimbot</b><small>free download</small></div><span class="st bad">DETECTED</span></div>
+          <div class="ldr-hw">HWID <b id="ldr-hwid"></b><br>status <b class="okc">spoofed</b> &middot; region <b>auto</b></div>
+        </div>
+        <div class="ldr-right">
+          <div class="ldr-log" id="ldr-log"></div>
+          <div class="ldr-prog"><i id="ldr-bar"></i></div>
+          <div class="ldr-row"><span id="ldr-pct">0%</span><span id="ldr-state">loading</span></div>
+          <button class="ldr-inject" id="ldr-inject" disabled><span>LOADING</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="intro-center" id="ldr-logo">
     <div class="logo">
-      <svg class="mark" viewBox="0 0 120 140" aria-hidden="true">
-        <path class="sh" d="M60 6 L108 22 V64 C108 98 86 122 60 134 C34 122 12 98 12 64 V22 Z"/>
-        <g class="xh"><circle cx="60" cy="68" r="22"/><path d="M60 38v14M60 84v14M30 68h14M76 68h14"/><circle class="dot" cx="60" cy="68" r="3.2"/></g>
-        <path class="sl" d="M24 114 L96 24"/>
-      </svg>
+      <svg class="mark" viewBox="0 0 120 140" aria-hidden="true"><path class="sh" d="M60 6 L108 22 V64 C108 98 86 122 60 134 C34 122 12 98 12 64 V22 Z"/><g class="xh"><circle cx="60" cy="68" r="22"/><path d="M60 38v14M60 84v14M30 68h14M76 68h14"/><circle class="dot" cx="60" cy="68" r="3.2"/></g><path class="sl" d="M24 114 L96 24"/></svg>
       <div class="word" data-text="NO ANTICHEAT"><span class="w1">NO</span> <span class="w2">ANTICHEAT</span></div>
     </div>
   </div>
-  <div class="intro-load"><div class="bar"><i id="intro-bar"></i></div><div class="step" id="intro-step">booting</div></div>
   <div class="intro-flash"></div>
 </div>
 <canvas id="gl"></canvas>
@@ -100,7 +125,7 @@
     <p class="tagline">you can't aim. good thing nobody's checking.</p>
     <button class="tap-start" id="title-go"><span>TAP TO START</span></button>
   </div>
-  <div class="title-foot"><span>FRAGLINE client</span><span class="title-ver">v0.5</span></div>
+  <div class="title-foot"><span>FRAGLINE client</span><span class="title-ver">v0.6</span></div>
 </section>
 
 <section id="scr-name" class="screen hidden">
@@ -350,6 +375,7 @@
 <script src="js/vendor/three.min.js"></script>
 <script src="js/data.js"></script>
 <script src="js/maps.js"></script>
+<script src="js/maps2.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/core.js"></script>
 <script src="js/world.js"></script>
@@ -366,6 +392,7 @@
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/store.js"></script>
+<script src="js/intro.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

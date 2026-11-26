@@ -99,6 +99,7 @@
       html.push(`<button class="tier ${open ? 'open' : 'locked'} m-${t.map}" data-tier="${t.id}">
         <div class="swatch"></div><div class="tnum">TIER ${t.id} · ${t.rank}</div><div class="tname">${t.name}</div>
         <div class="tmeta">${t.modeLabel} · ${botsLabel(t)} · first to ${t.scoreToWin}${t.loot ? ' · loot + shields' : ''}</div>
+        <div class="tmaps">${(t.maps || [t.map]).map(D.mapTitle).join(' · ')}</div>
         <div class="tpay">Win ${U.fmt(t.base * (ranked ? D.RANKED.payMult : 1) * df.pay)} + ${U.fmt(t.kill * (ranked ? D.RANKED.payMult : 1) * df.pay)}/kill</div><div class="tprog">${prog}</div></button>`);
     }
     for (const t of D.LOCKED_TIERS) {
@@ -212,6 +213,7 @@
     return `<button class="tier tourney ${open ? 'open' : 'locked'}" data-tourney="1">
       <div class="swatch"></div><div class="tnum">TOURNAMENT · 3 rounds</div><div class="tname">FRAGLINE Open</div>
       <div class="tmeta">1v1 bracket vs seeded pros · ${T.rounds.map(r => r.label).join(' → ')}</div>
+      <div class="tmaps">${T.rounds.map(r => D.mapTitle(r.map)).join(' → ')}</div>
       <div class="tpay">Entry ${U.fmt(T.fee)} · prizes ${T.prize.slice(1).map(U.fmt).join(' / ')}</div>
       <div class="tprog">${open ? `Titles: ${s.tourney.won} · entered ${s.tourney.played}` : `Locked: reach Tier ${T.unlockTier}`}</div></button>`;
   }
@@ -219,7 +221,7 @@
   UI.showLobby = function () {
     const t = G.match.tier, p = G.player;
     $('lobby-title').textContent = t.name;
-    $('lobby-sub').textContent = `${t.modeLabel} · ${D.MAPS[t.map].name} · ${G.bots.length + 1} players · first to ${t.scoreToWin}`;
+    $('lobby-sub').textContent = `${t.modeLabel} · ${D.mapTitle(t.map)} · ${G.bots.length + 1} players · first to ${t.scoreToWin}`;
     const row = (name, team, me) => `<div class="lp ${me ? 'me' : ''} ${team === 'A' || team === 'P' ? 'A' : 'B'}"><span>${esc(name)}</span><span>${me ? 'you' : U.randInt(18, 95) + ' ms'}</span></div>`;
     let html = row(p.name, p.team, true);
     for (const b of G.bots) html += row(b.name, b.team, false);
@@ -1096,6 +1098,11 @@
     });
     // tap anywhere on the title screen
     $('scr-title').addEventListener('click', e => { if (!e.target.closest('#title-go')) $('title-go').click(); });
+    // after the loader's INJECT: straight to name entry (first time) or the lobby
+    UI.afterInject = () => {
+      if (!NA.Save.data.username) { $('name-input').value = 'newplayer_' + U.randInt(1000, 9999); UI.show('scr-name'); }
+      else UI.showMenu();
+    };
     click('m-items', () => NA.Store.open('shop'));
     click('m-locker', () => NA.Store.open('locker'));
     // the character in the lobby: drag to spin it, tap to open the Locker

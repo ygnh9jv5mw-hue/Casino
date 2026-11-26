@@ -192,6 +192,60 @@
       g.strokeStyle = 'rgba(255,255,255,0.18)'; g.lineWidth = 1;
       for (let i = 0; i < 14; i++) { const x = r() * 256, y = r() * 256; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 30, y + (r() - 0.5) * 8); g.stroke(); }
     },
+    raised(g, d, r) {
+      noiseFill(g, d.seed, d.c[0], 0.05, 3);
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+        g.fillStyle = 'rgba(255,255,255,0.05)'; g.fillRect(x * 64 + 3, y * 64 + 3, 58, 3);
+        if ((x + y * 3) % 5 === 1) { g.fillStyle = 'rgba(0,0,0,0.45)'; for (let i = 0; i < 6; i++) for (let k = 0; k < 6; k++) g.fillRect(x * 64 + 10 + i * 8, y * 64 + 10 + k * 8, 3, 3); }
+      }
+      g.strokeStyle = d.c[1]; g.lineWidth = 3;
+      for (let i = 0; i <= 256; i += 64) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.moveTo(0, i); g.lineTo(256, i); g.stroke(); }
+    },
+    rackfront(g, d, r) {
+      g.fillStyle = '#121519'; g.fillRect(0, 0, 256, 256);
+      for (let col = 0; col < 4; col++) {
+        const x0 = col * 64;
+        g.fillStyle = '#1b1f25'; g.fillRect(x0 + 3, 2, 58, 252);
+        for (let u = 0; u < 21; u++) {
+          const y = 6 + u * 12;
+          g.fillStyle = r() < 0.3 ? '#22272e' : '#191d22'; g.fillRect(x0 + 6, y, 52, 10);
+          g.fillStyle = 'rgba(0,0,0,0.6)'; for (let v = 0; v < 5; v++) g.fillRect(x0 + 24 + v * 6, y + 3, 3, 5);
+          const n = 1 + ((r() * 3) | 0);
+          for (let k = 0; k < n; k++) { const c = r(); g.fillStyle = c < 0.6 ? '#4ade80' : c < 0.85 ? '#38bdf8' : '#fbbf24'; g.globalAlpha = r() < 0.3 ? 0.25 : 1; g.fillRect(x0 + 9 + k * 5, y + 4, 3, 3); g.globalAlpha = 1; }
+        }
+        g.fillStyle = '#0a0c0f'; g.fillRect(x0, 0, 3, 256);
+      }
+    },
+    ledboard(g, d) {
+      g.fillStyle = '#05070c'; g.fillRect(0, 0, 256, 256);
+      g.fillStyle = d.c[0]; g.font = '900 italic 46px Futura, "Arial Black", sans-serif'; g.textBaseline = 'middle';
+      g.shadowColor = d.c[0]; g.shadowBlur = 10;
+      g.fillText(d.text || 'FRAGLINE', 8, 64, 240); g.fillStyle = d.c[1]; g.shadowColor = d.c[1]; g.fillText(d.text2 || 'MAJOR', 8, 192, 240);
+      g.shadowBlur = 0; g.fillStyle = 'rgba(0,0,0,0.35)'; for (let y = 0; y < 256; y += 4) g.fillRect(0, y, 256, 1);
+    },
+    grille(g, d) {
+      g.fillStyle = '#16181c'; g.fillRect(0, 0, 256, 256);
+      g.fillStyle = '#060708'; for (let y = 4; y < 256; y += 8) for (let x = (y / 8) % 2 * 4 + 4; x < 256; x += 8) { g.beginPath(); g.arc(x, y, 2.4, 0, 7); g.fill(); }
+      g.strokeStyle = '#2a2d33'; g.lineWidth = 8; g.strokeRect(4, 4, 248, 248);
+    },
+    flightcase(g, d, r) {
+      noiseFill(g, d.seed, '#1f2227', 0.06, 3);
+      g.strokeStyle = '#a7adb5'; g.lineWidth = 14; g.strokeRect(7, 7, 242, 242);
+      g.fillStyle = '#c8ccd2'; for (const [x, y] of [[0, 0], [216, 0], [0, 216], [216, 216]]) g.fillRect(x, y, 40, 40);
+      g.fillStyle = '#7d838b'; g.fillRect(108, 120, 40, 16);
+    },
+    checker(g, d) {
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.fillStyle = (x + y) % 2 ? d.c[0] : d.c[1]; g.fillRect(x * 64, y * 64, 64, 64); }
+      g.globalAlpha = 0.06; noiseFill(g, d.seed, '#ffffff', 0.5, 3); g.globalAlpha = 1;
+    },
+    panel(g, d, r) {
+      noiseFill(g, d.seed, d.c[0], 0.04, 3);
+      for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
+        g.fillStyle = 'rgba(255,255,255,0.05)'; g.fillRect(x * 128 + 6, y * 128 + 6, 116, 4);
+        g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x * 128 + 6, y * 128 + 118, 116, 4);
+      }
+      g.strokeStyle = d.c[1]; g.lineWidth = 4; for (let i = 0; i <= 256; i += 128) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.moveTo(0, i); g.lineTo(256, i); g.stroke(); }
+    },
     solid(g, d, r) {
       noiseFill(g, d.seed, d.c[0], d.k || 0.04, 4);
       if (d.c[1]) speckle(g, r, 300, [d.c[1]], 1, 2, 0.1);
@@ -245,6 +299,63 @@
       g.fillStyle = '#fff'; g.font = '900 italic 52px Futura, "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillText(a[0], 256, 140, 450);
       g.font = '600 24px sans-serif'; g.fillText(a[1], 256, 190, 450);
     },
+    screenWarden(g) {
+      g.fillStyle = '#04101f'; g.fillRect(0, 0, 512, 256);
+      g.strokeStyle = 'rgba(56,189,248,0.15)'; g.lineWidth = 1; for (let x = 0; x < 512; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 256); g.stroke(); } for (let y = 0; y < 256; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke(); }
+      g.fillStyle = '#38bdf8'; g.font = '900 italic 40px Futura, "Arial Black", sans-serif'; g.fillText('WARDEN AC', 20, 52);
+      g.font = '700 18px ui-monospace, monospace'; g.fillStyle = '#94a3b8'; g.fillText('cheat detection network · node 07', 22, 78);
+      g.fillStyle = '#e2e8f0'; g.font = '800 26px ui-monospace, monospace'; g.fillText('DETECTIONS TODAY:', 22, 130); g.fillStyle = '#f43f5e'; g.fillText('0', 330, 130);
+      g.fillStyle = '#e2e8f0'; g.fillText('STATUS:', 22, 166); g.fillStyle = '#fbbf24'; g.fillText('COMING SOON™', 150, 166);
+      g.strokeStyle = '#4ade80'; g.lineWidth = 3; g.beginPath(); g.moveTo(22, 222); for (let x = 22; x < 490; x += 6) g.lineTo(x, 222 + (Math.random() < 0.04 ? -8 : 0)); g.stroke();
+      g.fillStyle = '#4ade80'; g.font = '600 14px ui-monospace, monospace'; g.fillText('flatline is normal. probably.', 300, 246);
+    },
+    screenGame(g) {
+      const gr = g.createLinearGradient(0, 0, 0, 160); gr.addColorStop(0, '#5aa7e6'); gr.addColorStop(1, '#bfe0ff'); g.fillStyle = gr; g.fillRect(0, 0, 256, 160);
+      g.fillStyle = '#5c9a46'; g.fillRect(0, 150, 256, 106); g.fillStyle = '#8a8f96'; g.fillRect(30, 96, 60, 60); g.fillRect(170, 110, 50, 46);
+      g.fillStyle = '#ef4444'; g.fillRect(120, 118, 16, 34); g.fillStyle = '#f1c9a5'; g.fillRect(121, 104, 14, 14);
+      g.strokeStyle = '#ffffff'; g.lineWidth = 3; g.beginPath(); g.moveTo(128, 112); g.lineTo(128, 124); g.moveTo(122, 118); g.lineTo(134, 118); g.stroke();
+      g.fillStyle = '#111'; g.fillRect(150, 200, 106, 56); g.fillStyle = '#facc15'; g.font = 'bold 18px monospace'; g.fillText('30/90', 168, 236);
+      g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(6, 6, 80, 14); g.fillStyle = '#4ade80'; g.fillRect(6, 6, 60, 14);
+    },
+    arcadeFront(g) {
+      g.fillStyle = '#1e1b4b'; g.fillRect(0, 0, 256, 512);
+      const m = g.createLinearGradient(0, 0, 256, 0); m.addColorStop(0, '#f43f5e'); m.addColorStop(1, '#a855f7'); g.fillStyle = m; g.fillRect(10, 10, 236, 70);
+      g.fillStyle = '#fff'; g.font = '900 italic 34px Futura, "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillText('HEADSHOT', 128, 58);
+      g.fillStyle = '#020617'; g.fillRect(24, 100, 208, 170);
+      g.fillStyle = '#22d3ee'; for (let i = 0; i < 6; i++) g.fillRect(40 + i * 30, 130 + (i % 2) * 20, 18, 12);
+      g.fillStyle = '#facc15'; g.fillRect(118, 240, 20, 14); g.fillStyle = '#4ade80'; g.font = 'bold 14px monospace'; g.fillText('INSERT COIN', 128, 226);
+      g.fillStyle = '#312e81'; g.fillRect(10, 290, 236, 80);
+      g.fillStyle = '#111'; g.beginPath(); g.arc(70, 330, 16, 0, 7); g.fill(); g.fillStyle = '#ef4444'; g.beginPath(); g.arc(70, 318, 12, 0, 7); g.fill();
+      [['#ef4444', 140], ['#facc15', 175], ['#22c55e', 210]].forEach(([c, x]) => { g.fillStyle = c; g.beginPath(); g.arc(x, 330, 11, 0, 7); g.fill(); });
+      g.fillStyle = '#0f172a'; g.fillRect(100, 410, 56, 40); g.fillStyle = '#fbbf24'; g.fillRect(124, 420, 8, 20);
+    },
+    fridgeFront(g) {
+      g.fillStyle = '#0b1220'; g.fillRect(0, 0, 256, 512);
+      const gl = g.createLinearGradient(0, 0, 0, 512); gl.addColorStop(0, '#dbeafe'); gl.addColorStop(1, '#93c5fd'); g.fillStyle = gl; g.fillRect(14, 14, 228, 484);
+      const cols = ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#a855f7'];
+      for (let s = 0; s < 5; s++) { g.fillStyle = '#64748b'; g.fillRect(14, 100 + s * 92, 228, 4); for (let k = 0; k < 7; k++) { g.fillStyle = cols[(s + k) % 5]; g.fillRect(22 + k * 31, 52 + s * 92, 22, 46); g.fillStyle = 'rgba(255,255,255,0.4)'; g.fillRect(25 + k * 31, 56 + s * 92, 4, 38); } }
+      g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(30, 20, 18, 470);
+      g.fillStyle = '#0b1220'; g.fillRect(0, 0, 256, 40); g.fillStyle = '#4ade80'; g.font = '900 italic 24px Futura, "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillText('GAMER FUEL', 128, 30);
+    },
+    neon(g, d) {
+      g.fillStyle = '#05060a'; g.fillRect(0, 0, 512, 128);
+      g.font = '900 italic 66px Futura, "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.shadowColor = d.fg; g.shadowBlur = 24; g.fillStyle = d.fg; g.fillText(d.text, 256, 60, 480); g.shadowBlur = 8; g.fillStyle = '#ffffff'; g.globalAlpha = 0.85; g.fillText(d.text, 256, 60, 480); g.globalAlpha = 1;
+      if (d.sub) { g.shadowBlur = 10; g.shadowColor = d.fg; g.font = '700 20px sans-serif'; g.fillStyle = d.fg; g.fillText(d.sub, 256, 108); }
+    },
+    jumbo(g, d) {
+      g.fillStyle = '#060912'; g.fillRect(0, 0, 512, 256);
+      const gr = g.createLinearGradient(0, 0, 512, 0); gr.addColorStop(0, '#1d4ed8'); gr.addColorStop(0.5, '#0b1020'); gr.addColorStop(1, '#b91c1c'); g.fillStyle = gr; g.fillRect(0, 150, 512, 106);
+      g.fillStyle = '#facc15'; g.font = '900 italic 48px Futura, "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillText(d.text || 'GRAND FINAL', 256, 64);
+      g.fillStyle = '#f43f5e'; g.font = '800 20px sans-serif'; g.fillText('● LIVE', 256, 100);
+      g.fillStyle = '#fff'; g.font = '900 italic 40px Futura, "Arial Black", sans-serif'; g.fillText('TEAM A', 110, 216); g.fillText('TEAM B', 402, 216); g.fillText('vs', 256, 216);
+    },
+    poster(g, d) {
+      g.fillStyle = d.bg; g.fillRect(0, 0, 256, 384);
+      g.fillStyle = d.fg; g.font = '900 italic 40px Futura, "Arial Black", sans-serif'; g.textAlign = 'center';
+      (d.lines || []).forEach((l, i) => { g.font = i === 0 ? '900 italic 40px Futura, "Arial Black", sans-serif' : '700 20px sans-serif'; g.fillText(l, 128, 90 + i * (i === 0 ? 50 : 30), 230); });
+      g.strokeStyle = d.fg; g.lineWidth = 6; g.strokeRect(10, 10, 236, 364);
+    },
     trainWin(g) {
       g.fillStyle = '#c8ccd2'; g.fillRect(0, 0, 512, 64);
       for (let i = 0; i < 8; i++) { const gr = g.createLinearGradient(0, 8, 0, 56); gr.addColorStop(0, '#5e7f9c'); gr.addColorStop(1, '#22313f'); g.fillStyle = gr; g.fillRect(8 + i * 63, 8, 52, 48); g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(12 + i * 63, 10, 10, 44); }
@@ -254,7 +365,10 @@
     if (texCache[key]) return texCache[key];
     const pic = PICS[d.t];
     const c = document.createElement('canvas');
-    if (pic) { c.width = d.t === 'sign' || d.t === 'adPanel' || d.t === 'trainWin' ? 512 : 256; c.height = d.t === 'sign' ? 128 : d.t === 'adPanel' ? 280 : d.t === 'trainWin' ? 64 : 256; }
+    if (pic) {
+      const sz = { sign: [512, 128], adPanel: [512, 280], trainWin: [512, 64], screenWarden: [512, 256], arcadeFront: [256, 512], fridgeFront: [256, 512], neon: [512, 128], jumbo: [512, 256], poster: [256, 384] }[d.t] || [256, 256];
+      c.width = sz[0]; c.height = sz[1];
+    }
     else c.width = c.height = 256;
     const g = c.getContext('2d');
     d.seed = hashStr(key);
@@ -323,7 +437,34 @@
     platformEdge: M('solid', ['#f2c230'], 1), stripe: M('solid', ['#1f6fb2'], 1), door: M('metal', ['#9aa0a8', '#6b7179', '#c8ccd2'], 2), rail: M('metal', ['#9aa0a8', '#6b7179', '#c8ccd2'], 1),
     planksDeck: M('wood', ['#9c7a52'], 2), paintRedWall: M('plaster', ['#c0392b', '#a93226', '#d35445'], 3), paintWhiteWall: M('plaster', ['#f2f2f2', '#dadada', '#ffffff'], 3),
     palm: M('wood', ['#8a6a46'], 1), palmLeaf: M('soft', ['#3f9a3a', '#2b7229', '#6cc55e'], 1),
+    // server farm
+    raisedFloor: M('raised', ['#3a4049', '#262b32'], 2.4), serverWall: M('panel', ['#2a313b', '#1a1f26'], 3),
+    serverRack: M('metal', ['#1d2127', '#121519', '#3a4048'], 2), rackFront: M('rackfront', null, 2.2),
+    coreMetal: M('metal', ['#20314a', '#0f1a2b', '#3d5a80'], 2), console: M('metal', ['#3b4250', '#262b34', '#5a6270'], 1),
+    coolUnit: M('metal', ['#c9ced6', '#9aa1ab', '#e5e8ec'], 2), upsCabinet: M('metal', ['#2b2f36', '#1b1e23', '#4b515a'], 2),
+    cableSpool: M('wood', ['#7a5a3a'], 1), cableTray: M('solid', ['#e3b23c'], 1),
+    // lan cafe
+    cafeFloor: M('checker', ['#262033', '#1c1726'], 2), cafeWall: M('plaster', ['#2b2438', '#231d2e', '#352d44'], 3),
+    pcDesk: M('solid', ['#16141c', '#2a2633'], 1), divider: M('solid', ['#2a2338', '#3a3150'], 1), vending: M('paint', ['#b91c1c', '#7f1d1d', '#fca5a5'], 2),
+    arcade: M('solid', ['#1e1b4b', '#312e81'], 1), counter: M('wood', ['#5b3a24'], 2), fridge: M('metal', ['#d6dbe1', '#a5acb5', '#f1f3f5'], 2),
+    couch: M('soft', ['#7c2d12', '#5c210d', '#9a3a17'], 1, { k: 0.08, n: 300 }), cafeColumn: M('plaster', ['#3a3150', '#2d2640', '#463c60'], 2), beanBag: M('soft', ['#4338ca', '#3730a3', '#6366f1'], 1, { k: 0.08, n: 300 }),
+    // arena
+    arenaFloor: M('raised', ['#1e2230', '#141824'], 4), stage: M('metal', ['#14161c', '#0a0b0f', '#2a2e38'], 2), barrier: M('ledboard', ['#38bdf8', '#f472b6'], 4, { text: 'FRAGLINE', text2: 'MAJOR 2026' }),
+    ledWall: M('ledboard', ['#facc15', '#38bdf8'], 3, { text: 'GRAND', text2: 'FINAL' }), boothDesk: M('solid', ['#111827', '#1f2937'], 1), pedestal: M('metal', ['#e5e7eb', '#b0b5bc', '#ffffff'], 1),
+    speaker: M('grille', null, 1.6), sponsor: M('ledboard', ['#4ade80', '#facc15'], 3, { text: 'GAMER FUEL', text2: 'skillissue' }), flightCase: M('flightcase', null, 1.2),
+    craneBase: M('metal', ['#2b2f36', '#1b1e23', '#4b515a'], 1), truss: M('metal', ['#a7adb5', '#6b7179', '#d1d5db'], 1), standSeat: M('solid', ['#1f2937', '#374151'], 2),
     // pictures
+    screenWarden: M('screenWarden', null, 1, { pic: true, glow: 1 }), screenGame: M('screenGame', null, 1, { pic: true, glow: 1 }),
+    arcadeFront: M('arcadeFront', null, 1, { pic: true, glow: 1 }), fridgeFront: M('fridgeFront', null, 1, { pic: true, glow: 1 }),
+    neonCafe: M('neon', null, 1, { pic: true, glow: 1, text: 'NetCafe 24/7', sub: 'no refunds on lag', fg: '#f472b6' }),
+    neonShop: M('neon', null, 1, { pic: true, glow: 1, text: 'skillissue.shop', sub: 'official partner · undetected', fg: '#22d3ee' }),
+    jumbo: M('jumbo', null, 1, { pic: true, glow: 1 }),
+    posterShop: M('poster', null, 1, { pic: true, bg: '#7c3aed', fg: '#ffffff', lines: ['UNDETECTED', 'since yesterday', 'skillissue.shop'] }),
+    posterKevin: M('poster', null, 1, { pic: true, bg: '#0f172a', fg: '#facc15', lines: ['WANTED', 'BOT_Kevin', 'for: missing every shot'] }),
+    signServer: M('sign', null, 1, { pic: true, text: 'NODE 07', sub: 'cheat detection · do not unplug', bg: '#0b3d91', fg: '#ffffff' }),
+    paintBlue: M('solid', ['#1d4ed8'], 1), paintRed: M('solid', ['#b91c1c'], 1),
+    teamA: M('neon', null, 1, { pic: true, glow: 1, text: 'TEAM A', fg: '#60a5fa' }), teamB: M('neon', null, 1, { pic: true, glow: 1, text: 'TEAM B', fg: '#f87171' }),
+    neonPink: M('glow', null, 1, { glow: 0xf472b6 }), neonCyan: M('glow', null, 1, { glow: 0x22d3ee }), neonPurple: M('glow', null, 1, { glow: 0xa855f7 }), glowBlue: M('glow', null, 1, { glow: 0x38bdf8 }),
     target: M('target', null, 1, { pic: true }), clock: M('clock', null, 1, { pic: true, tr: true }),
     window: M('window', null, 1, { pic: true }), windowCity: M('windowCity', null, 1, { pic: true }),
     adPanel: M('adPanel', null, 1, { pic: true }), trainWin: M('trainWin', null, 1, { pic: true }),
@@ -336,12 +477,16 @@
     lampBig: M('glow', ['#fff2b0'], 1, { glow: 0xfff0a8 }), headlight: M('glow', ['#fff8e0'], 1, { glow: 0xfff8e0 }),
   };
   W.MAT_DEFS = MAT_DEFS;
+  // a second copy of a texture with a different random pattern (blinking server LEDs)
+  W.altTexture = (key, v) => genTexture(key + '#' + v, Object.assign({}, MAT_DEFS[key]));
+  W.material = k => material(k);
   const matCache = {};
   function material(key) {
     if (matCache[key]) return matCache[key];
     const d = MAT_DEFS[key] || MAT_DEFS.devGrey;
     let m;
-    if (d.glow) m = new THREE.MeshBasicMaterial({ color: d.glow });
+    if (d.glow && d.pic) m = new THREE.MeshBasicMaterial({ map: genTexture(key, d) });
+    else if (d.glow) m = new THREE.MeshBasicMaterial({ color: d.glow });
     else if (d.pic) m = new THREE.MeshLambertMaterial({ map: genTexture(key, d), transparent: !!d.tr, alphaTest: d.tr ? 0.5 : 0 });
     else m = new THREE.MeshLambertMaterial({ map: genTexture(key, d), vertexColors: true });
     m.userData.tile = d.tile || 2;
@@ -418,6 +563,7 @@
     // One mesh per material instead of one per box: big maps stay around 30 draw calls.
     const byMat = new Map();
     const push = b => {
+      if (b.m === 'none') return;
       const mat = material(b.m);
       if (!byMat.has(mat)) byMat.set(mat, { geos: [], cast: false });
       const e = byMat.get(mat);

@@ -205,6 +205,8 @@
   A.fumble = () => { A.noiseBurst('lowpass', 600, 0.12, 0.3); A.tone(300, 0.2, 'sine', 0.12, 0.05, 120); };
   A.win = () => [392, 523, 659, 784].forEach((f, i) => A.tone(f, 0.18, 'triangle', 0.12, i * 0.11));
   A.knife = () => { A.noiseBurst('highpass', 2600, 0.12, 0.28); A.tone(700, 0.1, 'sine', 0.06, 0, 300); };
+  // the loader's INJECT: a quick run of data chirps
+  A.inject = () => { for (let i = 0; i < 9; i++) A.tone(600 + i * 140 + Math.random() * 80, 0.045, 'square', 0.035, i * 0.07); A.noiseBurst('highpass', 3500, 0.5, 0.05, 0.1); };
   A.whoosh = (d) => A.noiseBurst('bandpass', 900 + Math.random() * 400, 0.18, 0.06, d || 0);
   A.equip = () => { A.noiseBurst('highpass', 4000, 0.03, 0.18); A.noiseBurst('highpass', 3000, 0.04, 0.16, 0.08); A.tone(520, 0.05, 'square', 0.04, 0.08); };
   // the logo sting: sub boom, a rising sweep, two glitch ticks and a bright chord

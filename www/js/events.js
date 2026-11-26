@@ -36,8 +36,11 @@
   // ---------------------------------------------------------------- tiers
   E.lootTier = function () {
     const t = topTier(), hi = t.id;
-    const map = hi >= 8 ? 'island' : hi >= 7 ? 'metro' : hi >= 5 ? 'shipyard' : 'courtyard';
-    const players = { island: 16, metro: 12, shipyard: 10, courtyard: 8 }[map];
+    const pool = hi >= 8 ? ['island'] : hi >= 7 ? ['metro', 'arena'] : hi >= 5 ? ['shipyard', 'servers'] : ['courtyard', 'servers'];
+    // the map shown on the event card is the one you get when you start
+    if (pool.indexOf(E._lootMap) < 0) E._lootMap = U.pick(pool);
+    const map = E._lootMap;
+    const players = { island: 16, metro: 12, shipyard: 10, courtyard: 8, servers: 10, arena: 12, lancafe: 6 }[map];
     return {
       id: 200, name: 'Loot Rush', rank: t.rank, map, mode: 'ffa', modeLabel: 'Loot Rush', scoreToWin: map === 'island' ? 20 : 15, timeLimit: 420,
       base: Math.round(t.base * 0.9), kill: t.kill, winsToUnlock: 99, shield: 0, loot: true, lootMode: true, lootTier: hi,
@@ -46,7 +49,7 @@
   };
   E.chaosTier = function () {
     const t = topTier(), hi = t.id;
-    const maps = ['warehouse', 'courtyard'].concat(hi >= 5 ? ['shipyard'] : [], hi >= 6 ? ['office'] : []);
+    const maps = ['warehouse', 'courtyard', 'lancafe', 'servers'].concat(hi >= 5 ? ['shipyard', 'arena'] : [], hi >= 6 ? ['office'] : []);
     return {
       id: 300, name: 'Chaos FFA', rank: t.rank, map: U.pick(maps), mode: 'ffa', modeLabel: 'Chaos FFA', scoreToWin: 20, timeLimit: 300,
       base: Math.round(t.base * 1.1), kill: t.kill, winsToUnlock: 99, shield: 0, loot: hi >= 4, chaos: true,
@@ -108,7 +111,7 @@
     const lt = E.lootTier(), lo = E.lootUnlocked();
     html.push(`<button class="tier ev-loot ${lo ? 'open' : 'locked'}" data-event="loot">
       <div class="swatch"></div><div class="tnum">EVENT · always on</div><div class="tname">Loot Rush</div>
-      <div class="tmeta">Everyone spawns with a pistol. Loot the map, kills drop guns. ${lt.enemies.length + 1}-player FFA on ${D.MAPS[lt.map].name}</div>
+      <div class="tmeta">Everyone spawns with a pistol. Loot the map, kills drop guns. ${lt.enemies.length + 1}-player FFA on ${D.mapTitle(lt.map)}</div>
       <div class="tpay">Win ${U.fmt(lt.base * NA.Game.diff().pay)} + ${U.fmt(lt.kill * NA.Game.diff().pay)}/kill</div>
       <div class="tprog">${lo ? 'Loot ESP is extra good here' : 'Locked: reach Tier 3'}</div></button>`);
     const ch = E.chaosUnlocked(), ct = E.chaosTier();
@@ -123,6 +126,7 @@
     if (kind === 'loot') {
       if (!E.lootUnlocked()) { NA.UI.toast('Loot Rush unlocks at Tier 3'); return false; }
       NA.Game.startMatch(E.lootTier());
+      E._lootMap = null;
       return true;
     }
     if (!E.chaosUnlocked()) { NA.UI.toast('Chaos FFA unlocks at Tier 3'); return false; }
