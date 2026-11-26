@@ -15,9 +15,14 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v0.6)
+## What's in this build (v0.7)
 
-**New in v0.6**
+**New in v0.7: in-match UI redesign**
+- Pre-match screen: big map name, BLUE vs RED team cards (or everyone in FFA), countdown ring and a tip, with a camera push-in over the map
+- HUD: score bar with the timer in the middle and progress to the target, rounded minimap with suspicion meter, smaller chat that stays out of the way, health and segmented shield bars that flash when you get hit, a big ammo counter by the fire button with a reload bar, glass touch buttons with icons, a ghost joystick so you know where to thumb, a CHEATS button instead of "INS", and name tags on teammates
+- Results and pause screens restyled to match
+
+**v0.6**
 - **The intro is a cheat loader**: a skillissue.shop loader window logs you in, lists its "products" (NO ANTICHEAT: UNDETECTED), prints a console log while the game really loads, then waits for you to press **INJECT**. The logo slams in with the sound and you land in the lobby
 - **Three themed maps**:
   - **Server Farm**: Warden AC's own datacenter. Rows of blinking server racks, cable trays, a glowing core in the middle, status screens saying detections today: 0

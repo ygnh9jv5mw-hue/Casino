@@ -1732,6 +1732,18 @@
   }
 
   // Slow orbit over the map behind menus.
+  // Pre-match: a slow push-in from your spawn towards the middle of the map, under any ceiling.
+  const CEIL = { office: 4, metro: 6, servers: 5, lancafe: 3.6, arena: 17 };
+  G.lobbyCamera = function (t) {
+    const p = G.player, cam = NA.R.camera;
+    if (!p || !W.current) return;
+    const k = Math.min(1, (4 - G.lobbyT) / 4), e = k * k * (3 - 2 * k);
+    const len = Math.hypot(p.pos.x, p.pos.z) || 1, dx = -p.pos.x / len, dz = -p.pos.z / len;
+    const h = Math.min(4.2, (CEIL[W.current.id] || 99) - 0.8);
+    cam.position.set(p.pos.x - dx * 1.5 + dx * e * 4, h - e * 1.2, p.pos.z - dz * 1.5 + dz * e * 4);
+    cam.rotation.order = 'YXZ';
+    cam.lookAt(dx * 4 + Math.sin(t * 0.3) * 1.5, 1.4, dz * 4);
+  };
   G.menuCamera = function (t) {
     const cam = NA.R.camera, size = W.current ? W.current.def.size : [32, 20];
     const big = Math.max(size[0], size[1]);

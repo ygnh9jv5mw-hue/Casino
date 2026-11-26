@@ -218,19 +218,52 @@
       <div class="tprog">${open ? `Titles: ${s.tourney.won} · entered ${s.tourney.played}` : `Locked: reach Tier ${T.unlockTier}`}</div></button>`;
   }
 
+  // Pre-match: map name, mode, both teams (or everyone in FFA), countdown ring and a tip.
+  const TIPS = [
+    'Open the cheat menu with the ⚡ CHEATS button.',
+    'Knife from behind for an instant kill.',
+    'Too obvious and the lobby reports you. Watch the SUS meter.',
+    'Loot glows by rarity: gold beats purple beats blue.',
+    'Headshots pay more. Aimbot knows that.',
+    'Ranked has a real anticheat. Kind of.',
+    'New skins rotate in the Item Shop every day.',
+    'Big FFA lobbies pay more per kill.',
+  ];
   UI.showLobby = function () {
-    const t = G.match.tier, p = G.player;
+    const t = G.match.tier, p = G.player, s = NA.Save.data;
+    $('pm-map').textContent = D.mapTitle(t.map);
     $('lobby-title').textContent = t.name;
-    $('lobby-sub').textContent = `${t.modeLabel} · ${D.mapTitle(t.map)} · ${G.bots.length + 1} players · first to ${t.scoreToWin}`;
-    const row = (name, team, me) => `<div class="lp ${me ? 'me' : ''} ${team === 'A' || team === 'P' ? 'A' : 'B'}"><span>${esc(name)}</span><span>${me ? 'you' : U.randInt(18, 95) + ' ms'}</span></div>`;
-    let html = row(p.name, p.team, true);
-    for (const b of G.bots) html += row(b.name, b.team, false);
-    $('lobby-players').innerHTML = html;
-    $('lobby-players').classList.toggle('many', G.bots.length > 7);
+    $('lobby-sub').textContent = `${t.modeLabel} · ${G.bots.length + 1} players · first to ${t.scoreToWin}`;
+    let i = 0;
+    const card = (name, me, side) => {
+      const ping = me ? 0 : U.randInt(14, 95);
+      const RK = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLAT', 'EMERALD', 'DIAMOND', 'MASTER', 'GM', 'LEGEND'];
+      const rk = me ? (NA.Prog.myRank().name || 'IRON').split(' ')[0].toUpperCase().slice(0, 7) : RK[Math.max(0, Math.min(9, Math.round(t.id - 2 + (Math.random() * 3 - 1))))];
+      return `<div class="pc${me ? ' me' : ''}" style="animation-delay:${(i++) * 45}ms"><span class="png${ping > 70 ? ' p2' : ''}"><u></u><u></u><u></u></span><b>${esc(name)}${me ? ' (you)' : ''}</b><span class="lv">${rk}</span></div>`;
+    };
+    const el = $('lobby-players');
+    if (t.mode === 'tdm') {
+      const A = [p].concat(G.bots.filter(b => b.team === 'A')), B = G.bots.filter(b => b.team === 'B');
+      const many = Math.max(A.length, B.length) > 8;
+      const colA = A.slice(0, many ? 8 : 99).map(e => card(e.name, e === p, 'A')).join('') + (many && A.length > 8 ? `<div class="pc"><b>+${A.length - 8} more</b></div>` : '');
+      const colB = B.slice(0, many ? 8 : 99).map(e => card(e.name, false, 'B')).join('') + (many && B.length > 8 ? `<div class="pc"><b>+${B.length - 8} more</b></div>` : '');
+      el.className = 'pm-teams';
+      el.innerHTML = `<div class="pm-col A"><h4>BLUE TEAM</h4>${colA}</div><div class="pm-vs">VS</div><div class="pm-col B"><h4>RED TEAM</h4>${colB}</div>`;
+    } else {
+      const all = [p].concat(G.bots), shown = all.slice(0, 15);
+      el.className = 'pm-teams ffa';
+      el.innerHTML = shown.map(e => card(e.name, e === p)).join('') + (all.length > 15 ? `<div class="pc"><b>+${all.length - 15} more</b></div>` : '');
+    }
+    $('pm-tip').textContent = U.pick(TIPS);
     $('lobby-count').textContent = '4';
+    const arc = $('pm-arc');
+    arc.style.transition = 'none'; arc.style.strokeDashoffset = '0'; void arc.offsetWidth; arc.style.transition = '';
     UI.show('scr-lobby');
   };
-  UI.lobbyTick = n => { const el = $('lobby-count'); if (el.textContent !== String(n)) el.textContent = n; };
+  UI.lobbyTick = n => {
+    const el = $('lobby-count');
+    if (el.textContent !== String(n)) { el.textContent = n; $('pm-arc').style.strokeDashoffset = String(163.4 * (1 - n / 4)); if (n > 0) A.click(); }
+  };
 
   UI.showHUD = function () {
     UI.show('hud');
@@ -612,16 +645,22 @@
   UI.hudTick = function () {
     if (UI.current !== 'hud' || !G.match || !G.player) return;
     const p = G.player, mt = G.match, t = mt.tier, m = G.mods;
+    // score bar: two blocks with the timer between, progress lines towards the target
+    const pr = v => `<i class="pr" style="width:${Math.min(100, v / t.scoreToWin * 100)}%"></i>`;
+    const blk = (side, val, label, me) => `<div class="sb ${side}${me ? ' me' : ''}">${side === 'a' ? `<span>${label}</span><b>${val}</b>` : `<b>${val}</b><span>${label}</span>`}${pr(val)}</div>`;
     let sl;
-    if (t.mode === 'tdm') sl = `<span class="a">BLUE ${mt.score.A}</span> — <span class="b">${mt.score.B} RED</span> <small>to ${t.scoreToWin}</small>`;
-    else if (t.mode === 'duel') { const k = G.bots[0]; sl = `<span class="a">YOU ${p.kills}</span> — <span class="b">${k.kills} ${esc(k.name)}</span> <small>to ${t.scoreToWin}</small>`; }
+    if (t.mode === 'tdm') sl = blk('a', mt.score.A, p.team === 'A' ? 'BLUE · you' : 'BLUE') + '<div class="gap"></div>' + blk('b', mt.score.B, 'RED');
+    else if (t.mode === 'duel') { const k = G.bots[0]; sl = blk('a', p.kills, 'YOU', true) + '<div class="gap"></div>' + blk('b', k.kills, esc(k.name)); }
     else if (G.bots.length) {
       const lead = G.bots.reduce((a, b) => (b.kills > a.kills ? b : a), G.bots[0]);
-      sl = `<span class="a">YOU ${p.kills}</span> · <span class="b">${esc(lead.name)} ${lead.kills}</span> <small>to ${t.scoreToWin}</small>`;
-    } else sl = `<span class="a">YOU ${p.kills}</span>`;
+      const place = 1 + G.bots.filter(b => b.kills > p.kills).length;
+      sl = blk('a', p.kills, `YOU · #${place}`, true) + '<div class="gap"></div>' + blk('b', lead.kills, esc(lead.name));
+    } else sl = blk('a', p.kills, 'YOU', true) + '<div class="gap"></div>' + blk('b', 0, '-');
+    sl += `<small class="to">FIRST TO ${t.scoreToWin}</small>`;
     if (sl !== lastScore) { $('scoreline').innerHTML = sl; lastScore = sl; }
     const tm = Math.ceil(mt.time);
     $('timer').textContent = `${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}`;
+    $('timer').classList.toggle('low', tm <= 30);
     const sus = Math.round(mt.sus);
     $('sus-fill').style.width = sus + '%';
     $('sus-val').textContent = sus;
@@ -644,14 +683,22 @@
       $('det').className = d >= 80 ? 'hot' : d >= 50 ? 'warm' : '';
     }
     $('credits-live').textContent = `+${U.fmt(mt.liveCredits * m.payoutMult)} this match`;
-    $('hp-fill').style.width = Math.max(0, p.hp) + '%';
-    $('hp-fill').style.background = p.hp > 50 ? '#4ade80' : p.hp > 25 ? '#facc15' : '#f87171';
+    const hpw = Math.max(0, p.hp) + '%';
+    $('hp-fill').style.width = hpw;
+    $('hp-ghost').style.width = hpw;
+    $('hp-fill').style.background = p.hp > 50 ? 'linear-gradient(90deg,#22c55e,#4ade80)' : p.hp > 25 ? 'linear-gradient(90deg,#eab308,#facc15)' : 'linear-gradient(90deg,#dc2626,#f87171)';
+    if (UI.lastHp !== undefined && p.hp < UI.lastHp - 0.5) { const v = $('vitals'); v.classList.remove('hurt'); void v.offsetWidth; v.classList.add('hurt'); }
+    UI.lastHp = p.hp;
     $('hp-val').textContent = Math.ceil(Math.max(0, p.hp));
     const w = G.curW(), wi = G.curInst();
     $('ammo-val').textContent = m.infAmmo ? '∞' : wi.ammo;
     $('ammo-max').textContent = m.infAmmo ? '' : '/' + w.mag;
     const wn = $('weapon-name');
     wn.textContent = p.reloadT > 0 ? 'RELOADING…' : (wi.rarity ? D.RARITY[wi.rarity].name + ' ' : '') + w.name;
+    const am = $('ammo');
+    am.classList.toggle('low', !m.infAmmo && wi.ammo <= Math.ceil(w.mag * 0.25));
+    am.classList.toggle('reloading', p.reloadT > 0);
+    if (p.reloadT > 0) $('ammo-rl').style.width = Math.round((1 - p.reloadT / (p.reloadTotal || 1)) * 100) + '%';
     wn.style.color = D.RARITY[wi.rarity].color;
     $('sh').classList.toggle('hidden', !p.maxShield);
     $('sh-fill').style.width = Math.max(0, p.shield / (p.maxShield || 100) * 100) + '%';
@@ -862,8 +909,11 @@
       if (!b.alive || !G.isAlly(b) || p.pos.distanceTo(b.pos) > 50) continue;
       const s = project(b.pos.x, b.pos.y + 2.1, b.pos.z, w, h);
       if (!s) continue;
-      g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillText(b.name, s.x + 1, s.y + 1);
-      g.fillStyle = '#93c5fd'; g.fillText(b.name, s.x, s.y);
+      const tw = g.measureText(b.name).width + 12;
+      g.fillStyle = 'rgba(8,11,19,0.6)';
+      if (g.roundRect) { g.beginPath(); g.roundRect(s.x - tw / 2, s.y - 11, tw, 15, 7); g.fill(); } else g.fillRect(s.x - tw / 2, s.y - 11, tw, 15);
+      g.fillStyle = '#60a5fa'; g.fillRect(s.x - tw / 2 + 3, s.y - 6, 4, 4);
+      g.fillStyle = '#dbeafe'; g.fillText(b.name, s.x + 3, s.y);
     }
   }
   UI.drawMinimap = function () {
@@ -917,7 +967,7 @@
   function initTouch() {
     const el = $('touch'), joy = $('joy'), knob = $('joy-knob'), T = {};
     const has = role => Object.keys(T).some(k => T[k].role === role);
-    const hideJoy = () => { joy.classList.remove('on'); knob.style.transform = ''; };
+    const hideJoy = () => { joy.classList.remove('on'); el.classList.remove('joy-on'); knob.style.transform = ''; };
     el.addEventListener('touchstart', e => {
       e.preventDefault();
       A.unlock();
@@ -933,7 +983,7 @@
         if (t.clientX < innerWidth * 0.42 && !has('joy')) {
           T[t.identifier] = { role: 'joy', ox: t.clientX, oy: t.clientY };
           joy.style.left = t.clientX + 'px'; joy.style.top = t.clientY + 'px';
-          joy.classList.add('on');
+          joy.classList.add('on'); el.classList.add('joy-on');
         } else if (!has('look')) T[t.identifier] = { role: 'look', x: t.clientX, y: t.clientY };
       }
     }, { passive: false });

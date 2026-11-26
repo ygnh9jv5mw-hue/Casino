@@ -61,42 +61,40 @@
 <!-- ======================= HUD ======================= -->
 <div id="hud" class="hidden">
   <div id="hud-tl">
-    <div id="sus" title="Suspicion">
-      <svg viewBox="0 0 24 24" class="eye"><path d="M12 5C6.5 5 2.4 9.2 1 12c1.4 2.8 5.5 7 11 7s9.6-4.2 11-7c-1.4-2.8-5.5-7-11-7zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg>
-      <div class="bar"><i id="sus-fill"></i></div><b id="sus-val">0</b>
-    </div>
-    <div id="death-actions" class="hidden"><span id="da-name"></span><button class="btn tiny" id="da-report">REPORT</button><button class="btn tiny" id="da-clip">CLIP IT</button></div>
+    <div class="mm-wrap"><canvas id="minimap" width="220" height="220"></canvas><i class="mm-n">N</i></div>
+    <div id="sus" title="Suspicion"><svg viewBox="0 0 24 24" class="eye"><path d="M12 5C6.5 5 2.4 9.2 1 12c1.4 2.8 5.5 7 11 7s9.6-4.2 11-7c-1.4-2.8-5.5-7-11-7zm0 11a4 4 0 110-8 4 4 0 010 8z" fill="currentColor"/></svg><span class="lbl">SUS</span><div class="bar"><i id="sus-fill"></i></div><b id="sus-val">0</b></div>
     <div id="det" class="hidden" title="Warden AC detection"><span>WARDEN</span><div class="bar"><i id="det-fill"></i></div><b id="det-val">0%</b></div>
     <div id="credits-live">+&#8353;0</div>
-    <canvas id="minimap" width="220" height="220"></canvas>
   </div>
   <div id="hud-top"><div id="scoreline"></div><div id="timer">4:00</div></div>
   <div id="killfeed"></div>
   <div id="hud-bottom">
     <div id="vitals">
-      <div id="sh" class="hidden"><div class="bar"><i id="sh-fill"></i></div><b id="sh-val">0</b></div>
-      <div id="hp"><div class="bar"><i id="hp-fill"></i></div><b id="hp-val">100</b></div>
+      <div id="sh" class="hidden"><i class="vi sh-i">&#9960;</i><div class="bar"><i id="sh-fill"></i></div><b id="sh-val">0</b></div>
+      <div id="hp"><i class="vi hp-i">&#10010;</i><div class="bar"><i id="hp-ghost"></i><i id="hp-fill"></i></div><b id="hp-val">100</b></div>
     </div>
-    <div id="ammo"><b id="ammo-val">12</b><span id="ammo-max">/12</span><span id="weapon-name">P9 Pistol</span></div>
   </div>
+  <div id="ammo"><div class="am-row"><b id="ammo-val">12</b><span id="ammo-max">/12</span></div><span id="weapon-name">P9 Pistol</span><div class="am-reload"><i id="ammo-rl"></i></div></div>
+  <div id="death-actions" class="hidden"><span id="da-name"></span><button class="btn tiny" id="da-report">REPORT</button><button class="btn tiny" id="da-clip">CLIP IT</button></div>
   <div id="killpop"></div>
   <div id="center-msg"></div>
-  <div id="aim-hint" class="hidden">Click to aim · WASD move · Space jump · R reload · Q swap · Right-click scope · E pick up · Insert cheats · Enter chat</div>
+  <div id="aim-hint" class="hidden">Click to aim · WASD move · Space jump · R reload · Q swap · V knife · Right-click scope · E pick up · Insert cheats · Enter chat</div>
   <div id="fps" class="hidden"></div>
   <div id="touch">
+    <div id="joy-ghost"><i></i></div>
     <div id="joy"><div id="joy-knob"></div></div>
-    <button class="tb" id="b-fire" data-btn="fire">FIRE</button>
-    <button class="tb" id="b-jump" data-btn="jump">JUMP</button>
-    <button class="tb" id="b-reload" data-btn="reload">R</button>
-    <button class="tb" id="b-swap" data-btn="swap">&#8644;</button>
-    <button class="tb" id="b-ads" data-btn="ads">ADS</button>
-    <button class="tb" id="b-knife" data-btn="knife" aria-label="Knife"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 21l7-7m0 0l2 2 9-11-11 9z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></button>
+    <button class="tb" id="b-fire" data-btn="fire" aria-label="Fire"><svg viewBox="0 0 24 24" width="34" height="34"><circle cx="12" cy="12" r="7" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.8" fill="#fff"/></svg></button>
+    <button class="tb" id="b-jump" data-btn="jump" aria-label="Jump"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 15l7-7 7 7" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 20h14" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity="0.5"/></svg><small>JUMP</small></button>
+    <button class="tb" id="b-reload" data-btn="reload" aria-label="Reload"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M20 12a8 8 0 11-2.4-5.7M20 4v5h-5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="tb" id="b-swap" data-btn="swap" aria-label="Swap weapon"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 8h14l-4-4M20 16H6l4 4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="tb" id="b-ads" data-btn="ads" aria-label="Aim down sights"><svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="8.5" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg><small>ADS</small></button>
+    <button class="tb" id="b-knife" data-btn="knife" aria-label="Knife"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 21l7-7m0 0l2 2 9-11-11 9z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></button>
     <button class="tb hidden" id="b-pick" data-btn="pick">PICK UP</button>
   </div>
   <div id="hud-tr">
-    <button class="pill" data-btn="chat" id="b-chat">CHAT</button>
-    <button class="pill ins" data-btn="ins" id="b-ins">INS</button>
-    <button class="pill" data-btn="pause" id="b-pause">II</button>
+    <button class="hbtn" data-btn="chat" id="b-chat" aria-label="Chat"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg></button>
+    <button class="hbtn ins" data-btn="ins" id="b-ins" aria-label="Cheats"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M13 2L4 14h7l-1 8 9-12h-7z" fill="currentColor"/></svg><span>CHEATS</span></button>
+    <button class="hbtn" data-btn="pause" id="b-pause" aria-label="Pause"><svg viewBox="0 0 24 24" width="16" height="16"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
   </div>
 </div>
 
@@ -125,7 +123,7 @@
     <p class="tagline">you can't aim. good thing nobody's checking.</p>
     <button class="tap-start" id="title-go"><span>TAP TO START</span></button>
   </div>
-  <div class="title-foot"><span>FRAGLINE client</span><span class="title-ver">v0.6</span></div>
+  <div class="title-foot"><span>FRAGLINE client</span><span class="title-ver">v0.7</span></div>
 </section>
 
 <section id="scr-name" class="screen hidden">
@@ -200,10 +198,16 @@
 </section>
 
 <section id="scr-lobby" class="screen hidden see-through">
-  <div class="lobby">
-    <div class="lobby-head"><b id="lobby-title"></b><span id="lobby-sub" class="muted"></span></div>
-    <div id="lobby-players"></div>
-    <div class="lobby-count"><span>Match starts in</span><b id="lobby-count">4</b></div>
+  <div class="prematch">
+    <div class="pm-head">
+      <div class="pm-map" id="pm-map"></div>
+      <div class="pm-chips"><b id="lobby-title"></b><span id="lobby-sub"></span></div>
+    </div>
+    <div class="pm-teams" id="lobby-players"></div>
+    <div class="pm-foot">
+      <div class="pm-count"><svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" class="trk"/><circle cx="30" cy="30" r="26" class="arc" id="pm-arc"/></svg><b id="lobby-count">4</b></div>
+      <div class="pm-tip"><small>MATCH STARTING</small><span id="pm-tip"></span></div>
+    </div>
   </div>
 </section>
 

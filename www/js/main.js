@@ -84,6 +84,7 @@
     if (SR.scene && SR.wants()) { SR.update(dt); SR.render(R.renderer); }
     else {
       if (G.state === 'idle') G.menuCamera(now / 1000);
+      else if (G.state === 'lobby' && G.lobbyCamera) G.lobbyCamera(now / 1000);
       R.renderer.render(R.scene, R.camera);
       if (G.state === 'playing') { R.renderer.clearDepth(); R.renderer.render(R.vmScene, R.vmCamera); }
     }
