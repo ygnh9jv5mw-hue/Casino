@@ -15,9 +15,16 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v0.7)
+## What's in this build (v0.8)
 
-**New in v0.7: in-match UI redesign**
+**New in v0.8: battle-royale style HUD**
+- Minimap top-right with timer, players and eliminations under it; round menu, chat and CHEATS buttons beside it
+- Squad list top-left (teammates' health and shields), eliminations feed under it
+- Team score (or the leader in FFA) at the top with a compass strip
+- Slanted health and segmented shield bars, a hotbar with melee + two weapon slots in rarity colours (tap to switch), ammo above it
+- Floating damage numbers (white body, yellow headshot, blue shield), an ELIMINATED pop with the victim's name, a pick-up card for loot, a second fire button on the left, and "#1 VICTORY" / "#N PLACE" results in free-for-all
+
+**v0.7: in-match UI redesign**
 - Pre-match screen: big map name, BLUE vs RED team cards (or everyone in FFA), countdown ring and a tip, with a camera push-in over the map
 - HUD: score bar with the timer in the middle and progress to the target, rounded minimap with suspicion meter, smaller chat that stays out of the way, health and segmented shield bars that flash when you get hit, a big ammo counter by the fire button with a reload bar, glass touch buttons with icons, a ghost joystick so you know where to thumb, a CHEATS button instead of "INS", and name tags on teammates
 - Results and pause screens restyled to match

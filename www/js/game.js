@@ -691,7 +691,7 @@
       if (G.usedTrigger) firstSeen('triggerbot');
       G.addSus(susGain);
       A.kill(); NA.haptic('MEDIUM');
-      NA.UI.killPop(head);
+      NA.UI.killPop(head, victim.name);
       const band = C.band(mt.sus, G.act());
       if (Math.random() < (G.bots.length > 10 ? 0.25 : 0.45)) {
         const npc = D.CHAT.npcKilled[victim.name];
@@ -723,8 +723,9 @@
   }
   function damageBot(b, dmg, attacker, head, info) {
     if (!b.alive) return;
-    const hadShield = b.shield > 0;
+    const hadShield = b.shield > 0, sh0 = b.shield || 0;
     applyDamage(b, dmg);
+    if (attacker === G.player && NA.UI.dmgNum) NA.UI.dmgNum({ x: b.pos.x, y: b.pos.y + (head ? 1.85 : 1.35), z: b.pos.z }, dmg, head ? 'head' : hadShield && (b.shield || 0) < sh0 && (b.shield || 0) > 0 ? 'shield' : 'body');
     b.mesh.userData.av.hitAt = performance.now();
     b.lastAttacker = attacker;
     b.lastAttackT = performance.now();

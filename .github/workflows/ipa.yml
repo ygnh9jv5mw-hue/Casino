@@ -45,7 +45,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/App.xcarchive \
-            MARKETING_VERSION="0.7.0" \
+            MARKETING_VERSION="0.8.0" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             > build/xcodebuild.log 2>&1 || { tail -120 build/xcodebuild.log; exit 1; }
@@ -73,8 +73,8 @@ jobs:
             for i in $(seq 1 10); do published && break; sleep 60; done
           fi
           if published; then echo "The IPA for this commit is already published."; exit 0; fi
-          cp dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.7-unsigned.ipa"
-          git add -f dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.7-unsigned.ipa"
+          cp dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.8-unsigned.ipa"
+          git add -f dist/NoAnticheat-unsigned.ipa "dist/NoAnticheat-v0.8-unsigned.ipa"
           git commit -m "Build unsigned IPA (run ${{ github.run_number }}, ${GITHUB_SHA::7}, ${{ matrix.runner }}) [skip ci]" || exit 0
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"

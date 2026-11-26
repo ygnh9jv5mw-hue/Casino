@@ -287,7 +287,10 @@
   // ---------------------------------------------------------------- results
   UI.showResults = function (r) {
     const t = G.match.tier, p = G.player;
-    $('res-title').textContent = r.kicked === 'ban' ? 'BANNED' : r.kicked ? 'KICKED' : r.tourney && r.tourney.champion ? 'CHAMPION' : r.won ? 'VICTORY' : 'DEFEAT';
+    // free-for-all shows your placement, battle-royale style
+    let place = 0;
+    if (G.match && G.match.tier.mode === 'ffa' && G.player && !r.kicked) place = 1 + G.bots.filter(b => b.kills > G.player.kills).length;
+    $('res-title').textContent = r.kicked === 'ban' ? 'BANNED' : r.kicked ? 'KICKED' : r.tourney && r.tourney.champion ? 'CHAMPION' : r.won ? (place === 1 ? '#1 VICTORY' : 'VICTORY') : place ? `#${place} PLACE` : 'DEFEAT';
     $('res-title').className = r.won ? 'win' : 'lose';
     $('res-sub').textContent = `${G.ranked ? 'RANKED · ' : ''}${t.name} · ${t.modeLabel}`;
     const order = t.mode === 'tdm' ? r.rows.filter(x => x.team === 'A').concat(r.rows.filter(x => x.team === 'B')) : r.rows;
@@ -634,33 +637,64 @@
     if (attacker && p) UI.hurtAng = U.wrap(Math.atan2(-(attacker.pos.x - p.pos.x), -(attacker.pos.z - p.pos.z)) - p.yaw);
     UI.hurtAngT = performance.now();
   };
-  UI.killPop = head => {
+  UI.killPop = (head, name) => {
     const el = $('killpop'), t = G.match.tier;
-    el.textContent = `${head ? 'HEADSHOT ' : ''}+${U.fmt(t.kill * (head ? 1.5 : 1) * G.mods.payoutMult)}`;
+    el.innerHTML = `${head ? 'HEADSHOT · ' : ''}ELIMINATED<span class="kp-n">${esc(name || '')}</span><span class="kp-c">+${U.fmt(t.kill * (head ? 1.5 : 1) * G.mods.payoutMult)}</span>`;
     el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
   };
   UI.fps = v => { const el = $('fps'); el.classList.toggle('hidden', !NA.Save.data.settings.showFps); el.textContent = Math.round(v) + ' fps'; };
   const tc = team => (team === 'A' ? 'tA' : team === 'B' ? 'tB' : team === 'P' ? 'tP' : 'tF');
-  let lastScore = '', lastFeed = '';
+  let lastScore = '', lastFeed = '', lastSquad = null, lastHot = '';
+  // blocky side-on gun silhouettes for the hotbar
+  const GUN_RECTS = {
+    pistol: [[16, 8, 26, 7], [18, 15, 7, 11], [40, 9, 6, 4]],
+    smg: [[2, 9, 9, 5], [11, 8, 32, 8], [43, 10, 9, 4], [27, 16, 6, 10], [16, 16, 6, 8]],
+    rifle: [[2, 9, 12, 7], [14, 8, 30, 8], [44, 10, 17, 3], [31, 16, 7, 10], [20, 16, 5, 8], [28, 5, 9, 3]],
+    dmr: [[2, 9, 12, 7], [14, 8, 30, 8], [44, 10, 18, 3], [31, 16, 6, 8], [20, 16, 5, 8], [20, 3, 18, 5]],
+    sniper: [[2, 10, 14, 7], [16, 10, 24, 6], [40, 11, 23, 3], [19, 3, 19, 5], [22, 16, 5, 8], [36, 7, 3, 3]],
+    shotgun: [[2, 10, 14, 7], [16, 9, 26, 7], [42, 9, 20, 4], [40, 13, 13, 4], [20, 16, 5, 7]],
+    lmg: [[2, 9, 10, 8], [12, 8, 32, 9], [44, 10, 17, 4], [24, 17, 11, 8], [47, 14, 2, 10], [53, 14, 2, 10]],
+  };
+  const gunIcon = cls => `<svg viewBox="0 0 64 28">${(GUN_RECTS[cls] || GUN_RECTS.rifle).map(r => `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="1" fill="#fff"/>`).join('')}</svg>`;
+  const KNIFE_ICON = '<svg viewBox="0 0 24 24"><path d="M3 21l7-7m0 0l2 2 9-11-11 9z" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/></svg>';
   UI.hudTick = function () {
     if (UI.current !== 'hud' || !G.match || !G.player) return;
     const p = G.player, mt = G.match, t = mt.tier, m = G.mods;
-    // score bar: two blocks with the timer between, progress lines towards the target
-    const pr = v => `<i class="pr" style="width:${Math.min(100, v / t.scoreToWin * 100)}%"></i>`;
-    const blk = (side, val, label, me) => `<div class="sb ${side}${me ? ' me' : ''}">${side === 'a' ? `<span>${label}</span><b>${val}</b>` : `<b>${val}</b><span>${label}</span>`}${pr(val)}</div>`;
+    // top-centre: team scores (or the leader in free-for-all)
     let sl;
-    if (t.mode === 'tdm') sl = blk('a', mt.score.A, p.team === 'A' ? 'BLUE · you' : 'BLUE') + '<div class="gap"></div>' + blk('b', mt.score.B, 'RED');
-    else if (t.mode === 'duel') { const k = G.bots[0]; sl = blk('a', p.kills, 'YOU', true) + '<div class="gap"></div>' + blk('b', k.kills, esc(k.name)); }
+    if (t.mode === 'tdm') sl = `<div class="tm a"><span>BLUE</span><b>${mt.score.A}</b></div><div class="to">TO ${t.scoreToWin}</div><div class="tm b"><b>${mt.score.B}</b><span>RED</span></div>`;
+    else if (t.mode === 'duel') { const k = G.bots[0]; sl = `<div class="tm me"><span>YOU</span><b>${p.kills}</b></div><div class="to">TO ${t.scoreToWin}</div><div class="tm b"><b>${k.kills}</b><span>${esc(k.name)}</span></div>`; }
     else if (G.bots.length) {
       const lead = G.bots.reduce((a, b) => (b.kills > a.kills ? b : a), G.bots[0]);
       const place = 1 + G.bots.filter(b => b.kills > p.kills).length;
-      sl = blk('a', p.kills, `YOU · #${place}`, true) + '<div class="gap"></div>' + blk('b', lead.kills, esc(lead.name));
-    } else sl = blk('a', p.kills, 'YOU', true) + '<div class="gap"></div>' + blk('b', 0, '-');
-    sl += `<small class="to">FIRST TO ${t.scoreToWin}</small>`;
+      sl = p.kills >= lead.kills ? `<div class="lead">YOU LEAD <b>${p.kills}</b> / ${t.scoreToWin}</div>` : `<div class="lead">#${place} · LEADER ${esc(lead.name)} <b>${lead.kills}</b> / ${t.scoreToWin}</div>`;
+    } else sl = `<div class="lead">FIRST TO <b>${t.scoreToWin}</b></div>`;
     if (sl !== lastScore) { $('scoreline').innerHTML = sl; lastScore = sl; }
     const tm = Math.ceil(mt.time);
     $('timer').textContent = `${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}`;
     $('timer').classList.toggle('low', tm <= 30);
+    $('st-players').textContent = G.bots.length + 1;
+    $('st-kills').textContent = p.kills;
+    // squad list (team modes): name + health/shield of each teammate
+    let sq = '';
+    if (t.mode === 'tdm') {
+      const allies = G.bots.filter(b => b.team === p.team);
+      sq = allies.slice(0, 4).map(b => `<div class="sq${b.alive ? '' : ' dead'}"><i class="sq-c" style="background:#4aa3ff"></i><span>${esc(b.name)}</span><div class="sq-b"><i style="width:${b.alive ? Math.max(0, b.hp / (b.maxHp || 100) * 100) : 0}%"></i><u style="width:${b.alive ? Math.min(100, (b.shield || 0)) : 0}%"></u></div></div>`).join('')
+        + (allies.length > 4 ? `<div class="sq more">+${allies.length - 4} teammates</div>` : '');
+    }
+    if (sq !== lastSquad) { $('squad').innerHTML = sq; lastSquad = sq; }
+    // hotbar: melee + the two weapon slots, rarity coloured
+    const hsig = p.slots.map(s => (s ? s.id + ':' + (s.rarity || 0) + ':' + s.ammo : '-')).join('|') + '|' + p.slot + '|' + (m.infAmmo ? 1 : 0);
+    if (hsig !== lastHot) {
+      lastHot = hsig;
+      const cells = [0, 1].map(i => {
+        const s = p.slots[i];
+        if (!s) return `<button class="slot empty" data-slot="${i}"><span class="sk">${i + 1}</span></button>`;
+        const wd = D.WEAPONS[s.id];
+        return `<button class="slot${p.slot === i ? ' on' : ''}" data-slot="${i}" style="--rc:${D.RARITY[s.rarity || 0].color}"><span class="sk">${i + 1}</span>${gunIcon(wd.cls)}<span class="sa">${m.infAmmo ? '∞' : s.ammo}</span></button>`;
+      });
+      $('hotbar').innerHTML = `<button class="slot melee" data-slot="k"><span class="sk">V</span>${KNIFE_ICON}</button>` + cells.join('');
+    }
     const sus = Math.round(mt.sus);
     $('sus-fill').style.width = sus + '%';
     $('sus-val').textContent = sus;
@@ -707,11 +741,14 @@
     $('b-ads').classList.toggle('on', G.ads);
     const nl = G.nearLoot;
     $('b-pick').classList.toggle('hidden', !nl);
-    if (nl) $('b-pick').innerHTML = `PICK UP<small style="color:${D.RARITY[nl.rarity].color}">${esc(D.RARITY[nl.rarity].name + ' ' + G.lootLabel(nl))}</small>`;
-    $('b-swap').classList.toggle('dim', !p.slots[p.slot === 0 ? 1 : 0]);
+    if (nl) {
+      const col = D.RARITY[nl.rarity].color, bp = $('b-pick');
+      bp.style.setProperty('--rc', col);
+      bp.innerHTML = `<span style="color:${col}">${esc(G.lootLabel(nl))}</span><small style="color:${col}">${D.RARITY[nl.rarity].name} · tap to pick up</small><i class="pk">${U.isTouch ? '+' : 'E'}</i>`;
+    }
     const now = performance.now();
     const feed = mt.killfeed.filter(k => now - k.t < 6000).slice(-4)
-      .map(k => `<div class="kf ${k.mine ? 'mine' : ''}"><span class="${tc(k.kt)}">${esc(k.k)}</span> ${k.wb ? '<span class="hs">▦</span>' : ''}${k.knife ? '<span class="kn">🔪</span>' : k.head ? '<span class="hs">◎</span>' : '›'} <span class="${tc(k.vt)}">${esc(k.v)}</span></div>`).join('');
+      .map(k => `<div class="kf ${k.mine ? 'mine' : ''}"><span class="${tc(k.kt)}">${esc(k.k)}</span><em>${k.knife ? 'knifed' : k.wb ? 'wallbanged' : k.head ? 'headshot' : 'eliminated'}</em><span class="${tc(k.vt)}">${esc(k.v)}</span></div>`).join('');
     if (feed !== lastFeed) { $('killfeed').innerHTML = feed; lastFeed = feed; }
   };
 
@@ -742,6 +779,9 @@
     if (m.lootEsp) drawLootESP(g, w, h);
     if (m.esp) drawESP(g, w, h);
     drawAllyTags(g, w, h);
+    const odt = Math.min(0.1, (now - (UI.lastOv || now)) / 1000); UI.lastOv = now;
+    drawDmg(g, w, h, odt);
+    drawCompass(g, w, (G.match.tier.mode === 'ffa' ? 38 : 42) + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--st')) || 0));
     if (p.alive) {
       if (m.aimbot && m.aimbot.fovCircle && m.aimbot.fov < 180) {
         const r = Math.tan(m.aimbot.fov / 2 * U.DEG) / Math.tan(NA.R.camera.fov * U.DEG / 2) * h / 2;
@@ -900,6 +940,52 @@
         g.moveTo(w / 2, h); g.lineTo(cx, maxY); g.stroke();
       }
     });
+  }
+  // floating damage numbers: white body, yellow headshot, blue shield
+  const DMG = [];
+  UI.dmgNum = function (pos, val, kind) {
+    DMG.push({ x: pos.x + U.rand(-0.35, 0.35), y: pos.y, z: pos.z + U.rand(-0.35, 0.35), v: Math.max(1, Math.round(val)), k: kind, t: 0 });
+    if (DMG.length > 24) DMG.shift();
+  };
+  const HF = '"Futura-CondensedExtraBold", "AvenirNextCondensed-Heavy", Impact, "Arial Narrow", sans-serif';
+  function drawDmg(g, w, h, dt) {
+    g.textAlign = 'center'; g.lineJoin = 'round';
+    for (let i = DMG.length - 1; i >= 0; i--) {
+      const d = DMG[i];
+      d.t += dt;
+      if (d.t > 0.95) { DMG.splice(i, 1); continue; }
+      const s = project(d.x, d.y + 0.25 + d.t * 0.9, d.z, w, h);
+      if (!s) continue;
+      const pop = d.t < 0.12 ? 1.45 - d.t * 3.75 : 1, size = (d.k === 'head' ? 25 : 21) * pop;
+      g.globalAlpha = d.t > 0.65 ? 1 - (d.t - 0.65) / 0.3 : 1;
+      g.font = `900 ${size.toFixed(1)}px ${HF}`;
+      g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.strokeText(d.v, s.x, s.y);
+      g.fillStyle = d.k === 'head' ? '#ffd84a' : d.k === 'shield' ? '#5fd0ff' : '#ffffff'; g.fillText(d.v, s.x, s.y);
+    }
+    g.globalAlpha = 1;
+  }
+  // compass strip under the score bar
+  const CARD = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+  function drawCompass(g, w, y) {
+    const p = G.player;
+    if (!p) return;
+    const head = ((-p.yaw * 180 / Math.PI) % 360 + 360) % 360, half = 118, ppd = 2.3, cx = w / 2;
+    const gr = g.createLinearGradient(cx - half, 0, cx + half, 0);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.2, 'rgba(0,0,0,0.32)'); gr.addColorStop(0.8, 'rgba(0,0,0,0.32)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(cx - half, y, half * 2, 18);
+    g.textAlign = 'center';
+    for (let a = 0; a < 360; a += 15) {
+      const d = ((a - head + 540) % 360) - 180, x = cx + d * ppd;
+      if (Math.abs(d * ppd) > half - 4) continue;
+      g.globalAlpha = 1 - Math.pow(Math.abs(d * ppd) / half, 2);
+      const lbl = CARD[a];
+      if (lbl) { g.font = `900 12px ${HF}`; g.fillStyle = lbl === 'N' ? '#ffe066' : '#ffffff'; g.fillText(lbl, x, y + 13); }
+      else { g.fillStyle = 'rgba(255,255,255,0.85)'; g.fillRect(x - 0.75, y + 5, 1.5, 8); }
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = '#ffffff';
+    g.beginPath(); g.moveTo(cx - 5, y + 24); g.lineTo(cx + 5, y + 24); g.lineTo(cx, y + 19); g.fill();
+    g.font = `900 10px ${HF}`; g.fillText(String(Math.round(head) % 360), cx, y + 35);
   }
   function drawAllyTags(g, w, h) {
     const p = G.player;
@@ -1153,6 +1239,16 @@
       if (!NA.Save.data.username) { $('name-input').value = 'newplayer_' + U.randInt(1000, 9999); UI.show('scr-name'); }
       else UI.showMenu();
     };
+    // hotbar: tap a slot to switch weapons, the melee slot swings the knife
+    $('hotbar').addEventListener('pointerdown', e => {
+      const b = e.target.closest('.slot');
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      A.unlock();
+      if (b.dataset.slot === 'k') G.knife();
+      else if (!b.classList.contains('empty')) { G.selectSlot(+b.dataset.slot); NA.UI.hudTick(); }
+      else G.swapWeapon();
+    });
     click('m-items', () => NA.Store.open('shop'));
     click('m-locker', () => NA.Store.open('locker'));
     // the character in the lobby: drag to spin it, tap to open the Locker
