@@ -61,6 +61,7 @@
 <!-- ======================= HUD ======================= -->
 <div id="hud" class="hidden">
   <div id="targethud" class="hidden"></div>
+  <div id="ban-banner"></div>
   <div id="code-crash" class="hidden"><div class="cc-t">cheat.lua <i>crashed</i></div><pre id="cc-trace"></pre><div class="cc-b"><span id="cc-msg">restarting…</span><div class="cc-bar"><i id="cc-fill"></i></div></div></div>
   <div id="fh-crash" class="hidden"><div class="fh-t">FREEHAX.EXE<i>×</i></div><div class="fh-b"><b>FREEHAX.EXE has stopped working</b><span>Windows is checking for a solution to the problem…</span><div class="fh-bar"><i></i></div></div></div>
   <div id="hud-tl">
@@ -426,6 +427,17 @@
 <div id="toast"></div>
 <div id="rotate" class="hidden"><div>&#8635;</div><p>Turn your phone sideways to play</p></div>
 
+<section id="ban-screen" class="hidden">
+  <div class="ban-scan"></div>
+  <div class="ban-in">
+    <div class="ban-ac"><i></i>WARDEN AC &middot; ENFORCEMENT</div>
+    <h1 class="ban-h">BANNED</h1>
+    <p class="ban-sub" id="ban-sub">This account has been permanently banned for cheating.</p>
+    <div class="ban-card" id="ban-card"></div>
+    <button class="ban-go" id="ban-go">START A NEW ACCOUNT</button>
+  </div>
+</section>
+<div id="ban-flash"><b>BANNED</b><span>WARDEN AC</span></div>
 <script src="js/vendor/three.min.js"></script>
 <script src="js/data.js"></script>
 <script src="js/maps.js"></script>
@@ -444,6 +456,8 @@
 <script src="js/configs.js"></script>
 <script src="js/sellers.js"></script>
 <script src="js/code.js"></script>
+<script src="js/forums.js"></script>
+<script src="js/ban.js"></script>
 <script src="js/loop.js"></script>
 <script src="js/comms.js"></script>
 <script src="js/game.js"></script>

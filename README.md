@@ -15,7 +15,16 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v1.2)
+## What's in this build (v1.2.1)
+
+**New in v1.2.1: cheat forums and permanent bans**
+- **Cheat forums**: three made-up coder forums are new tabs next to the seller sites: **h4xboard** (the big market), **pastebucket** (cheap, no refunds) and **ring0** (invite only, Tier 4). Hire a coder to write the next version of a cheat.lua file for you. It's usually cheaper than writing it yourself, and a coder can skip the files that version normally needs first. Offers rotate every 3 minutes
+- **Not every coder is honest.** Some deliver clean code. Some are **scammers** who take the credits and block you. Some ship **buggy** code: each forum bug adds 8% to the crash chance until you fix it in main.lua. Some sell code Warden already knows (**DETECTED**): it works, but Ranked flags it right away (detection ×3 for that cheat, +12% at match start) and casual lobbies get suspicious faster. Rewrite detected code for half the price of the version
+- **Do your homework**: every listing shows the coder's rating, account age, posts and sales, reviews (some are fake: short, all caps, from brand-new accounts posting on the same day) and a proof clip. The obvious scammers are easy to spot. The good ones on ring0 aren't
+- **Bans are permanent now.** A Warden ban in Ranked closes your account. A red ban screen shows your ticket and your stats, then you start over on a fresh account: Tier 1, 0 credits and the buggy starter script. You keep your cosmetics, achievements and settings, and 25% of everything you spent on cheat.lua comes back as **legacy credits** that can only be spent on writing code. No more temporary bans, fines or RP penalties
+- When a cheater in your lobby gets banned, the whole lobby sees it in a ban banner
+
+**v1.2**
 
 **New in v1.2: cheat.lua, the code skill tree**
 - **The cheat shop is gone. You write your cheat now.** CHEATS opens **cheat.lua** in a code editor. The skill tree is the code: folders are branches (core, aim, visuals, weapon, movement, server, exploits, bypass, misc), files are features, and every version of a file is one level. Writing a version types its code into the file, and **main.lua** shows your whole script growing (from 16 lines to over 200)
@@ -130,8 +139,7 @@ Casual is the original game: there is no anticheat. **Ranked** (unlocks at Tier 
 - **Bypass gear** in the shop: HWID Spoofer, Kernel Driver, Signature Mask, Trace Cleaner.
 - A **loader minigame** before every ranked match: inject cleanly for less detection, botch it and you start the match already flagged. Or play legit with no cheats loaded.
 - **Anticheat updates** every few matches can detect your bypass (detection ×2.5) until the seller patches it, or you pay for a priority patch.
-- **Bans scale like a real game**: 5 minutes, then 30 minutes + fine, then 2 hours + fine + rank reset, then permanent. Matches you finish with high detection can still get you caught in a **ban wave** afterwards.
-- **Appeals**: pick an excuse or write your own (don't mention the cheat). Review takes about a minute. Permanent bans can also be dodged with an **alt account** (needs an HWID Spoofer).
+- **Every ban is permanent**: the account is closed and you restart on a fresh one (see v1.2.1 above). Matches you finish with high detection can still get you caught in a **ban wave** afterwards, and a ban wave closes the account too. There are no appeals.
 
 ## Hidden admin panel
 

@@ -61,7 +61,7 @@
     $('m-locker-sub').textContent = `${owned + 4} items`;
     renderGoals();
     const AS = NA.Sellers.active(), ast = NA.Sellers.status(AS.id);
-    { const nb = NA.Code.bugs().length; $('m-shop').querySelector('.t-sub').innerHTML = `cheat.lua · ${NA.Code.lines()} lines${nb ? ` · <b class="sst detected">${nb} BUG${nb > 1 ? 'S' : ''}</b>` : ast !== 'ok' ? ` · <b class="sst ${ast}">${esc(AS.short)} ${NA.Sellers.STATUS_LABEL[ast]}</b>` : ''}`; }
+    { const nb = NA.Code.bugCount(); $('m-shop').querySelector('.t-sub').innerHTML = `cheat.lua · ${NA.Code.lines()} lines${nb ? ` · <b class="sst detected">${nb} BUG${nb > 1 ? 'S' : ''}</b>` : ast !== 'ok' ? ` · <b class="sst ${ast}">${esc(AS.short)} ${NA.Sellers.STATUS_LABEL[ast]}</b>` : ''}`; }
     const fromElsewhere = UI.current !== 'scr-menu';
     UI.show('scr-menu');
     UI.fillMenuArt();
@@ -372,7 +372,7 @@
     const rk = r.ranked, RS = NA.Save.data.ranked;
     if (rk && (rk.ban || rk.wave)) {
       const b = rk.ban || rk.wave;
-      un.innerHTML = `<b class="ban">${rk.wave ? 'BAN WAVE · ' : ''}${esc(b.label)}</b><br>${esc(b.reason)}${b.fine ? ` · fined ${U.fmt(b.fine)}` : ''}${b.rrLost ? ` · rank reset (−${b.rrLost} RR)` : ''}${rk.confiscated ? ` · winnings confiscated (${U.fmt(rk.confiscated)})` : ''}<br><span class="muted">Ticket #${b.ticket}. You can appeal from the Ranked lobby list.</span>`;
+      un.innerHTML = `<b class="ban">${rk.wave ? 'BAN WAVE · ' : ''}${esc(b.label)}</b><br>${esc(b.reason)}${b.fine ? ` · fined ${U.fmt(b.fine)}` : ''}${b.rrLost ? ` · rank reset (−${b.rrLost} RR)` : ''}${rk.confiscated ? ` · winnings confiscated (${U.fmt(rk.confiscated)})` : ''}<br><span class="muted">Ticket #${b.ticket}. No appeals: the account is gone.</span>`;
       un.classList.add('soon'); un.classList.remove('hidden');
     } else if (rk) {
       const k = rk.rank || {};
@@ -404,6 +404,7 @@
     }
     UI.refreshDMBadge();
     UI.show('scr-results');
+    if (NA.Ban.pending()) setTimeout(() => NA.Ban.show(), r.kicked === 'ban' ? 1500 : 900);
     const s = NA.Save.data;
     if (NA.Save.level('autoqueue') && s.settings.autoQueue && !r.unlocked && t.tourney === undefined && !G.ranked && t.id <= D.MAX_PLAYABLE_TIER) UI.startAuto(t.id);
   };
@@ -500,7 +501,11 @@
   }
   function renderShopChrome(site) {
     const SLR = NA.Sellers, X = SLR.BY[site];
-    $('shop-tabs').innerHTML = SLR.LIST.map(x => `<button data-site="${x.id}" class="${x.id === site ? 'on' : ''}" style="--sa:${x.acc}"><i class="fav"></i><span>${esc(x.site)}</span>${SLR.activeId() === x.id ? '<em>LOADED</em>' : ''}<b class="dot ${SLR.status(x.id)}"></b></button>`).join('');
+    $('shop-tabs').innerHTML = SLR.LIST.map(x => `<button data-site="${x.id}" class="${x.id === site ? 'on' : ''}" style="--sa:${x.acc}"><i class="fav"></i><span>${esc(x.site)}</span>${SLR.activeId() === x.id ? '<em>LOADED</em>' : ''}<b class="dot ${SLR.status(x.id)}"></b></button>`).join('')
+      + NA.Forums.LIST.map(x => `<button data-site="${x.id}" class="forum ${x.id === site ? 'on' : ''}" style="--sa:${x.acc}"><i class="fav"></i><span>${esc(x.site.split('/')[0])}</span>${NA.Forums.unlocked(x.id) ? '' : '<em>🔒</em>'}</button>`).join('');
+    const FX = NA.Forums.BY[site];
+    $('scr-shop').dataset.forum = FX ? '1' : '';
+    if (FX) { $('shop-addr').innerHTML = '<span class="sec">&#128274;</span> https://' + FX.site; $('shop-hero').innerHTML = `<b>${esc(FX.name)}</b><span>${esc(FX.tag)}</span>`; $('scr-shop').dataset.site = site; return; }
     $('shop-addr').innerHTML = (X.secure ? '<span class="sec">&#128274;</span> ' : '<span class="nsec">&#9888; Not secure</span> ') + (X.id === 'freehax' ? 'http://' : 'https://') + X.site;
     $('shop-hero').innerHTML = HEROES[site];
     $('scr-shop').dataset.site = site;
@@ -508,8 +513,9 @@
   UI.renderShop = function () {
     const s = NA.Save.data, html = [];
     $('shop-credits').textContent = U.fmt(s.credits);
-    const site = NA.Sellers.BY[UI.shopSite] ? UI.shopSite : 'skillissue';
+    const site = NA.Sellers.BY[UI.shopSite] || NA.Forums.BY[UI.shopSite] ? UI.shopSite : 'skillissue';
     renderShopChrome(site);
+    if (NA.Forums.BY[site]) { $('shop-list').innerHTML = NA.Forums.page(site); renderDMs(); return; }
     html.push(loaderBar());
     if (site !== 'skillissue') {
       html.push(sellerPage(NA.Sellers.BY[site]));
@@ -1577,7 +1583,9 @@
     UI.afterInject = () => {
       if (!NA.Save.data.username) { UI.showName(); }
       else UI.showMenu();
+      NA.Ban.check();
     };
+    NA.Ban.bind();
     // hotbar: tap a slot to switch weapons, the melee slot swings the knife
     $('hotbar').addEventListener('pointerdown', e => {
       const b = e.target.closest('.slot');
@@ -1721,6 +1729,7 @@
         return;
       }
       if (sl) { const X = NA.Sellers.BY[sl.dataset.sload]; if (NA.Sellers.load(X.id)) { A.equip ? A.equip() : A.click(); UI.toast(`${X.name} loaded for your next match`); UI.renderShop(); } return; }
+      if (NA.Forums.click(e)) return;
       if (e.target.closest('[data-open-code]')) { A.click(); NA.Code.open(UI.shopFrom === 'scr-code' ? NA.Code.from : 'scr-menu'); return; }
       const b = e.target.closest('[data-buy]');
       if (!b) return;

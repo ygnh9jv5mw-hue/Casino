@@ -10,7 +10,7 @@
   R.unlocked = () => NA.Save.data.highestTier >= RK().unlockTier;
   R.version = () => S().acVersion.join('.');
   R.rankName = rr => NA.Prog.rankOf(rr).name;
-  R.banned = () => S().perma || Date.now() < S().banUntil;
+  R.banned = () => false;   // v1.2: no timed bans any more. A ban ends the account (see ban.js)
   R.banLeft = () => Math.max(0, S().banUntil - Date.now());
   R.fmtLeft = ms => { const s = Math.ceil(ms / 1000), m = Math.floor(s / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}:${String(s % 60).padStart(2, '0')}`; };
 
@@ -34,6 +34,7 @@
       if (!c || !c.level || c.enabled === false) continue;
       const use = Math.max(1, Math.min(c.level, c.use || c.level));
       let x = RK().heat[id] * Math.pow(use, 0.85);
+      if (NA.Code && NA.Code.isDetected(id)) x *= 3;   // forum code Warden already has a signature for
       if (id === 'aimbot') {
         // smoothing looks human, silent aim does not
         const o = NA.Game.opt('aimbot');
@@ -56,22 +57,11 @@
     return m;
   };
 
-  // Apply the next step of the ban ladder. Returns the ban record.
+  // v1.2: a Warden ban closes the account for good (ban.js shows the ban screen and starts you over).
+  // Returns a record shaped like the old ban ladder's, for the results screen.
   R.ban = function (reason, peak, wave) {
-    const s = S(), save = NA.Save.data;
-    const step = RK().ladder[Math.min(s.offenses, RK().ladder.length - 1)];
-    s.offenses++;
-    s.bans++;
-    const fine = Math.min(Math.round(save.credits * step.fine), 250000);
-    save.credits -= fine;
-    const rrLost = step.rrReset ? s.rr : 0;
-    if (step.rrReset) s.rr = 0;
-    if (step.mins) s.banUntil = Date.now() + step.mins * 60000;
-    else s.perma = true;
-    s.ban = { reason, peak: Math.round(peak), wave: !!wave, label: step.label, fine, rrLost, perma: !step.mins, at: Date.now(), ticket: U.randInt(10000, 99999), appealed: false };
-    s.appeal = null;
-    NA.Save.save();
-    return s.ban;
+    const rec = NA.Ban.trigger(reason, { peak, wave });
+    return Object.assign({ label: 'Permanent: account closed', perma: true, fine: 0, rrLost: 0, peak: Math.round(peak || 0) }, rec, { wave: !!wave });
   };
 
   R.appeal = function (excuseIdx, custom) {

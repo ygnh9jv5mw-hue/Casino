@@ -199,10 +199,26 @@
       NA.Save.save();
     }
     if (!s.code.has) s.code.has = {};
+    if (!s.code.by) s.code.by = {};          // 'file:version' -> { seller, forum, det } for code a forum seller wrote
+    if (!s.code.fbugs) s.code.fbugs = [];    // bugs that came with forum code
   };
   Code.level = id => { const f = BY[id]; if (!f) return 0; if (f.kind === 'cheat') return NA.Save.level(id); if (f.kind === 'main') return 1; return st().has[id] ? 1 : 0; };
   Code.cost = id => { const f = BY[id]; if (f.kind === 'cheat') return NA.Game.cost(id); const s = S(); return !s.flags.firstBuy ? Math.ceil(f.cost / 2) : f.cost; };
   Code.bugOn = b => !st().has[BUGS[b].file];
+  // code credits: 25% of your old script, carried over to a new account after a ban (spent first)
+  Code.legacy = () => Math.max(0, Math.floor(st().legacy || 0));
+  Code.avail = () => S().credits + Code.legacy();
+  function tidy(n) { if (n < 1000) return Math.round(n); const mag = Math.pow(10, Math.floor(Math.log10(n)) - 1); return Math.round(n / mag) * mag; }
+  // what everything in cheat.lua cost at full price
+  Code.spent = function () {
+    let t = 0;
+    for (const f of F) {
+      const lv = Code.level(f.id);
+      if (f.kind === 'cheat') { const c = f.cheat; for (let v = 1; v <= lv; v++) t += tidy(c.base * Math.pow(c.growth, v - 1)); }
+      else if ((f.kind === 'fix' || f.kind === 'stab') && lv) t += f.cost;
+    }
+    return t;
+  };
   Code.bugs = () => Object.keys(BUGS).filter(Code.bugOn);
   // why the next version can't be written yet ('' = it can)
   Code.why = function (id) {
@@ -218,17 +234,21 @@
     const w = Code.why(id);
     if (w === 'max') return 'max';
     if (w) return Code.level(id) ? 'part' : 'locked';
-    return S().credits >= Code.cost(id) ? 'ready' : 'cant';
+    return Code.avail() >= Code.cost(id) ? 'ready' : 'cant';
   };
   Code.write = function (id) {
     const f = BY[id], s = S();
     if (!f || Code.why(id)) return false;
     const cost = Code.cost(id);
-    if (s.credits < cost) return false;
+    if (Code.avail() < cost) return false;
     const before = Code.lines();
-    if (f.kind === 'cheat') { if (!NA.Game.buy(id)) return false; }
-    else {
-      s.credits -= cost;
+    const useL = Math.min(Code.legacy(), cost);
+    if (f.kind === 'cheat') {
+      s.credits += useL; st().legacy = Code.legacy() - useL;
+      if (!NA.Game.buy(id)) { s.credits -= useL; st().legacy += useL; return false; }
+    } else {
+      st().legacy = Code.legacy() - useL;
+      s.credits -= cost - useL;
       st().has[id] = true;
       if (!s.flags.firstBuy) { s.flags.firstBuy = true; s.flags.improvedPending = true; NA.Game.achieve('first_buy', "First One's Half Off"); }
       NA.Save.save(); NA.Game.computeMods(); NA.Audio.buy();
@@ -238,6 +258,52 @@
     NA.Save.save();
     return { added: Code.lines() - before };
   };
+  // ---------------------------------------------------------------- code from the forums
+  Code.FB_PCT = 8;
+  Code.forumWrite = function (id, info) {
+    const s = S(), f = BY[id], c = s.cheats[id] || { level: 0, enabled: true };
+    if (!f || f.kind !== 'cheat' || c.level >= f.max) return false;
+    c.level++; c.enabled = true; c.use = c.level;
+    s.cheats[id] = c;
+    st().by[id + ':' + c.level] = { seller: info.seller, forum: info.forum, det: info.q === 'detected' };
+    if (info.q === 'buggy') st().fbugs.push({ id: 'fb' + Date.now().toString(36), file: id, v: c.level, pct: Code.FB_PCT, cost: Math.max(20, Math.round(info.price * 0.35)), seller: info.seller });
+    st().written = (st().written || 0) + 1;
+    NA.Save.save();
+    return true;
+  };
+  Code.fbugs = () => st().fbugs || [];
+  Code.bugCount = () => Code.bugs().length + Code.fbugs().length;
+  Code.fixFB = function (bid) {
+    const s = S(), b = Code.fbugs().find(x => x.id === bid);
+    if (!b || s.credits < b.cost) return false;
+    s.credits -= b.cost;
+    st().fbugs = Code.fbugs().filter(x => x.id !== bid);
+    NA.Save.save(); NA.Audio.buy();
+    return true;
+  };
+  // code Warden already has a signature for
+  Code.detVersions = id => { const lv = Code.level(id), out = []; for (let v = 1; v <= lv; v++) { const b = st().by[id + ':' + v]; if (b && b.det) out.push(v); } return out; };
+  Code.isDetected = id => Code.detVersions(id).length > 0;
+  Code.detectedActive = function () {
+    const s = S(); let n = 0;
+    for (const f of F) if (f.kind === 'cheat' && Code.isDetected(f.id)) { const c = s.cheats[f.id]; if (c && c.level && c.enabled !== false) n++; }
+    return n;
+  };
+  Code.rewriteCost = function (id) {
+    const c = D.CHEAT[id], vs = Code.detVersions(id);
+    if (!vs.length) return 0;
+    const top = Math.max.apply(null, vs);
+    return Math.max(10, Math.round(c.base * Math.pow(c.growth, top - 1) * 0.5));
+  };
+  Code.rewrite = function (id) {
+    const s = S(), cost = Code.rewriteCost(id);
+    if (!cost || s.credits < cost) return false;
+    s.credits -= cost;
+    for (const v of Code.detVersions(id)) st().by[id + ':' + v].det = false;
+    NA.Save.save(); NA.Audio.buy(); NA.Game.computeMods();
+    return true;
+  };
+
   // risky versions you'll actually run this match (owned, switched on, at or above the risky version)
   Code.riskList = function () {
     const s = S(), out = [];
@@ -252,7 +318,7 @@
   };
   Code.stability = () => (st().has.pcall ? 0.6 : 1) * (st().has.pool ? 0.6 : 1) * (st().has.tests ? 0.5 : 1);
   Code.crashChance = function () {
-    let p = Code.riskList().reduce((a, r) => a + r.pct, 0) + (Code.bugOn('leak') ? 12 : 0);
+    let p = Code.riskList().reduce((a, r) => a + r.pct, 0) + (Code.bugOn('leak') ? 12 : 0) + Code.fbugs().reduce((a, b) => a + b.pct, 0);
     return Math.min(60, p * Code.stability()) / 100;
   };
   Code.crashDur = () => (st().has.watchdog ? 5 : 15);
@@ -363,13 +429,13 @@
       const open = Code.openFolders[fo.id];
       const files = F.filter(f => f.folder === fo.id);
       const ready = files.filter(f => Code.status(f.id) === 'ready').length;
-      const bugs = fo.id === 'core' ? Code.bugs().length : 0;
+      const bugs = fo.id === 'core' ? Code.bugCount() : 0;
       html.push(`<button class="fo ${open ? 'open' : ''}" data-folder="${fo.id}"><i class="car">${open ? '▾' : '▸'}</i><b>${fo.id}</b>${bugs ? `<em class="bug">${bugs} bug${bugs > 1 ? 's' : ''}</em>` : ''}${ready ? `<em>${ready}</em>` : ''}</button>`);
       if (!open) continue;
       for (const { f, guide } of treeRows(fo.id)) {
-        const status = Code.status(f.id), bug = f.kind === 'fix' && status !== 'max';
+        const status = Code.status(f.id), bug = (f.kind === 'fix' && status !== 'max') || Code.fbugs().some(b => b.file === f.id), det = f.kind === 'cheat' && Code.isDetected(f.id);
         const risky = f.risk && Object.keys(f.risk).some(v => +v > Code.level(f.id) || Code.level(f.id) >= +v);
-        html.push(`<button class="fi ${status} ${f.id === sel ? 'sel' : ''} ${bug ? 'isbug' : ''}" data-file="${f.id}"><span class="g">${guide}</span><i class="ic"></i><span class="nm">${esc(f.name)}</span>${risky ? '<b class="rk" title="has unstable versions">⚡</b>' : ''}<span class="rt">${rowRight(f)}</span></button>`);
+        html.push(`<button class="fi ${status} ${f.id === sel ? 'sel' : ''} ${bug ? 'isbug' : ''}" data-file="${f.id}"><span class="g">${guide}</span><i class="ic"></i><span class="nm">${esc(f.name)}</span>${risky ? '<b class="rk" title="has unstable versions">⚡</b>' : ''}${det ? '<b class="dt">DET</b>' : ''}<span class="rt">${rowRight(f)}</span></button>`);
       }
     }
     $('code-tree').innerHTML = html.join('');
@@ -383,11 +449,11 @@
   }
   function riskTag(f, v) { const r = f.risk && f.risk[v]; return r ? `<span class="rtag">⚡ UNSTABLE · +${r}% crash chance per match</span>` : ''; }
   function writeCard(f, v) {
-    const why = Code.why(f.id), cost = Code.cost(f.id), s = S(), can = !why && s.credits >= cost;
+    const why = Code.why(f.id), cost = Code.cost(f.id), s = S(), can = !why && Code.avail() >= cost;
     const title = f.kind === 'cheat' ? `${f.cheat.name}${f.max > 1 ? ' · v' + v : ''}` : f.title;
     const fx = f.kind === 'cheat' ? f.cheat.fx(v) : f.fx;
     const btn = why ? `<button class="wr cant" disabled>🔒 ${esc(why)}</button>`
-      : `<button class="wr ${can ? '' : 'cant'}" data-write="${f.id}">${can ? 'WRITE IT' : 'NEED ' + U.fmt(cost - s.credits) + ' MORE'} · ${U.fmt(cost)}</button>`;
+      : `<button class="wr ${can ? '' : 'cant'}" data-write="${f.id}">${can ? 'WRITE IT' : 'NEED ' + U.fmt(cost - Code.avail()) + ' MORE'} · ${U.fmt(cost)}</button>`;
     const tag = f.kind === 'cheat' ? f.cheat.tag : (f.kind === 'fix' ? 'Bug: ' + BUGS[f.bug].fx : 'Stability');
     return `<div class="wcard ${why ? 'locked' : ''}"><small>${f.kind === 'fix' ? 'FIX THIS BUG' : why ? 'LOCKED' : 'NEXT VERSION'}</small><b>${esc(title)}</b><span>${esc(fx)}</span><i>${esc(tag)}</i>${riskTag(f, v)}${btn}</div>`;
   }
@@ -398,13 +464,14 @@
     if (f.kind === 'main') {
       path = 'core/main.lua';
       const lines = Code.script();
-      const bugs = Code.bugs();
+      const bugs = { length: Code.bugCount() };
       out.push(`<div class="ed-sum"><b>${Code.lines()}</b> lines of cheat · ${bugs.length ? `<span class="bad">${bugs.length} bug${bugs.length > 1 ? 's' : ''}</span>` : '<span class="good">no bugs</span>'} · <span class="${Code.crashChance() > 0.15 ? 'bad' : Code.crashChance() > 0 ? 'warn' : 'good'}">${Math.round(Code.crashChance() * 100)}% crash chance per match</span></div>`);
+      for (const b of Code.fbugs()) out.push(`<div class="bugrow"><span>${esc(BY[b.file].name)} v${b.v} (from ${esc(b.seller)}) crashes: +${b.pct}% crash chance per match</span><button class="wr sm ${s.credits >= b.cost ? '' : 'cant'}" data-fixfb="${b.id}">FIX · ${U.fmt(b.cost)}</button></div>`);
       lines.forEach((l, i) => {
         let h = lineHtml(i + 1, l.t, l.bug ? 'bug' : l.fixed ? 'fixed' : '');
         if (l.bug) {
           const fx = BY[BUGS[l.bug].file];
-          h += `<div class="bugrow"><span>${esc(BUGS[l.bug].name)}: ${esc(BUGS[l.bug].fx)}</span><button class="wr sm ${s.credits >= Code.cost(fx.id) ? '' : 'cant'}" data-write="${fx.id}">FIX · ${U.fmt(Code.cost(fx.id))}</button></div>`;
+          h += `<div class="bugrow"><span>${esc(BUGS[l.bug].name)}: ${esc(BUGS[l.bug].fx)}</span><button class="wr sm ${Code.avail() >= Code.cost(fx.id) ? '' : 'cant'}" data-write="${fx.id}">FIX · ${U.fmt(Code.cost(fx.id))}</button></div>`;
         }
         out.push(h);
       });
@@ -415,9 +482,12 @@
         const ls = verLines(f, v);
         if (v <= lv) {
           const fresh = animateFrom != null && v > animateFrom;
-          out.push(lineHtml(n++, header(f, v), 'hd' + (fresh ? ' new' : ''), fresh ? 0 : null));
+          const by = st().by[f.id + ':' + v];
+          out.push(lineHtml(n++, header(f, v) + (by ? `  (by ${by.seller} on ${by.forum})` : ''), 'hd' + (fresh ? ' new' : ''), fresh ? 0 : null));
           ls.forEach((t, i) => out.push(lineHtml(n++, t, fresh ? 'new' : '', fresh ? i + 1 : null)));
           if (f.risk && f.risk[v]) out.push(`<div class="rnote">⚡ unstable: +${f.risk[v]}% crash chance per match while v${v} runs</div>`);
+          if (by && by.det) out.push(`<div class="detrow"><span><b>DETECTED</b> Warden has this signature: in Ranked it heats up 3× faster and starts the match flagged</span>${v === Math.max.apply(null, Code.detVersions(f.id)) ? `<button class="wr sm ${s.credits >= Code.rewriteCost(f.id) ? '' : 'cant'}" data-rewrite="${f.id}">REWRITE CLEAN · ${U.fmt(Code.rewriteCost(f.id))}</button>` : ''}</div>`);
+          for (const b of Code.fbugs().filter(x => x.file === f.id && x.v === v)) out.push(`<div class="bugrow"><span>Bug from ${esc(b.seller)}: +${b.pct}% crash chance per match</span><button class="wr sm ${s.credits >= b.cost ? '' : 'cant'}" data-fixfb="${b.id}">FIX · ${U.fmt(b.cost)}</button></div>`);
         } else if (v === lv + 1) {
           out.push(lineHtml(n++, header(f, v), 'hd dim'));
           ls.forEach(t => out.push(redact(n++, t)));
@@ -432,9 +502,9 @@
     $('code-title').textContent = f.name;
   }
   function renderStatus() {
-    const bugs = Code.bugs().length, cc = Math.round(Code.crashChance() * 100);
-    $('code-status').innerHTML = `<span class="br">⎇ main</span><span>${Code.lines()} lines</span><span class="${bugs ? 'bad' : 'good'}">${bugs ? '⚠ ' + bugs + ' bug' + (bugs > 1 ? 's' : '') : '✔ no bugs'}</span><span class="${cc > 15 ? 'bad' : cc ? 'warn' : 'good'}">⚡ ${cc}% crash/match${S().code.has.watchdog ? ' · watchdog on' : ''}</span><span class="sp"></span><span>Lua</span><span>UTF-8</span>`;
-    $('code-credits').textContent = U.fmt(S().credits);
+    const bugs = Code.bugCount(), cc = Math.round(Code.crashChance() * 100), det = F.filter(f => f.kind === 'cheat' && Code.isDetected(f.id)).length;
+    $('code-status').innerHTML = `<span class="br">⎇ main</span><span>${Code.lines()} lines</span><span class="${bugs ? 'bad' : 'good'}">${bugs ? '⚠ ' + bugs + ' bug' + (bugs > 1 ? 's' : '') : '✔ no bugs'}</span><span class="${cc > 15 ? 'bad' : cc ? 'warn' : 'good'}">⚡ ${cc}% crash/match${S().code.has.watchdog ? ' · watchdog on' : ''}</span>${det ? `<span class="bad">${det} detected</span>` : ''}<span class="sp"></span><span>Lua</span><span>UTF-8</span>`;
+    $('code-credits').innerHTML = U.fmt(S().credits) + (Code.legacy() ? ` <small class="cc-leg">+${U.fmt(Code.legacy())} code</small>` : '');
   }
   Code.render = function (animateFrom) {
     renderTree(); renderEditor(animateFrom); renderStatus();
@@ -447,11 +517,14 @@
       if (fi) { NA.Audio.click(); st().sel = fi.dataset.file; NA.Save.save(); renderTree(); renderEditor(); $('code-ed').scrollTop = 0; }
     });
     $('code-ed').addEventListener('click', e => {
+      const fb = e.target.closest('[data-fixfb]'), rw = e.target.closest('[data-rewrite]');
+      if (fb) { if (Code.fixFB(fb.dataset.fixfb)) { NA.UI.toast('Bug fixed'); Code.render(); } else { NA.Audio.deny && NA.Audio.deny(); NA.UI.toast('Not enough credits'); } return; }
+      if (rw) { if (Code.rewrite(rw.dataset.rewrite)) { NA.UI.toast('Rewritten clean. Warden lost the signature'); Code.render(); } else { NA.Audio.deny && NA.Audio.deny(); NA.UI.toast('Not enough credits'); } return; }
       const b = e.target.closest('[data-write]');
       if (!b || b.disabled) return;
       const id = b.dataset.write, f = BY[id], before = Code.level(id);
       if (Code.why(id)) return;
-      if (S().credits < Code.cost(id)) { NA.Audio.deny && NA.Audio.deny(); NA.UI.toast(`Need ${U.fmt(Code.cost(id) - S().credits)} more credits`); return; }
+      if (Code.avail() < Code.cost(id)) { NA.Audio.deny && NA.Audio.deny(); NA.UI.toast(`Need ${U.fmt(Code.cost(id) - Code.avail())} more credits`); return; }
       const r = Code.write(id);
       if (!r) return;
       if (f.kind === 'fix') NA.UI.toast(`Bug fixed: ${BUGS[f.bug].name}`);

@@ -76,7 +76,7 @@
     if (m.practiceDone) m.swayMult *= 0.95;
     // bugs still in cheat.lua
     if (NA.Code && NA.Code.bugOn('aim')) m.assistPull *= 0.5;
-    m.susBug = NA.Code && NA.Code.bugOn('mark') ? 1.25 : 1;
+    m.susBug = (NA.Code && NA.Code.bugOn('mark') ? 1.25 : 1) * (NA.Code && NA.Code.detectedActive() ? 1.2 : 1);
     m.anyActive = TOGGLES.some(id => on(id) > 0);
     m.adv = NA.Cfg.adv();
     const cf = G.match && G.match.chaosFx;
@@ -429,6 +429,8 @@
     }
     if (G.ranked) {
       G.match.detMult = NA.Ranked.matchMult(G.loader) * G.loadout.detMult;
+      // detected forum code: Warden flags it the moment it loads
+      if (NA.Code && NA.Code.detectedActive()) G.match.det = Math.min(90, G.match.det + 12 * NA.Code.detectedActive());
       const wp = NA.Ranked.profile();
       G.match.wp = wp;
       G.match.scanT = wp.scan ? wp.scan * U.rand(0.6, 1) : 0;
@@ -563,7 +565,7 @@
       ranked = NA.Ranked.afterMatch(won, mt.detPeak, kicked === 'ban', { diff: mt.diff, promo: mt.promo, mvp });
       ranked.peak = Math.round(mt.detPeak);
       ranked.legit = G.legit;
-      if (kicked === 'ban') ranked.ban = NA.Save.data.ranked.ban;
+      if (kicked === 'ban') ranked.ban = NA.Ban.pending() ? Object.assign({ label: 'Permanent: account closed' }, NA.Ban.pending()) : null;
       if (ranked.wave) { s.credits -= pay.total; s.lifetimeCredits -= pay.total; ranked.confiscated = pay.total; }
     }
     if (t.tourney !== undefined) {
@@ -695,7 +697,7 @@
     const mt = G.match;
     NA.Ranked.ban(`Cheat software detected by ${D.RANKED.ac} v${NA.Ranked.version()}`, Math.max(mt.detPeak, 100), false);
     C.system(`A player in your match has been banned by ${D.RANKED.ac}. Thank you for reporting.`, { priority: true });
-    NA.UI.centerMsg('BANNED BY WARDEN AC', 2500);
+    NA.Ban.flash();
     endMatch(false, 'ban');
   };
 
@@ -1384,6 +1386,7 @@
     b.cheat.gone = true;
     C.system(byReport ? (G.ranked ? `${b.name} was banned by ${D.RANKED.ac}. Thanks for your report!` : `A moderator actually reviewed a report for once. ${b.name} has been banned.`)
       : `${b.name} was banned by ${D.RANKED.ac}.`, { priority: true });
+    NA.Ban.banner(b.name, byReport ? 'report' : 'warden');
     const o = G.bots.find(x => x !== b);
     if (o) C.post(o.name, U.pick(D.CHAT.cheater.banned).replace('{name}', b.name), G.isAlly(o) ? 'team' : 'bot', { delay: 900 });
     if (byReport) {

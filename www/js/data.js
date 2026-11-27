@@ -191,7 +191,7 @@ window.NA = window.NA || {};
     { id: 'freeze', name: 'Freeze Target', cat: 'Exploit', tab: 'exploits', tier: 6, base: 16000, growth: 2.5, max: 2, toggle: true,
       tag: 'Desync them. Politely.', fx: l => `Enemies you hit freeze for ${[1.2, 2.2][l - 1]} s (4 s cooldown each)` },
     { id: 'hwid', name: 'HWID Spoofer', cat: 'Bypass', tier: 2, base: 400, growth: 3.0, max: 3,
-      tag: 'New motherboard serial every boot. Ranked only.', fx: l => `Warden detection −${10 * l}% · lets you make alt accounts` },
+      tag: 'New motherboard serial every boot. Ranked only.', fx: l => `Warden detection −${10 * l}%` },
     { id: 'kernel', name: 'Kernel Driver', cat: 'Bypass', tier: 3, base: 1500, growth: 3.5, max: 2,
       tag: 'Runs below the anticheat. Allegedly.', fx: l => `Warden detection −${18 * l}%` },
     { id: 'sigmask', name: 'Signature Mask', cat: 'Bypass', tier: 3, base: 1200, growth: 3.0, max: 2,
