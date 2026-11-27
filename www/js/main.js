@@ -15,6 +15,7 @@
   ];
   function boot() {
     NA.Save.load();
+    if (NA.Code) NA.Code.init();
     if (NA.Loop) NA.Loop.checkAway();
     NA.Audio.setVolume(NA.Save.data.settings.volume);
     const intro = document.getElementById('intro');

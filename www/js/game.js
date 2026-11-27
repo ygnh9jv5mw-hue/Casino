@@ -74,6 +74,9 @@
       practiceDone: !!(s.practiceStartedAt && Date.now() - s.practiceStartedAt >= 3600e6),
     };
     if (m.practiceDone) m.swayMult *= 0.95;
+    // bugs still in cheat.lua
+    if (NA.Code && NA.Code.bugOn('aim')) m.assistPull *= 0.5;
+    m.susBug = NA.Code && NA.Code.bugOn('mark') ? 1.25 : 1;
     m.anyActive = TOGGLES.some(id => on(id) > 0);
     m.adv = NA.Cfg.adv();
     const cf = G.match && G.match.chaosFx;
@@ -650,6 +653,7 @@
     if (!mt || G.state !== 'playing' || mt.tier.chaos) return;
     if (amt > 0 && G.loadout) amt *= G.loadout.susMult;
     if (amt > 0 && G.mods.kdSpoof) amt *= 0.8;
+    if (amt > 0 && G.mods.susBug) amt *= G.mods.susBug;
     if (amt > 0 && G.mods.streamProof) amt *= 0.7;
     mt.sus = U.clamp(mt.sus + amt, 0, 100);
     if (amt > 0) mt.susIdle = 0;
@@ -2098,9 +2102,9 @@
       case 'setzero': s.credits = 0; msg = 'Credits set to ₡0'; break;
       case 'c1m': s.credits += 1e6; s.lifetimeCredits += 1e6; msg = '+₡1,000,000'; break;
       case 'tiers': tiers(); msg = 'All tiers unlocked'; break;
-      case 'cheats': maxCheats(); msg = 'Every cheat maxed'; break;
+      case 'cheats': maxCheats(); if (NA.Code) NA.Code.unlockAll(); msg = 'Every cheat maxed'; break;
       case 'guns': allGuns(); msg = 'Every gun owned'; break;
-      case 'everything': tiers(); maxCheats(); allGuns(); s.credits += 1e6; msg = 'Everything unlocked'; break;
+      case 'everything': tiers(); maxCheats(); if (NA.Code) NA.Code.unlockAll(); allGuns(); s.credits += 1e6; msg = 'Everything unlocked'; break;
       case 'god': G.god = !G.god; msg = 'God mode ' + (G.god ? 'on' : 'off'); break;
       case 'speed': G.speed = G.speed >= 4 ? 1 : G.speed * 2; msg = 'Game speed ' + G.speed + '×'; break;
       case 'killall': if (!inMatch && !G.paused) return 'Start a match first'; G.dev.killAll(); msg = 'Lobby deleted'; break;

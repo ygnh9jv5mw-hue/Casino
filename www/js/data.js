@@ -360,7 +360,7 @@ window.NA = window.NA || {};
   const STORY = {
     intro: [['BOT_Kevin', 'hello. i am a training bot.'], ['BOT_Kevin', 'you can do it.']],
     firstEnd: [['BOT_Kevin', 'gg. your accuracy was {acc}%. that is a record.']],
-    sellerIntro: ['saw ur stats lol', "{acc}% accuracy. that's not a skill issue, that's a skill absence.", "first one's half off. nobody has to know."],
+    sellerIntro: ['saw ur stats lol', "{acc}% accuracy. that's not a skill issue, that's a skill absence.", "i put a script on ur pc. cheat.lua. pasted it from a tutorial so it has bugs", "fix them in the editor. first fix is half off. nobody has to know."],
     improved: [['BOT_Kevin', 'you have improved. good job.']],
     momHello: [['mom_plays_too', 'hi everyone! :)'], ['mom_plays_too', 'stay close to me sweetie']],
     momNice: ['nice shot sweetie!! :)', 'look at you go!!', "that's my teammate!", 'so proud of you :)'],

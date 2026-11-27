@@ -46,6 +46,7 @@
   // ---------------------------------------------------------------- the next thing worth buying
   L.nextGoal = function () {
     const s = S(), G = NA.Game;
+    if (NA.Code) { const b = NA.Code.nextGoal(); if (!b) return null; b.have = s.credits; b.pct = Math.min(1, s.credits / b.cost); return b; }
     let best = null;
     for (const c of D.CHEATS) {
       if (c.base <= 0 || s.highestTier < c.tier) continue;

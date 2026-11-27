@@ -15,7 +15,17 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v1.1.1)
+## What's in this build (v1.2)
+
+**New in v1.2: cheat.lua, the code skill tree**
+- **The cheat shop is gone. You write your cheat now.** CHEATS opens **cheat.lua** in a code editor. The skill tree is the code: folders are branches (core, aim, visuals, weapon, movement, server, exploits, bypass, misc), files are features, and every version of a file is one level. Writing a version types its code into the file, and **main.lua** shows your whole script growing (from 16 lines to over 200)
+- **Branches**: a file opens up once the file it grows out of is written (no_spread.lua grows out of steady_hands.lua, aimbot.lua needs aim_assist.lua v3 and triggerbot.lua, wallbang.lua needs esp.lua v3 and aimbot.lua v2…). The explorer draws the tree, with prices on everything you can write right now
+- **You start with a pasted script**: "EASY AIMBOT 2024 (WORKING)", with a half-working aim assist and **three bugs**: an aim offset (Aim Assist pulls half as hard), a memory leak (12% chance per match that the cheat crashes) and a watermark left on (lobbies get suspicious 25% faster). Fix them from main.lua or the core folder. The first fix is half off
+- **Unstable code**: the strongest versions are marked ⚡ (aimbot snap and rage, triggerbot at 0 ms, the top Rapid Fire and Speedhack, ESP glow, wallbang through 2+ walls, Freeze). Each one you run adds a chance that **cheat.lua crashes mid-match**: a stack trace pops up and every cheat is off for 15 seconds. Turn the risky ones off in the cheat menu, or make the script stable in **core/**: error handling (−40%), a watchdog (restarts in 5 s), a memory pool (−40%) and unit tests (−50%)
+- Saves from older versions keep every cheat level (as written code) with the bugs already fixed
+- Loaders, the Config Market and the Armory are still on the seller sites (the **Sites** button in the editor)
+
+**v1.1.1**
 
 **New in v1.1.1: a gentler start**
 - Aim drift (the sway and the random twitches) now ramps up over the first three tiers: half strength on the Aim Map 1v1, 65% in Tier 2, 82% in Tier 3, full strength from Tier 4. Twitches are smaller and less frequent early on

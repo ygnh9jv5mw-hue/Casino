@@ -147,6 +147,8 @@
     if (NA.UI.sellerCrash) NA.UI.sellerCrash(false, true);
     const x = Sl.active(), L = build(x, Sl.stock(x.id));
     if (x.crash && Math.random() < 0.55) L.crashAt = U.rand(25, 90);
+    // unstable versions (and an unfixed memory leak) in cheat.lua can take the whole client down
+    if (L.crashAt < 0 && NA.Code && L.status !== 'updating' && Math.random() < NA.Code.crashChance()) { L.crashAt = U.rand(20, 80); L.crashKind = 'code'; L.crashSrc = NA.Code.crashSource(); }
     return (NA.Game.loadout = L);
   };
   // the live view for menus (stock as of right now)
@@ -186,9 +188,9 @@
     if (L.crashAt >= 0) {
       L.crashAt -= dt;
       if (L.crashAt < 0) {
-        L.crashAt = -1; L.crashT = 6; L.crashes++;
+        L.crashAt = -1; L.crashT = L.crashKind === 'code' ? NA.Code.crashDur() : 6; L.crashes++;
         G.computeMods();
-        NA.UI.sellerCrash(true);
+        NA.UI.sellerCrash(true, false, L);
         NA.Audio.deny();
       }
     }
@@ -226,7 +228,7 @@
         ss.minerTotal = (ss.minerTotal || 0) + fee;
         news.push({ k: 'bad', t: `FREEHAX.EXE mined ${U.fmt(fee)} credits on your phone (${U.fmt(ss.minerTotal)} total)` });
       }
-      if (L.crashes) news.push({ k: 'warn', t: 'FREEHAX.EXE crashed mid-match: cheats were off for 6 s' });
+      if (L.crashes) news.push({ k: 'warn', t: L.crashKind === 'code' ? `cheat.lua crashed mid-match (${L.crashSrc ? L.crashSrc.fn + '() in ' + L.crashSrc.file : 'unstable code'}): cheats were off for ${NA.Code.crashDur()} s` : 'FREEHAX.EXE crashed mid-match: cheats were off for 6 s' });
       if (L.dodged) news.push({ k: 'good', t: `VOIDWARE dodged ${L.dodged} Warden scan${L.dodged > 1 ? 's' : ''} for you` });
       if (x.sub && ss.active === x.id) {
         ss.subLeft = Math.max(0, (ss.subLeft || 0) - 1);

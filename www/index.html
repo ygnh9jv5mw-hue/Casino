@@ -61,6 +61,7 @@
 <!-- ======================= HUD ======================= -->
 <div id="hud" class="hidden">
   <div id="targethud" class="hidden"></div>
+  <div id="code-crash" class="hidden"><div class="cc-t">cheat.lua <i>crashed</i></div><pre id="cc-trace"></pre><div class="cc-b"><span id="cc-msg">restarting…</span><div class="cc-bar"><i id="cc-fill"></i></div></div></div>
   <div id="fh-crash" class="hidden"><div class="fh-t">FREEHAX.EXE<i>×</i></div><div class="fh-b"><b>FREEHAX.EXE has stopped working</b><span>Windows is checking for a solution to the problem…</span><div class="fh-bar"><i></i></div></div></div>
   <div id="hud-tl">
     <div id="watermark" class="hidden"></div>
@@ -170,7 +171,7 @@
       <div class="mgrid">
         <button class="mbtn items" id="m-items" style="--i:1"><span class="t-art pics" id="art-items"></span><span class="t-big">ITEM SHOP</span><span class="t-sub" id="m-items-sub">new items daily</span><i class="badge hidden" id="items-badge">NEW</i></button>
         <button class="mbtn locker" id="m-locker" style="--i:2"><span class="t-art pics" id="art-locker"></span><span class="t-big">LOCKER</span><span class="t-sub" id="m-locker-sub">outfits &middot; skins</span></button>
-        <button class="mbtn shop" id="m-shop" style="--i:3"><span class="t-art" id="art-cheats"></span><span class="t-big">CHEATS</span><span class="t-sub">skillissue.shop</span><i class="badge hidden" id="shop-badge"></i></button>
+        <button class="mbtn shop" id="m-shop" style="--i:3"><span class="t-art" id="art-cheats"></span><span class="t-big">CHEATS</span><span class="t-sub">cheat.lua</span><i class="badge hidden" id="shop-badge"></i></button>
         <button class="mbtn ranks" id="m-ranks" style="--i:4"><span class="t-art" id="art-ranks"></span><span class="t-big">RANKS</span><span class="t-sub" id="m-ranks-sub">ladder &middot; dailies</span><i class="badge hidden" id="ranks-badge"></i></button>
         <button class="mbtn comms" id="m-comms" style="--i:5"><span class="t-art" id="art-comms"></span><span class="t-big">COMMS</span><span class="t-sub">clips &middot; servers</span><i class="badge hidden" id="comms-badge"></i></button>
         <button class="mbtn prof" id="m-profile" style="--i:6"><span class="t-art pics" id="art-profile"></span><span class="t-big">PROFILE</span><span class="t-sub">stats</span></button>
@@ -248,7 +249,7 @@
       <div id="res-unlock" class="hidden"></div>
       <div id="res-seller" class="hidden"></div>
       <div class="res-buttons">
-        <button class="btn shopbtn" id="res-shop">SHOP<i class="badge hidden" id="res-badge"></i></button>
+        <button class="btn shopbtn" id="res-shop">CHEAT.LUA<i class="badge hidden" id="res-badge"></i></button>
         <button class="btn primary" id="res-again">PLAY AGAIN</button>
         <button class="btn" id="res-lobbies">LOBBIES</button>
         <button class="btn ghost" id="res-menu">MENU</button>
@@ -273,6 +274,23 @@
       </div>
       <aside class="shop-dms"><div class="dm-head">DMs &middot; @undetected</div><div id="shop-dms"></div></aside>
     </div>
+  </div>
+</section>
+
+<section id="scr-code" class="screen hidden">
+  <div class="ide">
+    <header class="ide-top">
+      <button class="btn ghost" id="code-back">&larr;</button>
+      <div class="ide-dots"><i></i><i></i><i></i></div>
+      <div class="ide-title"><b id="code-title">main.lua</b><small>cheat.lua &middot; skillissue IDE</small></div>
+      <div class="credits" id="code-credits"></div>
+      <button class="ide-btn" id="code-browser">&#127760; Sites</button>
+    </header>
+    <div class="ide-body">
+      <aside class="ide-tree" id="code-tree"></aside>
+      <main class="ide-ed" id="code-ed"></main>
+    </div>
+    <footer class="ide-status" id="code-status"></footer>
   </div>
 </section>
 
@@ -425,6 +443,7 @@
 <script src="js/events.js"></script>
 <script src="js/configs.js"></script>
 <script src="js/sellers.js"></script>
+<script src="js/code.js"></script>
 <script src="js/loop.js"></script>
 <script src="js/comms.js"></script>
 <script src="js/game.js"></script>

@@ -4,7 +4,7 @@
   const U = NA.U, D = NA.DATA, A = NA.Audio, C = NA.Chat;
   const $ = id => document.getElementById(id);
   const esc = U.esc;
-  const SCREENS = ['scr-title', 'scr-name', 'scr-menu', 'scr-items', 'scr-play', 'scr-lobby', 'scr-results', 'scr-shop', 'scr-profile', 'scr-settings', 'scr-pause', 'scr-ranks', 'scr-comms'];
+  const SCREENS = ['scr-title', 'scr-name', 'scr-menu', 'scr-items', 'scr-play', 'scr-lobby', 'scr-results', 'scr-shop', 'scr-profile', 'scr-settings', 'scr-pause', 'scr-ranks', 'scr-comms', 'scr-code'];
   const UI = { current: 'scr-title', hurtA: 0, hurtAng: null, hitT: -9, hitHead: false, keys: {}, cheatOpen: false, chatOpen: false, autoTimer: null };
   let G = null;
   const tv1 = new THREE.Vector3(), tv2 = new THREE.Vector3(), pv = new THREE.Vector3();
@@ -61,7 +61,7 @@
     $('m-locker-sub').textContent = `${owned + 4} items`;
     renderGoals();
     const AS = NA.Sellers.active(), ast = NA.Sellers.status(AS.id);
-    $('m-shop').querySelector('.t-sub').innerHTML = `${esc(AS.name)}${ast !== 'ok' ? ` · <b class="sst ${ast}">${NA.Sellers.STATUS_LABEL[ast]}</b>` : ''}`;
+    { const nb = NA.Code.bugs().length; $('m-shop').querySelector('.t-sub').innerHTML = `cheat.lua · ${NA.Code.lines()} lines${nb ? ` · <b class="sst detected">${nb} BUG${nb > 1 ? 'S' : ''}</b>` : ast !== 'ok' ? ` · <b class="sst ${ast}">${esc(AS.short)} ${NA.Sellers.STATUS_LABEL[ast]}</b>` : ''}`; }
     const fromElsewhere = UI.current !== 'scr-menu';
     UI.show('scr-menu');
     UI.fillMenuArt();
@@ -76,7 +76,7 @@
     const Lp = NA.Loop, out = [], stk = Lp.streak();
     if (stk >= 1) out.push(`<div class="gl streak"><b>🔥 ${stk} WIN STREAK</b><span>next win +${Math.round(Lp.streakBonus(stk + 1) * 100)}%</span></div>`);
     const ng = Lp.nextGoal();
-    if (ng) out.push(`<button class="gl ng ${ng.pct >= 1 ? 'ready' : ''}" data-goal="shop"><small>NEXT UPGRADE</small><b>${esc(ng.name)}${ng.max > 1 ? ' · L' + ng.lvl : ''}</b><i class="gbar"><u style="width:${Math.round(ng.pct * 100)}%"></u></i><span>${ng.pct >= 1 ? 'READY TO BUY ›' : `${U.fmt(ng.have)} / ${U.fmt(ng.cost)}`}</span></button>`);
+    if (ng) out.push(`<button class="gl ng ${ng.pct >= 1 ? 'ready' : ''}" data-goal="shop"><small>NEXT UPGRADE</small><b>${esc(ng.name)}${ng.max > 1 ? ' · L' + ng.lvl : ''}</b><i class="gbar"><u style="width:${Math.round(ng.pct * 100)}%"></u></i><span>${ng.pct >= 1 ? 'READY TO WRITE ›' : `${U.fmt(ng.have)} / ${U.fmt(ng.cost)}`}</span></button>`);
     const tg = Lp.tierGoal();
     if (tg) out.push(`<button class="gl tg" data-goal="play"><small>TIER ${tg.tier} UNLOCK</small><b>${tg.wins}/${tg.need} wins in ${esc(tg.from)}</b><i class="gbar"><u style="width:${Math.round(tg.wins / tg.need * 100)}%"></u></i></button>`);
     const jobs = Lp.jobs(), top = jobs[0];
@@ -455,7 +455,8 @@
     }, 2500);
   };
   UI.shopBack = function () {
-    if (UI.shopFrom === 'scr-results' && G.state === 'results') UI.show('scr-results');
+    if (UI.shopFrom === 'scr-code') NA.Code.open(NA.Code.from);
+    else if (UI.shopFrom === 'scr-results' && G.state === 'results') UI.show('scr-results');
     else if (UI.shopFrom === 'scr-comms') NA.Comms.open();
     else UI.showMenu();
   };
@@ -516,8 +517,8 @@
       renderDMs();
       return;
     }
-    if (!s.flags.firstBuy) html.push('<div class="teaser"><b>FIRST ONE\'S HALF OFF.</b> Prices below already include it. One time only.</div>');
-    for (const cat of D.CATEGORIES) {
+    html.push(`<div class="code-promo"><b>WE DON'T SELL CHEATS ANYMORE. YOU WRITE THEM.</b><span>Your cheat is a script now. Open cheat.lua to fix its bugs and write new features into it. ${NA.Code.lines()} lines so far.</span><button class="buy" data-open-code="1">OPEN CHEAT.LUA</button></div>`);
+    for (const cat of (UI.legacyShop ? D.CATEGORIES : [])) {
       const items = D.CHEATS.filter(c => c.cat === cat);
       if (!items.length) continue;
       html.push(`<div class="cat-h">${cat}</div><div class="items">`);
@@ -611,7 +612,7 @@
     const acc = st.shotsFired ? (100 * st.shotsHit / st.shotsFired).toFixed(1) : '0.0';
     const kd = st.deaths ? (st.kills / st.deaths).toFixed(2) : st.kills.toFixed(2);
     const card = (v, l, wide) => `<div class="stat ${wide ? 'wide' : ''}"><b>${v}</b><span>${l}</span></div>`;
-    const ach = { first_buy: "First One's Half Off", skill_issue: 'Skill Issue', placebo: 'Placebo', flawless: 'Flawless', arsenal: 'Arsenal', champion: 'FRAGLINE Open Champion', kicked: 'Democracy', ragequits: 'Lobby Cleaner', snitch: 'Hall Monitor', jury: 'Court of Public Opinion', scammed: 'Scammed', banned: 'Detected', banwave: 'Caught in the Wave' };
+    const ach = { first_buy: "First One's Half Off", skill_issue: 'Skill Issue', placebo: 'Placebo', flawless: 'Flawless', arsenal: 'Arsenal', champion: 'FRAGLINE Open Champion', kicked: 'Democracy', ragequits: 'Lobby Cleaner', snitch: 'Hall Monitor', jury: 'Court of Public Opinion', scammed: 'Scammed', banned: 'Detected', banwave: 'Caught in the Wave', bug_free: 'It Compiles' };
     const P = NA.Prog, rk = NA.Ranked.unlocked() && s.ranked.matches ? P.myRank() : null;
     const rc = rk ? P.COLORS[Math.min(P.COLORS.length - 1, Math.floor(rk.idx / 3))] || '#9ca3af' : '#9ca3af';
     const art = NA.Showroom.thumb ? NA.Showroom.thumb('outfit', NA.Cosmetics.equipped('outfit')) : '';
@@ -804,9 +805,18 @@
     if (lim.length) out.push(`<div class="cm-ban info"><span>${lim.join(' · ')}</span></div>`);
     return out.join('');
   }
-  UI.sellerCrash = function (on, quiet) {
-    $('fh-crash').classList.toggle('hidden', !on);
-    if (!on && !quiet) UI.toast('FREEHAX.EXE restarted. Cheats back on');
+  UI.sellerCrash = function (on, quiet, L) {
+    const code = L ? L.crashKind === 'code' : UI.crashKind === 'code';
+    if (on) UI.crashKind = code ? 'code' : 'fh';
+    $('fh-crash').classList.toggle('hidden', !on || code);
+    $('code-crash').classList.toggle('hidden', !on || !code);
+    if (on && code && L) {
+      const c = L.crashSrc || {};
+      $('cc-trace').textContent = `panic: ${c.why || 'segmentation fault'}\n  at ${c.fn || 'on_frame'}() ${c.file || 'main.lua'}:${U.randInt ? U.randInt(12, 240) : 77}\n  at on_frame() main.lua:6\n  at inject() loader.dll`;
+      $('cc-msg').textContent = NA.Code.crashDur() <= 5 ? 'watchdog restarting it…' : 'restarting… (a watchdog would make this faster)';
+      const fill = $('cc-fill'); fill.style.transition = 'none'; fill.style.width = '0%'; void fill.offsetWidth; fill.style.transition = `width ${L.crashT}s linear`; fill.style.width = '100%';
+    }
+    if (!on && !quiet) UI.toast(UI.crashKind === 'code' ? 'cheat.lua restarted. Cheats back on' : 'FREEHAX.EXE restarted. Cheats back on');
     if (!$('cheatmenu').classList.contains('hidden')) UI.renderCheatMenu();
   };
   UI.renderCheatMenu = function () {
@@ -1622,7 +1632,7 @@
       if (!b) return;
       A.click();
       const g = b.dataset.goal;
-      if (g === 'shop') { UI.shopSite = 'skillissue'; UI.showShop('scr-menu'); } else if (g === 'play') UI.showPlay(); else UI.showRanks();
+      if (g === 'shop') { const ng = NA.Code.nextGoal(); NA.Code.open('scr-menu', ng && ng.id); } else if (g === 'play') UI.showPlay(); else UI.showRanks();
     });
     $('away-card').addEventListener('click', e => {
       if (!e.target.closest('#away-claim')) return;
@@ -1633,7 +1643,8 @@
       $('menu-credits').textContent = U.fmt(NA.Save.data.credits);
       renderGoals();
     });
-    click('m-shop', () => UI.showShop('scr-menu'));
+    click('m-shop', () => NA.Code.open('scr-menu'));
+    NA.Code.bind();
     click('m-ranks', () => UI.showRanks());
     click('m-comms', () => { if (NA.Comms) NA.Comms.open(); });
     document.getElementById('scr-ranks').addEventListener('click', e => {
@@ -1710,6 +1721,7 @@
         return;
       }
       if (sl) { const X = NA.Sellers.BY[sl.dataset.sload]; if (NA.Sellers.load(X.id)) { A.equip ? A.equip() : A.click(); UI.toast(`${X.name} loaded for your next match`); UI.renderShop(); } return; }
+      if (e.target.closest('[data-open-code]')) { A.click(); NA.Code.open(UI.shopFrom === 'scr-code' ? NA.Code.from : 'scr-menu'); return; }
       const b = e.target.closest('[data-buy]');
       if (!b) return;
       const id = b.dataset.buy;
@@ -1722,7 +1734,7 @@
       UI.shopSite = b.dataset.site; A.click(); UI.renderShop();
       const sc = document.querySelector('#scr-shop .shop-main'); if (sc) sc.scrollTop = 0;
     });
-    click('res-shop', () => UI.showShop('scr-results'));
+    click('res-shop', () => NA.Code.open('scr-results'));
     click('res-again', () => {
       const t = G.match.tier;
       if (t.tourney !== undefined) { if (G.tourney) G.startMatch(G.tourneyTier(G.tourney.round)); else { G.toIdle(); UI.showPlay(); } }
