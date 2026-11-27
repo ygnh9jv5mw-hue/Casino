@@ -211,6 +211,7 @@
     </header>
     <div class="mode-row">
       <button class="mode on" id="mode-casual">CASUAL<small>No anticheat</small></button>
+      <button class="mode" id="mode-payload">5V5 PAYLOAD<small>Agents · plant the drive</small></button>
       <button class="mode" id="mode-ranked">RANKED<small>Warden AC</small></button>
       <button class="mode" id="mode-events">EVENTS<small>Loot Rush · Tournament · Chaos</small></button>
     </div>
@@ -275,6 +276,28 @@
       </div>
       <aside class="shop-dms"><div class="dm-head">DMs &middot; @undetected</div><div id="shop-dms"></div></aside>
     </div>
+  </div>
+</section>
+
+<section id="scr-agents" class="screen hidden">
+  <div class="menu ag-menu">
+    <header class="topbar">
+      <button class="btn ghost" data-back="scr-play">&larr; Back</button>
+      <div class="who"><b>Pick your agent</b> <span id="ag-map" class="muted"></span></div>
+      <button class="btn primary" id="ag-lock">LOCK IN</button>
+    </header>
+    <div class="ag-body"><div id="ag-grid"></div><div id="ag-detail"></div></div>
+  </div>
+</section>
+
+<section id="scr-team" class="screen hidden">
+  <div class="menu team-menu">
+    <header class="topbar">
+      <button class="btn ghost" id="team-back">&larr; Back</button>
+      <div class="who"><b>Teammates</b> <span class="muted">5v5 Payload</span></div>
+      <div class="credits" id="team-credits"></div>
+    </header>
+    <div class="team-body"><div id="team-roster"></div><div id="team-market"></div></div>
   </div>
 </section>
 
@@ -458,6 +481,10 @@
 <script src="js/code.js"></script>
 <script src="js/forums.js"></script>
 <script src="js/ban.js"></script>
+<script src="js/agents.js"></script>
+<script src="js/payload.js"></script>
+<script src="js/payload-ui.js"></script>
+<script src="js/team.js"></script>
 <script src="js/loop.js"></script>
 <script src="js/comms.js"></script>
 <script src="js/game.js"></script>

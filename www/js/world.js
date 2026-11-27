@@ -747,6 +747,13 @@
     }
     return true;
   }
+  // nearest walkable spot (cell centre) to a point, or null if there's none close by
+  W.snap = function (x, z) {
+    const n = W.current && W.current.nav;
+    if (!n) return { x, z };
+    const c = nearestWalkable(n, ...cellOf(n, x, z));
+    return c ? center(n, c[0], c[1]) : null;
+  };
   W.randomPoint = function () {
     const n = W.current.nav;
     const k = n.cells[Math.floor(Math.random() * n.cells.length)];

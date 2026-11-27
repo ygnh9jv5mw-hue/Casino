@@ -15,7 +15,24 @@ Direct download link for signers that take a URL:
 
 It's unsigned, so sign it with your own signer (or a sideloading tool with your Apple ID) before installing. Each run's IPA is also attached to the run under **Actions → Build NO ANTICHEAT IPA → Artifacts**.
 
-## What's in this build (v1.2.1)
+## What's in this build (v1.3)
+
+**New in v1.3: 5v5 Payload, agents and teammates**
+- **5V5 PAYLOAD** is a new tab on the Play screen (unlocks at Tier 2). Attackers carry a **payload drive** to site A or B and plug it into the server (hold 4 s). Defenders stop the plant, or pull the drive back out (hold 6 s, progress is kept at the halfway point). The drive uploads 40 s after the plant. First to 5 rounds wins and sides swap after round 4. Nobody respawns during a round: when you die you spectate a teammate
+- **Buy phase** at the start of every round, with **round credits** that are separate from your cheat credits: 800 to start, +200 per kill, +300 to the team for a plant, +3000 for a round win, +1900 for a loss (more if you keep losing). Buy sidearms, SMGs, shotguns, rifles, snipers and LMGs, light or heavy shields and ability charges. Armory guns you own show up too. Tap something again to sell it back. You keep your gun and shield if you survive the round. The drive spawns at your feet: walk over it to carry it, or a teammate takes it
+- **16 agents in 4 roles**, each with a bought ability (C), a free signature ability (E) and an ultimate (X, charged by kills, deaths, plants and defuses):
+  - Breachers: Spark (flash, dash), Rook (sticky charge, concussion), Blitz (slide that resets on kills), Quake (ground slam, fault line)
+  - Ghosts: Hush (smokes, vanish), Mirage (decoys that give enemies away), Static (smoke that jams minimaps, global blackout), Shade (mark and teleport back to it)
+  - Wardens: Bulwark (shield wall, team shields), Tripwire (laser traps that reveal), Anchor (turrets, shock mines), Lockdown (fields where nobody can plant or defuse)
+  - Scouts: Ping (tag drone, global reveal), Echo (sonar, footsteps), Hawk (recon and shock arrows), Relay (team scan and boost)
+- **Smarter bots for the objective.** Attackers group up before a site and go in together, the carrier plants, and the team guards the drive. Defenders hold their site, call out the push, rotate and retake. Bot personalities: **rushers** push and chase, **campers** hold angles and lurk, **snipers** buy the long guns and play far back. Bots use their abilities too
+- **Unrated** (no anticheat) or **Competitive** (Warden AC, Ranked pay)
+- **Teammates.** Scout players on the market (new ones every 8 minutes) and hire them with cheat credits for 3 matches. Sports-style cards show OVR, aim, game sense, clutch, account age, headshot %, K/D and reviews. Better teammates cost more, so it's a trade-off against cheats. Empty slots are random fills
+  - Teammates with good game sense **notice when you cheat** and report you. In Competitive that raises your Warden detection. In Unrated, three reports from your own team means they vote you out. Anyone who reports you ends their contract
+  - **Some players on the market are secretly cheating.** Some are obvious (aim 99, game sense 40, account 3 days old, suspiciously cheap), some are kind of sus, and some look completely clean. They carry you, but if Warden catches a cheater on your team in Competitive, your account gets closed too
+- **Boss match**: a made-up pro team with a fixed agent comp, full buys every round and pro aim. A different team every day, and a big payout if you beat them (Tier 4+)
+
+**v1.2.1**
 
 **New in v1.2.1: cheat forums and permanent bans**
 - **Cheat forums**: three made-up coder forums are new tabs next to the seller sites: **h4xboard** (the big market), **pastebucket** (cheap, no refunds) and **ring0** (invite only, Tier 4). Hire a coder to write the next version of a cheat.lua file for you. It's usually cheaper than writing it yourself, and a coder can skip the files that version normally needs first. Offers rotate every 3 minutes

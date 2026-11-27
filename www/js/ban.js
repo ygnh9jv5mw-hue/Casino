@@ -42,7 +42,7 @@
     const sum = b.sum;
     const lost = [`${U.fmt(sum.credits)} credits`, `${U.num(sum.lines)} lines of cheat.lua`, `Tier ${sum.tier}`, `${sum.guns} gun${sum.guns === 1 ? '' : 's'}`];
     if (sum.rank) lost.push(`${sum.rank} rank`);
-    lost.push(`${U.num(sum.matches)} matches of stats`);
+    lost.push(`${U.num(sum.matches)} match${sum.matches === 1 ? '' : 'es'} of stats`);
     const kept = [`${sum.cosmetics} cosmetic${sum.cosmetics === 1 ? '' : 's'}`, 'your achievements', `${U.fmt(b.keep)} code credits (25% of your code)`, 'what you know about the forum sellers'];
     const caught = sum.active.length ? sum.active.map(a => `${a.file} v${a.v}`).join(', ') : 'cheat.lua';
     $('ban-card').innerHTML = `
