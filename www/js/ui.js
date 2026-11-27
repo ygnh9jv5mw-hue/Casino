@@ -153,7 +153,7 @@
       <h2>${esc(d.crew)}</h2>
       <p class="vs-vibe">${esc(d.vibe)}</p>
       <div class="vs-row"><div><span>Leader</span><b>${esc(d.leader)}</b></div><div><span>Car</span><b>${esc(rc.name)}</b></div><div><span>Score to beat</span><b>${U.fmt(d.target)}</b></div></div>
-      <ul class="vs-rules"><li>Follow ${esc(d.leader)} through one lap of the course.</li><li>Drift close behind them for <b>tandem</b> points (x1.5).</li><li>Off the course, points stop counting.</li></ul>
+      <ul class="vs-rules"><li>Follow ${esc(d.leader)} through one lap of the course.</li><li>Drift close behind them for <b>tandem</b> points (x1.5).</li><li>Hold <b>x5</b> for 5 seconds and the drift banks itself (MAX BANK).</li><li>Off the course, points stop counting.</li></ul>
       <div class="vs-pay">Win: ${cr(owned ? Math.round(d.reward * 0.25 / 50) * 50 : d.reward)}${owned ? ' (replay)' : ' + the district'}${d.index < 4 && !owned ? ' + unlocks ' + esc(D.DISTRICTS[d.index + 1].name) : ''}</div>
       <div class="vs-btns"><button class="btn-ghost" data-go="back">Back</button><button class="btn-go" data-go="${id}">DRIFT</button></div></div>`;
     UI.show('scr-battle');
@@ -164,7 +164,7 @@
     $('roam-list').innerHTML = D.DISTRICTS.map(d => {
       const open = UI.unlocked(d);
       return `<button class="roam ${open ? '' : 'locked'}" data-roam="${open ? d.id : ''}" style="--c:${d.color}"${open ? '' : ' disabled'}><small>${esc(d.crew)} turf</small><b>${esc(d.name)}</b><span>${open ? (s.best[d.id] ? 'Best run: ' + U.fmt(s.best[d.id]) : 'No runs yet') : 'Locked'}</span></button>`;
-    }).join('') + `<p class="roam-note">Free roam pays ¥1 for every ${Math.round(1 / D.CREDITS_PER_POINT.roam)} points. Takeover battles pay more. Pause to end a run.</p>`;
+    }).join('') + `<p class="roam-note">Free roam pays ¥1 for every ${Math.round(1 / D.CREDITS_PER_POINT.roam)} points, up to ${cr(D.CREDIT_CAP.roam)} a run. Keep moving: circling on the spot doesn't pay. Pause to end a run.</p>`;
     UI.show('scr-roam');
   };
 
@@ -333,19 +333,44 @@
         <label class="srow">Vibration <input type="checkbox" ${st.haptics ? 'checked' : ''} data-set="haptics"></label>
         <label class="srow">Graphics <span class="chips"><button class="chip ${st.quality === 'high' ? 'on' : ''}" data-q="high">High</button><button class="chip ${st.quality === 'low' ? 'on' : ''}" data-q="low">Low (faster)</button></span></label>
         <p class="m-note">Graphics changes apply next time you open the game.</p></div>
-      <div class="set-card"><h4>Progress</h4><button class="btn-ghost danger" data-reset="1">${UI.resetArm ? 'Tap again to wipe everything' : 'Reset all progress'}</button><p class="m-note">Kaido Nights v${KN.VERSION}. Ads in this build are placeholders.</p></div>`;
+      <div class="set-card"><h4>Playtest</h4><p class="m-note">Played a bit? Copy this report and send it with what you thought.</p>
+        <button class="btn-go small" data-report="1">COPY PLAYTEST REPORT</button><textarea class="report hidden" id="report" readonly></textarea>
+        <button class="btn-ghost danger" data-reset="1">${UI.resetArm ? 'Tap again to wipe everything' : 'Reset all progress'}</button><p class="m-note">Kaido Nights v${KN.VERSION}. Ads in this build are placeholders.</p></div>`;
     UI.show('scr-settings');
   };
   function settingsClick(e) {
     const b = e.target.closest('button'); if (!b) return;
     A.init(); A.click();
     if (b.dataset.ctl) { setControls(b.dataset.ctl); UI.showSettings(); }
-    else if (b.dataset.q) { S().settings.quality = b.dataset.q; KN.Save.save(); UI.showSettings(); }
+    else if (b.dataset.report) {
+      const text = UI.report(), ta = $('report');
+      const show = () => { ta.value = text; ta.classList.remove('hidden'); ta.focus(); ta.select(); UI.toast('Select the text and copy it'); };
+      try { navigator.clipboard.writeText(text).then(() => { UI.toast('Report copied', 'good'); ta.value = text; ta.classList.remove('hidden'); }, show); } catch (_) { show(); }
+    }
+    else if (b.dataset.q) { S().settings.quality = b.dataset.q; delete S().settings.pr; KN.Save.save(); UI.showSettings(); }
     else if (b.dataset.reset) {
       if (!UI.resetArm) { UI.resetArm = true; UI.showSettings(); setTimeout(() => { UI.resetArm = false; }, 3000); return; }
       KN.Save.reset(); UI.resetArm = false; location.reload();
     }
   }
+  // a plain-text summary a tester can paste into a message
+  UI.report = function () {
+    const s = S(), st = s.stats, ua = navigator.userAgent || '';
+    const ios = (ua.match(/OS (\d+)_(\d+)/) || []).slice(1).join('.');
+    const device = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : 'Computer';
+    const ctl = { thumb: 'One-thumb', tilt: 'Tilt', arcade: 'Arcade', pro: 'Pro' }[s.settings.controls];
+    const G = KN.Game, pr = G.renderer ? G.renderer.getPixelRatio() : 1;
+    return [
+      `Kaido Nights v${KN.VERSION} playtest report`,
+      `Device: ${device}${ios ? ' iOS ' + ios : ''}, ${screen.width}x${screen.height}, render x${pr}${s.settings.pr ? ' (lowered for speed)' : ''}`,
+      `Controls: ${ctl}. Graphics: ${s.settings.quality}`,
+      `Played: ${Math.round(st.playSec / 60)} min over ${st.runs} runs`,
+      'Takeover: ' + D.DISTRICTS.map(d => `${d.name} ${s.taken[d.id] ? 'TAKEN' : 'not yet'} (${s.attempts[d.id] || 0} tries, best ${U.fmt(s.battleBest[d.id] || 0)} of ${U.fmt(d.target)})`).join('; '),
+      'Free roam best: ' + (D.DISTRICTS.filter(d => s.best[d.id]).map(d => `${d.name} ${U.fmt(s.best[d.id])}`).join('; ') || 'none'),
+      `Drifts ${st.drifts}, best drift ${U.fmt(st.bestDrift)}, near misses ${st.nearMiss}, manji ${st.manji}, links ${st.links}, scrapes ${st.scrapes}, crashes ${st.crashes}`,
+      `Garage: ${Object.keys(s.cars).map(id => D.CAR[id].name + (id === s.car ? ' (driving)' : '')).join(', ')}. ${cr(s.credits)}, ${s.rep} rep`,
+    ].join('\n');
+  };
   function settingsInput(e) {
     const t = e.target, k = t.dataset.set; if (!k) return;
     const st = S().settings;
@@ -367,9 +392,9 @@
     steps: [
       { key: 'start' },
       { text: 'Now <b>let go</b> and straighten out to <b>bank</b> the points.', key: 'bank' },
-      { text: 'Hold a drift longer to grow the multiplier. Try for <b>x3</b>.', key: 'x3' },
+      { text: 'Hold a drift longer to grow the multiplier. Try for <b>x3</b>.', key: 'x3', skip: 60 },
       { text: 'Flick to the <b>other side</b> mid-drift for a manji bonus.', key: 'manji', skip: 30 },
-      { text: 'Tail close to walls for near-miss points, but touch one and the drift is lost. <b>Bank 3 more drifts</b> to finish.', key: 'banks' },
+      { text: 'Tail close to walls for near-miss points. A scrape drops the multiplier, a hard hit loses the drift. <b>Bank 2 more</b> to finish.', key: 'banks', skip: 45 },
     ],
   };
   UI.showHud = function (mode) {
@@ -420,11 +445,14 @@
   }
   UI.scoreEvent = function (ev, data) {
     if (ev === 'bank') {
-      feed('+' + U.fmt(data.value), 'bank'); centerMsg('BANKED +' + U.fmt(data.value), 1.1, 'bank');
-      A.bank(data.mult); KN.Haptics.tap();
+      if (data.auto) { feed('MAX BANK +' + U.fmt(data.value), 'bank'); centerMsg('MAX BANK +' + U.fmt(data.value), 1.2, 'bank max'); A.bank(5); KN.Haptics.tap('MEDIUM'); }
+      else { feed('+' + U.fmt(data.value), 'bank'); centerMsg('BANKED +' + U.fmt(data.value), 1.1, 'bank'); A.bank(data.mult); KN.Haptics.tap(); }
       tutAdvance('bank');
       if (UI.tut && TUT.steps[UI.tut.i].key === 'x3' && data.mult >= 3) tutAdvance('x3');
-      if (UI.tut && TUT.steps[UI.tut.i].key === 'banks' && KN.Game.score.run.banks - UI.tut.banks0 >= 3) tutAdvance('banks');
+      if (UI.tut && TUT.steps[UI.tut.i].key === 'banks' && KN.Game.score.run.banks - UI.tut.banks0 >= 2) tutAdvance('banks');
+    } else if (ev === 'scrape') {
+      feed(data.from > data.to ? `SCRAPE  x${data.from} → x${data.to}` : 'SCRAPE', 'scrape');
+      const r = $('d-mult'); r.classList.remove('pop'); void r.offsetWidth; r.classList.add('pop');
     } else if (ev === 'lose') {
       feed(`${data.reason} −${U.fmt(data.value)}`, 'lose'); centerMsg(data.reason, 1.1, 'lose'); A.lose(); KN.Haptics.tap('HEAVY');
     } else if (ev === 'bonus') {
@@ -449,8 +477,9 @@
       $('d-pts').textContent = U.fmt(sc.value);
       $('d-mult').textContent = 'x' + sc.mult;
       $('d-ring').style.strokeDashoffset = String(119.4 * (1 - sc.stepProgress));
-      $('d-tag').textContent = sc.drifting ? Math.round(Math.abs(ph.beta) * 57.3) + '°' + (sc.links ? ` · LINK ${sc.links}` : '') : 'BANKING…';
+      $('d-tag').textContent = sc.drifting ? Math.round(Math.abs(ph.beta) * 57.3) + '°' + (sc.mult >= 5 ? ' · MAX' : sc.links ? ` · LINK ${sc.links}` : '') : 'BANKING…';
       dr.classList.toggle('tandem', sc.tandem);
+      dr.classList.toggle('max', sc.mult >= 5);
     }
     if (d.mode === 'battle') {
       const tgt = d.def.target;
@@ -458,9 +487,11 @@
       $('hb-fill').classList.toggle('win', sc.total >= tgt);
       $('hb-time').textContent = fmtT(d.timeLimit - d.t);
       $('hb-lap').textContent = Math.min(100, Math.round(d.progress / G.world.course.n * 100)) + '% of the lap';
-      $('offc').classList.toggle('hidden', d.onCourse || d.countdown > 0);
       $('tandem').classList.toggle('hidden', !sc.tandem);
     }
+    const ns = d.countdown <= 0 && !!d.noScore && (d.mode === 'battle' || sc.drifting);
+    $('offc').classList.toggle('hidden', !ns);
+    if (ns && $('offc').textContent !== d.noScore) $('offc').textContent = d.noScore;
     if (UI.tut) {
       UI.tut.t += dt;
       const step = TUT.steps[UI.tut.i];
@@ -535,7 +566,7 @@
     if (r.mode === 'battle') { title = r.win ? 'TAKEOVER!' : 'NOT TONIGHT'; sub = r.win ? `${r.def.crew} bow out. ${r.def.name} is yours.` : `${r.def.leader} holds ${r.def.name}. You needed ${U.fmt(r.target)}.`; }
     else if (r.mode === 'tutorial') { title = 'TUTORIAL DONE'; sub = 'You can slide. Now go take the city.'; }
     else { title = 'RUN OVER'; sub = r.total > 0 && r.total > r.prevBest ? 'New personal best here!' : r.prevBest ? 'Best run here: ' + U.fmt(r.prevBest) : 'Pause any time to end a free roam run.'; }
-    const lines = [[`${U.fmt(r.total)} points`, r.credits]];
+    const lines = [[`${U.fmt(r.total)} points${r.capped ? ' (run max)' : ''}`, r.credits]];
     if (r.reward) lines.push(['Takeover reward', r.reward]);
     if (r.tutorial) lines.push(['Tutorial bonus', r.tutorial]);
     for (const c of r.challenges) lines.push(['Challenge: ' + c.text, c.pay]);
@@ -544,7 +575,7 @@
     const unlockCar = r.mode === 'battle' && r.win ? D.CARS.find(c => c.needs === r.def.id) : null;
     $('res').innerHTML = `<div class="res-head ${r.mode === 'battle' ? (r.win ? 'win' : 'loss') : ''}" style="--c:${r.def.color}"><small>${esc(r.def.name.toUpperCase())}</small><h2>${title}</h2><p>${esc(sub)}</p></div>
       ${r.mode === 'battle' ? `<div class="res-vs"><div><span>You</span><b>${U.fmt(r.total)}</b></div><div><span>${esc(r.def.leader)}</span><b>${U.fmt(r.target)}</b></div></div>` : `<div class="res-vs single"><div><span>Score</span><b>${U.fmt(r.total)}</b></div></div>`}
-      <div class="res-chips"><span>Best drift <b>${U.fmt(run.bestChain)}</b></span><span>Drifts <b>${run.drifts}</b></span><span>Near misses <b>${run.near}</b></span><span>Manji <b>${run.manji}</b></span><span>Links <b>${run.links}</b></span>${r.mode === 'battle' ? `<span>Tandem <b>${run.tandemRun.toFixed(1)}s</b></span>` : ''}<span>Crashes <b>${run.crashes}</b></span></div>
+      <div class="res-chips"><span>Best drift <b>${U.fmt(run.bestChain)}</b></span><span>Drifts <b>${run.drifts}</b></span><span>Near misses <b>${run.near}</b></span><span>Manji <b>${run.manji}</b></span><span>Links <b>${run.links}</b></span>${r.mode === 'battle' ? `<span>Tandem <b>${run.tandemRun.toFixed(1)}s</b></span>` : ''}${run.maxBanks ? `<span>Max banks <b>${run.maxBanks}</b></span>` : ''}<span>Scrapes <b>${run.scrapes}</b></span><span>Crashes <b>${run.crashes}</b></span></div>
       <div class="res-pay">${lines.map(l => `<div><span>${esc(l[0])}</span><b>+${cr(l[1])}</b></div>`).join('')}<div class="tot"><span>Total</span><b>+${cr(sum)}</b></div></div>
       ${nextD ? `<div class="res-unlock">Unlocked: <b>${esc(nextD.name)}</b>${unlockCar ? ` and the <b>${esc(unlockCar.name)}</b> in the garage` : ''}</div>` : unlockCar ? `<div class="res-unlock">Unlocked: the <b>${esc(unlockCar.name)}</b> in the garage</div>` : ''}
       <div class="res-btns">${KN.Ads.canReward() && sum > 0 ? `<button class="btn-ghost ad" data-r="ad">▶ AD: DOUBLE THE CREDITS</button>` : ''}

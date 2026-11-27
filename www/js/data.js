@@ -115,7 +115,7 @@
     {
       id: 'docks', name: 'The Docks', crew: 'Rust Rats', leader: 'Spanner', vibe: 'scrappy beginners in junk cars',
       color: '#f59e0b', rivalCar: 'rookie', rivalPaint: '#7a4a2a', rivalRust: true,
-      target: 6000, reward: 2500, bounds: [-212, -172, 212, 178], ground: 'concrete', theme: 'docks',
+      target: 8000, reward: 2500, bounds: [-212, -172, 212, 178], ground: 'concrete', theme: 'docks',
       roads: [
         loop(18, [[-182, -142], [182, -142], [182, 117], [-182, 117]], 34),
         road(16, [[0, -142], [0, 117]], false, 0),
@@ -130,7 +130,7 @@
     {
       id: 'industrial', name: 'Industrial Zone', crew: 'Forge Kings', leader: 'Anvil', vibe: 'heavy, loud, smoke-everything builds',
       color: '#ef4444', rivalCar: 'kuro', rivalPaint: '#2b2b2e',
-      target: 15000, reward: 5000, bounds: [-200, -200, 200, 200], ground: 'concrete', theme: 'industrial',
+      target: 30000, reward: 5000, bounds: [-200, -200, 200, 200], ground: 'concrete', theme: 'industrial',
       roads: [
         road(15, [[-150, -172], [-150, 172]], false, 0),
         road(12, [[-60, -172], [-60, 60]], false, 0),
@@ -152,7 +152,7 @@
     {
       id: 'downtown', name: 'Downtown', crew: 'Neon Syndicate', leader: 'Vega', vibe: 'flashy show cars, all style',
       color: '#ec4899', rivalCar: 'tsuki', rivalPaint: '#ff3e9a',
-      target: 28000, reward: 10000, bounds: [-232, -232, 232, 232], ground: 'sidewalk', theme: 'downtown',
+      target: 70000, reward: 10000, bounds: [-232, -232, 232, 232], ground: 'sidewalk', theme: 'downtown',
       roads: [
         road(16, [[-170, -205], [-170, 205]], false, 0), road(15, [[-60, -205], [-60, 205]], false, 0),
         road(16, [[60, -205], [60, 205]], false, 0), road(16, [[170, -205], [170, 205]], false, 0),
@@ -179,7 +179,7 @@
     {
       id: 'highway', name: 'The Highway', crew: 'Redline Collective', leader: 'Mach', vibe: 'pure speed, high-angle sweepers',
       color: '#38bdf8', rivalCar: 'ryu', rivalPaint: '#e11d48',
-      target: 40000, reward: 16000, bounds: [-312, -242, 312, 242], ground: 'grass', theme: 'highway', barriers: true,
+      target: 110000, reward: 16000, bounds: [-312, -242, 312, 242], ground: 'grass', theme: 'highway', barriers: true,
       roads: [
         { w: 20, pts: spline([[-250, -60], [-205, -180], [0, -205], [200, -175], [262, -30], [230, 120], [60, 192], [-120, 172], [-240, 100]], 7, true), closed: true },
         { w: 14, pts: spline([[-40, -203], [-30, -110], [50, -30], [100, 70], [60, 190]], 6, false), closed: false },
@@ -191,7 +191,7 @@
     {
       id: 'crown', name: 'The Crown', crew: 'Kaido Zero', leader: 'Zero', vibe: 'the crew that runs the whole city',
       color: '#a855f7', rivalCar: 'raiden', rivalPaint: '#0e0e10',
-      target: 52000, reward: 25000, bounds: [-232, -232, 232, 232], ground: 'sidewalk', theme: 'crown',
+      target: 160000, reward: 25000, bounds: [-232, -232, 232, 232], ground: 'sidewalk', theme: 'crown',
       roads: [
         loop(17, [[-172, -172], [172, -172], [172, 172], [-172, 172]], 44),
         road(18, [[0, -56], [-28, -100], [10, -138], [0, -172]], false, 18),
@@ -212,7 +212,8 @@
   ];
   D.DISTRICT = {};
   D.DISTRICTS.forEach((d, i) => { d.index = i; D.DISTRICT[d.id] = d; });
-  D.CREDITS_PER_POINT = { roam: 1 / 20, battle: 1 / 12 };
+  D.CREDITS_PER_POINT = { roam: 1 / 40, battle: 1 / 25 };
+  D.CREDIT_CAP = { roam: 3000, battle: 5000 };          // most a single run can pay out in points (rewards come on top)
 
   // ---------------------------------------------------------------- night meet challenges
   D.CHALLENGES = [

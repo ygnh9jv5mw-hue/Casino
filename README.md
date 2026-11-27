@@ -1,4 +1,4 @@
-# Kaido Nights (v0.1 test build)
+# Kaido Nights (v0.1.1 test build)
 
 A night-city drifting game for iPhone and the web. You start with a rusty '85 hatchback, learn to slide at the Docks, then take over the city one crew at a time.
 
@@ -11,19 +11,19 @@ A night-city drifting game for iPhone and the web. You start with a rusty '85 ha
 
   | District | Crew | Leader | Score to beat |
   | --- | --- | --- | --- |
-  | The Docks | Rust Rats | Spanner | 6,000 |
-  | Industrial Zone | Forge Kings | Anvil | 15,000 |
-  | Downtown | Neon Syndicate | Vega | 28,000 |
-  | The Highway | Redline Collective | Mach | 40,000 |
-  | The Crown | Kaido Zero | Zero | 52,000 |
+  | The Docks | Rust Rats | Spanner | 8,000 |
+  | Industrial Zone | Forge Kings | Anvil | 30,000 |
+  | Downtown | Neon Syndicate | Vega | 70,000 |
+  | The Highway | Redline Collective | Mach | 110,000 |
+  | The Crown | Kaido Zero | Zero | 160,000 |
 
-- **Free roam**: drift any district you've unlocked, for cash.
+- **Free roam**: drift any district you've unlocked, for cash (up to ¥3,000 a run; circling on the spot doesn't pay).
 - **Scoring**: points come from drift angle × speed. Hold a drift to grow the multiplier from ×1 up to ×5. Bonuses:
   - LINK: chain corners together.
   - MANJI: flick from one side to the other mid-drift.
   - NEAR MISS: tail close to a wall.
 
-  Straighten out to bank the points. If you hit a wall or spin, the chain is lost.
+  Straighten out to bank the points. Hold ×5 for 5 seconds and the chain banks itself while the drift carries on (MAX BANK). A scrape against a wall drops the multiplier one step; a hard hit or a spin loses the chain.
 - **Garage**:
   - Upgrades: engine, tires, suspension, angle kit, handbrake and weight cut, five levels each.
   - Paint, finish (gloss, metallic or matte), wheels and a rear wing.
@@ -32,6 +32,7 @@ A night-city drifting game for iPhone and the web. You start with a rusty '85 ha
   - Show your build off once a night for cash and rep.
   - Three daily challenges.
   - A rival who points you at the next Takeover.
+- **Playtest report**: Settings → Copy playtest report gives testers a text summary (device, controls, tries and best score per crew, crashes) to send back.
 - **Ads**: the rewarded "double it" ads are placeholders for now. AdMob (iPhone) and AdSense H5 Games Ads (web) can be plugged into `www/js/ads.js`.
 
 All cars, crews and brands are made up.
@@ -42,8 +43,8 @@ You can change the control mode in Settings, or from the pause menu mid-run.
 
 | Mode | Level | How it works |
 | --- | --- | --- |
-| One-thumb | Beginner | Gas is automatic. Hold the right half of the screen to slide right, the left half to slide left. Hold both to brake or reverse. |
-| Tilt | Beginner | Gas is automatic. Tilt the phone to steer. Tap for a handbrake kick. |
+| One-thumb | Beginner | Gas is automatic and eases off before walls and corners. Hold the right half of the screen to slide right, the left half to slide left. Hold both to brake or reverse. |
+| Tilt | Beginner | Gas is automatic, like one-thumb. Tilt the phone to steer. Tap for a handbrake kick. |
 | Arcade | Advanced | Gas, brake, e-brake and steering, with light assists. |
 | Pro | Advanced | Fully manual with no assists. Pays +20% points. |
 
@@ -53,7 +54,7 @@ On a keyboard, use the arrow keys or WASD, with Space for the e-brake and Esc to
 
 Every push to this branch builds an unsigned IPA on GitHub Actions and commits it to `dist/`:
 
-- `dist/KaidoNights-v0.1-unsigned.ipa`
+- `dist/KaidoNights-v0.1.1-unsigned.ipa`
 - `dist/KaidoNights-unsigned.ipa` (always the latest build)
 
 Sign and install it with your usual signer, the same way as NO ANTICHEAT.

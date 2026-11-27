@@ -84,7 +84,13 @@
       // ---- driver aids
       let throttle = input.throttle || 0, brake = input.brake || 0, hand = input.hand ? 1 : 0;
       if (as.autoGas) {
+        // input.vmax: the game's estimate of how fast we can go and still make the wall on our current arc
+        const lim = input.vmax == null ? 99 : input.vmax;
         if (brake > 0.1) throttle = 0;
+        else if (lim < 23 && speed > lim) {
+          throttle = drift > 0.3 ? 0.2 : 0;
+          if (speed > lim + 3 && u > 3) brake = Math.min(0.35, (speed - lim - 3) / 10);
+        }
         else if (drift > 0.3) throttle = Math.abs(steerIn) > 0.2 ? 0.92 : 0.32;
         else throttle = speed < 23 ? 1 : 0.65;
       }

@@ -8,7 +8,8 @@
   G.init = function () {
     const q = KN.Save.data.settings.quality;
     const r = G.renderer = new THREE.WebGLRenderer({ canvas: $('gl'), antialias: q === 'high', powerPreference: 'high-performance' });
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, q === 'high' ? 2 : 1.25));
+    // settings.pr: a lower resolution the frame-rate watchdog picked on an earlier run
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, q === 'high' ? 2 : 1.25, KN.Save.data.settings.pr || 9));
     r.shadowMap.enabled = q === 'high';
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     G.camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.3, 2600);
@@ -28,6 +29,22 @@
     G.resize();
     window.addEventListener('resize', G.resize);
     bindInput();
+  };
+  // frame-rate watchdog: if driving runs slow for a few seconds, drop the render resolution a step (and remember it)
+  const PR_STEPS = [2, 1.75, 1.5, 1.25, 1];
+  G.perf = { ema: 16.7, slowT: 0, drops: 0 };
+  G.watchFrame = function (ms) {
+    const P = G.perf, d = G.drive;
+    if (G.state !== 'drive' || !d || d.paused || d.finished || document.hidden || d.t < 3) { P.slowT = 0; P.ema = 16.7; return; }   // skip the shader warm-up
+    ms = Math.min(100, ms);
+    P.ema = U.lerp(P.ema, ms, 0.06);
+    P.slowT = P.ema > 23 ? P.slowT + ms / 1000 : Math.max(0, P.slowT - ms / 2000);
+    if (P.slowT < 2.5) return;
+    P.slowT = 0; P.ema = 16.7;
+    const cur = G.renderer.getPixelRatio(), next = PR_STEPS.find(v => v < cur - 0.01);
+    if (!next) return;
+    G.renderer.setPixelRatio(next); G.resize(); P.drops++;
+    KN.Save.data.settings.pr = next; KN.Save.save();
   };
   G.resize = function () {
     const w = window.innerWidth, h = window.innerHeight;
@@ -232,6 +249,41 @@
     }
   }
 
+  // beginner modes (auto gas): how fast can we go and still stop before the wall on the arc we're on now?
+  function aheadLimit(ph, w, d, dt) {
+    const v = ph.speed;
+    if (v < 4) { d.vdPrev = null; d.omega = 0; return 99; }
+    const vd = Math.atan2(ph.vx, ph.vz);
+    if (d.vdPrev != null && dt > 0) d.omega = U.lerp(d.omega || 0, U.clamp(U.wrap(vd - d.vdPrev) / dt, -3, 3), 0.25);
+    d.vdPrev = vd;
+    const k = U.clamp((d.omega || 0) / v, -0.08, 0.08);   // path curvature, radius >= 12.5 m
+    let x = ph.x, z = ph.z, hd = vd, s = 0;
+    while (s < 55) {
+      const c = w.sdf(x, z) - 1.0;
+      if (c < 0.4 && s > 2) break;
+      const step = U.clamp(c, 0.8, 6);
+      hd += k * step; x += Math.sin(hd) * step; z += Math.cos(hd) * step; s += step;
+    }
+    let lim = Math.sqrt(2 * 7 * Math.max(0, s - 5));
+    // on the course and heading along it: brake for the corners coming up, the way the crew leader does
+    const C = w.course;
+    let ci = d.ci == null ? 0 : d.ci, bd = 1e12;
+    const span = d.ci == null ? C.n : 40;
+    for (let k = -span; k <= span; k++) { const i = ((ci + k) % C.n + C.n) % C.n, p = C.pts[i], dd = (p[0] - ph.x) ** 2 + (p[1] - ph.z) ** 2; if (dd < bd) { bd = dd; ci = i; } }
+    if (bd > 40 * 40) d.ci = null; else d.ci = ci;
+    if (bd < 22 * 22) {
+      const along = Math.cos(U.wrap(vd - C.heading[ci]));
+      const dir = along > 0.6 ? 1 : along < -0.6 ? -1 : 0;
+      for (let k = 1; dir && k <= 45; k++) {
+        const kap = Math.abs(C.curv[((ci + dir * k) % C.n + C.n) % C.n]);
+        if (kap < 0.012) continue;
+        lim = Math.min(lim, Math.sqrt(9 / kap + 2 * 7 * Math.max(0, k * 2 - 4)));
+      }
+    }
+    return Math.max(6, lim);   // never below a crawl, or it can't turn away from a wall
+  }
+  G.aheadLimit = aheadLimit;
+
   G.update = function (dt) {
     G.time += dt;
     if (G.state !== 'drive') { KN.Scenes.update(dt); return; }
@@ -247,7 +299,10 @@
       ph.throttle = d.mode === 'battle' ? 0.6 : 0;
       ph.rpm = U.lerp(ph.rpm, d.mode === 'battle' ? 0.3 + 0.45 * Math.max(0, Math.sin(d.t * 6)) : 0.18, U.damp(8, dt));
       if (d.countdown <= 0) KN.UI.go();
-    } else ph.step(dt, inp, as);
+    } else {
+      if (as.autoGas) inp.vmax = aheadLimit(ph, G.world, d, dt);
+      ph.step(dt, inp, as);
+    }
     const col = KN.collide(ph, G.world);
     if (col.impact > 2.2) {
       KN.Audio.thud(Math.min(1, col.impact / 12)); KN.Haptics.tap(col.impact > 6 ? 'HEAVY' : 'MEDIUM');
@@ -259,16 +314,26 @@
       if (d.stuckT > 1.0 && !d.hinted) { d.hinted = true; KN.UI.toast(KN.Save.data.settings.controls === 'thumb' ? 'Stuck? Hold both sides to reverse' : 'Stuck? Hold BRAKE to reverse'); }
       if (d.stuckT > 3.2) respawn();
     }
-    let onCourse = true, tandem = false;
+    let onCourse = true, tandem = false, noScore = '';
     if (d.mode === 'battle') {
+      const before = d.progress;
       onCourse = updateProgress();
-      d.onCourse = onCourse;
+      // points only while you're actually making your way round the course (no donuts in a lot beside it)
+      d.stallT = d.progress > before ? 0 : (d.stallT || 0) + dt;
+      if (!onCourse) noScore = 'OFF COURSE';
+      else if (d.stallT > 2.5 && d.countdown <= 0) { onCourse = false; noScore = 'FOLLOW THE COURSE'; }
       updateRival(dt);
       const R = G.rival.st, dx = R.x - ph.x, dz = R.z - ph.z, dist = Math.hypot(dx, dz);
       const behind = dx * Math.sin(R.yaw) + dz * Math.cos(R.yaw) > -2;
       tandem = dist < 15 && behind && Math.abs(G.rival.ang) > 0.18 && G.score.drifting;
       d.rivalDist = dist;
+    } else if (d.mode === 'roam') {
+      // free roam: circling on the spot doesn't pay, you have to travel
+      d.trail = d.trail || []; d.trailT = (d.trailT || 0) + dt;
+      if (d.trailT >= 0.5) { d.trailT = 0; d.trail.push([ph.x, ph.z]); if (d.trail.length > 7) d.trail.shift(); }
+      if (d.trail.length >= 7 && Math.hypot(ph.x - d.trail[0][0], ph.z - d.trail[0][1]) < 18) { onCourse = false; noScore = 'KEEP MOVING'; }
     }
+    d.onCourse = onCourse; d.noScore = noScore;
     G.score.update(dt, ph, { near: col.near, impact: col.impact, onCourse, tandem, frozen });
     // effects
     const st = { x: ph.x, z: ph.z, yaw: ph.yaw, vx: ph.vx, vz: ph.vz };
@@ -329,10 +394,12 @@
     const prevBest = save.best[def.id] || 0;
     if (d.mode === 'battle') {
       win = sc.total >= def.target;
-      credits = Math.round(sc.total * D.CREDITS_PER_POINT.battle);
+      save.attempts[def.id] = (save.attempts[def.id] || 0) + 1;
+      save.battleBest[def.id] = Math.max(save.battleBest[def.id] || 0, sc.total);
+      credits = Math.min(D.CREDIT_CAP.battle, Math.round(sc.total * D.CREDITS_PER_POINT.battle));
       if (win) { reward = save.taken[def.id] ? Math.round(def.reward * 0.25 / 50) * 50 : def.reward; if (!save.taken[def.id]) save.stats.battlesWon++; save.taken[def.id] = true; }
     } else {
-      credits = Math.round(sc.total * D.CREDITS_PER_POINT.roam);
+      credits = Math.min(D.CREDIT_CAP.roam, Math.round(sc.total * D.CREDITS_PER_POINT.roam));
       save.best[def.id] = Math.max(save.best[def.id] || 0, sc.total);
     }
     let tutorial = 0;
@@ -340,7 +407,9 @@
     const st = save.stats;
     st.runs++; st.drifts += run.drifts; st.bestDrift = Math.max(st.bestDrift, run.bestChain); st.totalPoints += sc.total;
     st.nearMiss += run.near; st.manji += run.manji; st.links += run.links; st.tandem += Math.round(run.tandemRun); st.crashes += run.crashes;
-    const res = { mode: d.mode, why, def, total: sc.total, credits, reward, tutorial, win, run, target: def.target, time: d.t, prevBest };
+    st.scrapes += run.scrapes; st.playSec += Math.round(d.t);
+    const capped = credits >= D.CREDIT_CAP[d.mode === 'battle' ? 'battle' : 'roam'];
+    const res = { mode: d.mode, why, def, total: sc.total, credits, capped, reward, tutorial, win, run, target: def.target, time: d.t, prevBest };
     res.challenges = KN.UI.checkChallenges(d.mode, run, sc.total);
     save.credits += credits + reward + tutorial + res.challenges.reduce((a, c) => a + c.pay, 0);
     KN.Save.save();

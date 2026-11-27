@@ -10,8 +10,9 @@
     KN.Game.state = 'title';
     let last = performance.now();
     function frame(now) {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const ms = now - last, dt = Math.min(0.05, ms / 1000);
       last = now;
+      KN.Game.watchFrame(ms);
       try { KN.Game.update(dt); } catch (e) { console.error(e); }
       requestAnimationFrame(frame);
     }

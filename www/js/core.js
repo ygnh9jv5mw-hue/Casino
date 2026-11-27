@@ -2,7 +2,7 @@
 window.KN = window.KN || {};
 (function (KN) {
   'use strict';
-  KN.VERSION = '0.1';
+  KN.VERSION = '0.1.1';
 
   // ---------------------------------------------------------------- math + misc
   const U = KN.U = {
@@ -44,8 +44,10 @@ window.KN = window.KN || {};
     cars: { rookie: carState('#8a8f96', true) },
     taken: {},          // districtId -> true once you've beaten its crew
     best: {},           // districtId -> best free-roam score
+    attempts: {},       // districtId -> Takeover battles started... finished
+    battleBest: {},     // districtId -> best Takeover score
     settings: { controls: 'thumb', volume: 0.8, haptics: true, quality: 'high', tiltSens: 1 },
-    stats: { runs: 0, drifts: 0, bestDrift: 0, totalPoints: 0, nearMiss: 0, manji: 0, links: 0, tandem: 0, crashes: 0, battlesWon: 0 },
+    stats: { runs: 0, drifts: 0, bestDrift: 0, totalPoints: 0, nearMiss: 0, manji: 0, links: 0, tandem: 0, crashes: 0, scrapes: 0, battlesWon: 0, playSec: 0 },
     meet: { day: '', shown: false },
     challenges: { day: '', list: [] },
   });
